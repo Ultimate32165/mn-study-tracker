@@ -5,6 +5,16 @@ const $ = s => document.querySelector(s), app = $("#app"), modal = $("#modal");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const EMOJI = ["🐰", "🐻", "🐱", "🦊", "🐼", "🐨", "🦄", "🐥", "🍓", "🌸", "🍒", "⭐"];
 const DAY = 864e5;
+const THEMES = { strawberry: ["🍓", "#ffd6e7"], matcha: ["🍵", "#e0f4d6"], sky: ["☁️", "#d6ecff"], lilac: ["🔮", "#e9dcff"], sunny: ["🍑", "#ffe7bf"], night: ["🌙", "#1e1830"], cocoa: ["🍫", "#2a1f1c"] };
+let theme = "strawberry"; try { theme = localStorage.getItem("theme") || theme; } catch {}
+function applyTheme(t) {
+  try { localStorage.setItem("theme", t); } catch {}
+  const real = t === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "strawberry") : (THEMES[t] ? t : "strawberry");
+  document.documentElement.dataset.theme = real;
+  document.querySelector('meta[name="theme-color"]').content = THEMES[real][1];
+}
+applyTheme(theme);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => theme === "auto" && applyTheme("auto"));
 let me = null, users = [], sessions = [], tab = "home", unsubs = [], installEvt = null;
 
 // ---------- helpers ----------
@@ -94,8 +104,10 @@ function sheet({ title, note = "", secs = 0, date, onSave }) {
 function profileSheet(mine) {
   modal.innerHTML = `<div class="back"><div class="sheet"><h3>your profile</h3><input id="pn" value="${esc(mine.name)}" maxlength="20">
   <div class="emojis">${EMOJI.map(e => `<button class="av ${e === mine.emoji ? "sel" : ""}" data-e="${e}">${e}</button>`).join("")}</div>
+  <p class="hint">theme</p><div class="emojis">${["auto", ...Object.keys(THEMES)].map(t => `<button class="av ${t === theme ? "sel" : ""}" data-t="${t}" title="${t}">${t === "auto" ? "🌓" : THEMES[t][0]}</button>`).join("")}</div>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
+  modal.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { theme = b.dataset.t; applyTheme(theme); modal.querySelectorAll("[data-t]").forEach(x => x.classList.toggle("sel", x === b)); });
   modal.querySelectorAll("[data-e]").forEach(b => b.onclick = () => { em = b.dataset.e; modal.querySelectorAll("[data-e]").forEach(x => x.classList.toggle("sel", x === b)); });
   $("#sx").onclick = () => modal.innerHTML = "";
   $("#lo").onclick = () => { modal.innerHTML = ""; DB.logOut(); };
