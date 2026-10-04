@@ -65,3 +65,12 @@ nav button span{font-size:.75rem;font-family:"Baloo 2"}nav button.act{opacity:1;
 .study.go{background:linear-gradient(145deg,#8fe9c6,#4fcf9f);box-shadow:0 8px 0 #34a67c}
 .hero.brk .clock,.card.brk .clock{color:var(--alt)}
 .card.brk{box-shadow:0 5px 0 color-mix(in srgb,var(--alt) 45%,transparent)}.card.brk .pill{color:var(--alt);font-weight:800}
+.wheel{position:relative;display:flex;justify-content:center;align-items:center;gap:6px;margin-top:10px}
+.wheel>b{font-size:1.8rem;font-family:"Baloo 2";z-index:1;color:var(--soft)}
+.band{position:absolute;left:12%;right:12%;top:44px;height:44px;background:var(--tint);border-radius:14px}
+.col{position:relative;z-index:1;width:92px;height:132px;overflow-y:auto;scroll-snap-type:y mandatory;padding:44px 0;scrollbar-width:none;overscroll-behavior:contain;
+-webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent)}
+.col::-webkit-scrollbar{display:none}
+.col div{height:44px;line-height:44px;scroll-snap-align:center;font-size:1.6rem;font-family:"Baloo 2";opacity:.4;transition:opacity .1s}
+.col div.s{opacity:1;color:var(--main);font-weight:800}
+.wl{display:flex;justify-content:center;gap:50px;font-size:.8rem;color:var(--soft);margin:2px 0 4px}

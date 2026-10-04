@@ -93,15 +93,25 @@ const tick = () => document.querySelectorAll("[data-base]").forEach(e => e.textC
 setInterval(tick, 1000);
 
 // ---------- sheets ----------
-function sheet({ title, note = "", secs = 0, date, onSave }) {
+function sheet({ title, note = "", secs = 0, max, date, onSave }) { // max = cap in seconds (edit mode: can only reduce)
+  const mins = Math.floor(secs / 60), hMax = max === undefined ? 23 : Math.floor(max / 3600);
+  const col = (id, n) => `<div class="col" id="${id}">${[...Array(n + 1)].map((_, i) => `<div>${String(i).padStart(2, "0")}</div>`).join("")}</div>`;
   modal.innerHTML = `<div class="back"><div class="sheet"><h3>${title}</h3><p class="hint">${note}</p>
   ${date !== undefined ? `<input type="date" id="sd" value="${date}" max="${key(Date.now())}">` : ""}
-  <div class="hm"><label><input id="sh" type="number" min="0" max="23" inputmode="numeric" value="${Math.floor(secs / 3600)}">hours</label>
-  <label><input id="sm" type="number" min="0" max="59" inputmode="numeric" value="${Math.floor(secs % 3600 / 60)}">mins</label></div>
+  <div class="wheel"><div class="band"></div>${col("wh", hMax)}<b>:</b>${col("wm", 59)}</div><div class="wl"><span>hours</span><span>mins</span></div>
   <div class="row"><button class="btn ghost" id="sx">cancel</button><button class="btn" id="ss">save 💖</button></div></div></div>`;
+  const wh = $("#wh"), wm = $("#wm"), idx = c => Math.round(c.scrollTop / 44);
+  wh.scrollTop = Math.floor(mins / 60) * 44; wm.scrollTop = (mins % 60) * 44;
+  let t;
+  const clamp = () => { // if the wheels go above the original time, glide back to it
+    if (max === undefined) return; const cap = Math.floor(max / 60);
+    if (idx(wh) * 60 + idx(wm) > cap) { wh.scrollTo({ top: Math.floor(cap / 60) * 44, behavior: "smooth" }); wm.scrollTo({ top: (cap % 60) * 44, behavior: "smooth" }); }
+  };
+  const watch = c => { c.onscroll = () => { const i = idx(c); [...c.children].forEach((d, k) => d.classList.toggle("s", k === i)); clearTimeout(t); t = setTimeout(clamp, 150); }; c.onscroll(); };
+  watch(wh); watch(wm);
   $("#sx").onclick = () => modal.innerHTML = "";
   $("#ss").onclick = async () => {
-    const sec = (+$("#sh").value || 0) * 3600 + (+$("#sm").value || 0) * 60;
+    let sec = (idx(wh) * 60 + idx(wm)) * 60; if (max !== undefined) sec = Math.min(sec, max);
     try { await onSave(sec, $("#sd")?.value); modal.innerHTML = ""; } catch (e) { toast(errMsg(e)); }
   };
 }
@@ -136,17 +146,17 @@ app.onclick = async e => {
     else if (a === "discard") { if (confirm("Cancel without saving any time?")) await DB.cancelStudy(me.uid); }
     else if (a === "profile") profileSheet(mine);
     else if (a === "stop") {
-      const start = mine.startedAt ? mine.startedAt.toMillis() : Date.now(), el = Math.floor(elapsed(mine) / 1000);
-      sheet({ title: "done studying? 🎀", note: "Forgot to stop earlier? Lower the time to what you really studied.", secs: el,
-        onSave: async sec => { if (!sec) await DB.cancelStudy(me.uid); else await DB.addSession(me.uid, start, split(start, sec), sec, true); toast("Saved! 🌟"); } });
+      const start = mine.startedAt ? mine.startedAt.toMillis() : Date.now(), sec = Math.floor(elapsed(mine) / 1000);
+      if (sec < 60) { await DB.cancelStudy(me.uid); toast("Under a minute, so nothing was saved."); }
+      else { await DB.addSession(me.uid, start, split(start, sec), sec, true); toast("Saved! 🌟"); }
     } else if (a === "add") {
       sheet({ title: "add study time", note: "Studied without pressing the button? Add it here.", date: key(Date.now()),
         onSave: async (sec, d) => { if (!sec) throw Error("Enter some time first."); const [y, m, dd] = d.split("-").map(Number), st = new Date(y, m - 1, dd, 12).getTime();
           await DB.addSession(me.uid, st, split(st, sec), sec, false); toast("Added! ✨"); } });
     } else if (a === "edit") {
       const s = sessions.find(x => x.id === id), st = s.start.toMillis();
-      sheet({ title: "adjust time ✏️", note: "Change how long you actually studied.", secs: s.seconds,
-        onSave: async sec => { if (!sec) throw Error("Use the 🗑️ button to remove a session."); await DB.editSession(me.uid, s, split(st, sec), sec); toast("Updated! ✨"); } });
+      sheet({ title: "shorten session ✏️", note: "You can only reduce this session. To add more time, use “+ add time”.", secs: s.seconds, max: s.seconds,
+        onSave: async sec => { if (sec < 60) throw Error("Use the 🗑️ button to remove a session."); sec = Math.min(sec, s.seconds); await DB.editSession(me.uid, s, split(st, sec), sec); toast("Updated! ✨"); } });
     } else if (a === "del") { if (confirm("Delete this session?")) await DB.deleteSession(me.uid, sessions.find(x => x.id === id)); }
   } catch (err) { toast(errMsg(err)); }
 };
