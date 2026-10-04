@@ -1,5 +1,5 @@
 // 🔧 Paste your Firebase web-app config here (Firebase Console → Project settings → Your apps).
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyBa6az_MPOUBTEp-jyt3tA0fSWxN5DGYmM",
   authDomain: "mn-study-tracker.firebaseapp.com",
   projectId: "mn-study-tracker",
