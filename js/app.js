@@ -50,17 +50,21 @@ function installCard() {
   if (/iphone|ipad/i.test(navigator.userAgent)) return `<p class="hint">📲 To install: tap Share ⬆️ then “Add to Home Screen”</p>`;
   return "";
 }
+const runStart = u => u.runStart ?? (u.startedAt ? u.startedAt.toMillis() : Date.now());
+const elapsed = u => (u.accum || 0) + (u.status === "studying" ? Date.now() - runStart(u) : 0); // ms studied so far, excluding breaks
+const live = u => `data-base="${u.accum || 0}" data-run="${u.status === "studying" ? runStart(u) : ""}"`;
 const card = (u, isMe) => {
-  const s = stats(u), on = u.status === "studying", since = u.startedAt ? u.startedAt.toMillis() : Date.now();
-  return `<div class="card ${on ? "on" : ""}"><div class="who"><span class="av">${esc(u.emoji)}</span><div class="nm"><b>${esc(u.name)}${isMe ? " (you)" : ""}</b>
-  <span class="pill ${on ? "live" : ""}">${on ? "studying ✏️" : "resting 💤"}</span></div>${on ? `<div class="clock" data-since="${since}">00:00:00</div>` : ""}</div>
+  const s = stats(u), on = u.status === "studying", br = u.status === "paused";
+  return `<div class="card ${on ? "on" : ""} ${br ? "brk" : ""}"><div class="who"><span class="av">${esc(u.emoji)}</span><div class="nm"><b>${esc(u.name)}${isMe ? " (you)" : ""}</b>
+  <span class="pill ${on ? "live" : ""}">${on ? "studying ✏️" : br ? "on a break ☕" : "resting 💤"}</span></div>${on || br ? `<div class="clock" ${live(u)}>00:00:00</div>` : ""}</div>
   <div class="mini"><div><b>${fmt(s.today)}</b>today</div><div><b>${fmt(s.week)}</b>7 days</div><div><b>${s.streak}🔥</b>streak</div><div><b>${fmt(s.total)}</b>total</div></div></div>`;
 };
 function homeView(mine) {
-  const on = mine.status === "studying", since = mine.startedAt ? mine.startedAt.toMillis() : Date.now();
-  const hero = on
-    ? `<div class="hero on"><div class="clock big" data-since="${since}">00:00:00</div><button class="study stop" data-act="stop">stop</button>
-       <button class="link" data-act="discard">cancel without saving</button></div>`
+  const on = mine.status === "studying", br = mine.status === "paused";
+  const hero = on || br
+    ? `<div class="hero ${br ? "brk" : "on"}"><div class="clock big" ${live(mine)}>00:00:00</div><p class="hint">${br ? "timer paused ☕ take your time" : "you're doing great ✨"}</p>
+       <div class="duo"><button class="study ${br ? "go" : "pause"}" data-act="${br ? "resume" : "pause"}">${br ? "resume" : "pause"}<span>${br ? "▶️" : "⏸️"}</span></button>
+       <button class="study stop" data-act="stop">stop<span>⏹️</span></button></div><button class="link" data-act="discard">cancel without saving</button></div>`
     : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p></div>`;
   const others = users.filter(u => u.id !== me.uid).sort((a, b) => (b.status === "studying") - (a.status === "studying"));
   return `${hero}${installCard()}<h2>${others.length ? "friends" : "no friends yet"}</h2>
@@ -85,7 +89,7 @@ function render() {
   <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button></nav>`;
   tick();
 }
-const tick = () => document.querySelectorAll("[data-since]").forEach(e => e.textContent = clock((Date.now() - e.dataset.since) / 1000));
+const tick = () => document.querySelectorAll("[data-base]").forEach(e => e.textContent = clock((+e.dataset.base + (e.dataset.run ? Date.now() - e.dataset.run : 0)) / 1000));
 setInterval(tick, 1000);
 
 // ---------- sheets ----------
@@ -127,10 +131,12 @@ app.onclick = async e => {
     } else if (a === "tab") { tab = id; render(); }
     else if (a === "install") { installEvt.prompt(); installEvt = null; render(); }
     else if (a === "study") { await DB.startStudy(me.uid); toast("Good luck! 🍀"); }
+    else if (a === "pause") await DB.pauseStudy(me.uid, elapsed(mine));
+    else if (a === "resume") await DB.resumeStudy(me.uid);
     else if (a === "discard") { if (confirm("Cancel without saving any time?")) await DB.cancelStudy(me.uid); }
     else if (a === "profile") profileSheet(mine);
     else if (a === "stop") {
-      const start = mine.startedAt ? mine.startedAt.toMillis() : Date.now(), el = Math.floor((Date.now() - start) / 1000);
+      const start = mine.startedAt ? mine.startedAt.toMillis() : Date.now(), el = Math.floor(elapsed(mine) / 1000);
       sheet({ title: "done studying? 🎀", note: "Forgot to stop earlier? Lower the time to what you really studied.", secs: el,
         onSave: async sec => { if (!sec) await DB.cancelStudy(me.uid); else await DB.addSession(me.uid, start, split(start, sec), sec, true); toast("Saved! 🌟"); } });
     } else if (a === "add") {
