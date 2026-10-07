@@ -53,19 +53,39 @@ function installCard() {
 const runStart = u => u.runStart ?? (u.startedAt ? u.startedAt.toMillis() : Date.now());
 const elapsed = u => (u.accum || 0) + (u.status === "studying" ? Date.now() - runStart(u) : 0); // ms studied so far, excluding breaks
 const live = u => `data-base="${u.accum || 0}" data-run="${u.status === "studying" ? runStart(u) : ""}"`;
+const goalOf = u => u.goal ?? 14400, limitOf = u => u.limit ?? 10800, BREAK = 3e5;
+const liveToday = u => stats(u).today + (u.status === "studying" || u.status === "paused" ? elapsed(u) / 1000 : 0);
+const ls = (k, v) => { try { return v === undefined ? localStorage.getItem(k) : localStorage.setItem(k, v); } catch {} };
+let pomo = ls("pomo") === "1", lastCheer = 0, askedAt = 0, busy = false, brkSeen = 0, lastBest = 0;
+
+function burst(emojis, n = 70) { // confetti (colored bits) or floating emojis
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const box = document.createElement("div"); box.className = "fx";
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement("i");
+    d.style.cssText = `left:${Math.random() * 100}%;--x:${(Math.random() - .5) * 160}px;--r:${Math.random() * 720}deg;animation-delay:${Math.random() * .6}s;animation-duration:${2 + Math.random() * 1.5}s`;
+    if (emojis) d.textContent = emojis[i % emojis.length]; else d.style.background = ["#ff8fb8", "#b79cf5", "#6fdcb3", "#ffd36f", "#6fb3ff"][i % 5];
+    box.appendChild(d);
+  }
+  document.body.appendChild(box); setTimeout(() => box.remove(), 4500);
+}
+const notify = (t, body) => { try { if (Notification.permission === "granted" && document.hidden) navigator.serviceWorker.ready.then(r => r.showNotification(t, { body, icon: "icons/icon-192.png", tag: "mn" })); } catch {} };
+
 const card = (u, isMe) => {
-  const s = stats(u), on = u.status === "studying", br = u.status === "paused";
-  return `<div class="card ${on ? "on" : ""} ${br ? "brk" : ""}"><div class="who"><span class="av">${esc(u.emoji)}</span><div class="nm"><b>${esc(u.name)}${isMe ? " (you)" : ""}</b>
+  const s = stats(u), on = u.status === "studying", br = u.status === "paused", g = goalOf(u), lt = liveToday(u), p = g ? Math.min(100, lt / g * 100) : 0;
+  return `<div class="card ${on ? "on" : ""} ${br ? "brk" : ""}"><div class="who"><span class="ring ${!g ? "off" : p >= 100 ? "done" : ""}" style="--p:${p}"><span class="av">${esc(u.emoji)}</span></span><div class="nm"><b>${esc(u.name)}${isMe ? " (you)" : ""}</b>
   <span class="pill ${on ? "live" : ""}">${on ? "studying ✏️" : br ? "on a break ☕" : "resting 💤"}</span></div>${on || br ? `<div class="clock" ${live(u)}>00:00:00</div>` : ""}</div>
-  <div class="mini"><div><b>${fmt(s.today)}</b>today</div><div><b>${fmt(s.week)}</b>7 days</div><div><b>${s.streak}🔥</b>streak</div><div><b>${fmt(s.total)}</b>total</div></div></div>`;
+  <div class="mini"><div><b>${fmt(lt)}${g ? `<small> / ${fmt(g)}</small>` : ""}</b>today</div><div><b>${fmt(s.week)}</b>7 days</div><div><b>${s.streak}🔥</b>streak</div><div><b>${fmt(s.total)}</b>total</div></div>
+  ${!isMe && on ? `<div class="cheer"><span>send a cheer</span><button data-act="cheer" data-id="${u.id}" data-e="💖">💖</button><button data-act="cheer" data-id="${u.id}" data-e="🔥">🔥</button></div>` : ""}</div>`;
 };
 function homeView(mine) {
   const on = mine.status === "studying", br = mine.status === "paused";
+  const hint = br ? (mine.breakAt ? `<p class="hint" data-brk="${mine.breakAt}"></p>` : `<p class="hint">timer paused ☕ take your time</p>`) : `<p class="hint">you're doing great ✨${mine.pomo ? " 🍅" : ""}</p>`;
   const hero = on || br
-    ? `<div class="hero ${br ? "brk" : "on"}"><div class="clock big" ${live(mine)}>00:00:00</div><p class="hint">${br ? "timer paused ☕ take your time" : "you're doing great ✨"}</p>
+    ? `<div class="hero ${br ? "brk" : "on"}"><div class="clock big" ${live(mine)}>00:00:00</div>${hint}
        <div class="duo"><button class="study ${br ? "go" : "pause"}" data-act="${br ? "resume" : "pause"}">${br ? "resume" : "pause"}<span>${br ? "▶️" : "⏸️"}</span></button>
        <button class="study stop" data-act="stop">stop<span>⏹️</span></button></div><button class="link" data-act="discard">cancel without saving</button></div>`
-    : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p></div>`;
+    : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p><button class="chip" data-act="pomo">🍅 pomodoro: ${pomo ? "on (25 / 5)" : "off"}</button></div>`;
   const others = users.filter(u => u.id !== me.uid).sort((a, b) => (b.status === "studying") - (a.status === "studying"));
   return `${hero}${installCard()}<h2>${others.length ? "friends" : "no friends yet"}</h2>
   ${others.map(u => card(u, false)).join("") || `<p class="hint">Ask your friend to create an account — they'll show up here!</p>`}<h2>you</h2>${card(mine, true)}`;
@@ -89,8 +109,36 @@ function render() {
   <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button></nav>`;
   tick();
 }
-const tick = () => document.querySelectorAll("[data-base]").forEach(e => e.textContent = clock((+e.dataset.base + (e.dataset.run ? Date.now() - e.dataset.run : 0)) / 1000));
-setInterval(tick, 1000);
+const tick = () => {
+  document.querySelectorAll("[data-base]").forEach(e => e.textContent = clock((+e.dataset.base + (e.dataset.run ? Date.now() - e.dataset.run : 0)) / 1000));
+  document.querySelectorAll("[data-brk]").forEach(e => { const r = BREAK - (Date.now() - e.dataset.brk); e.textContent = r > 0 ? `☕ break · ${clock(r / 1000).slice(3)} left` : "break's over, ready to resume? 💪"; });
+};
+function watch() { // runs every second for the logged-in user
+  const m = users.find(u => u.id === me?.uid); if (!m) return;
+  if (m.pomo && m.status === "studying" && m.nextBreak && elapsed(m) >= m.nextBreak && !busy) { // pomodoro: auto-pause at each 25 min block
+    busy = true; DB.pomoBreak(me.uid, m.nextBreak).catch(() => {}).finally(() => setTimeout(() => busy = false, 2000));
+    toast("Break time! ☕"); notify("Break time ☕", "Nice focus! Take 5 minutes.");
+  }
+  if (m.status === "paused" && m.breakAt && Date.now() - m.breakAt >= BREAK && brkSeen !== m.breakAt) { brkSeen = m.breakAt; toast("Break's over 💪"); notify("Break's over 💪", "Ready to resume?"); }
+  const lim = limitOf(m);
+  if (m.status === "studying" && lim > 0 && !modal.innerHTML && Date.now() - askedAt > 3e5 && Date.now() >= Math.max(m.checkedAt || 0, runStart(m)) + lim * 1000) {
+    askedAt = Date.now(); askStill(m); notify("Still studying? 🥺", "Your timer has been running for a while.");
+  }
+  const g = goalOf(m), k = "goal-" + key(Date.now()), st = stats(m);
+  if (g > 0 && liveToday(m) >= g && ls(k) !== "1") { ls(k, "1"); burst(); toast("Daily goal reached! 🎉"); }
+  if (m.bestStreak === undefined) { if (st.streak !== lastBest) { lastBest = st.streak; DB.updateProfile(me.uid, { bestStreak: st.streak }); } }
+  else if (st.streak > m.bestStreak && st.streak !== lastBest) { lastBest = st.streak; DB.updateProfile(me.uid, { bestStreak: st.streak }); if (st.streak >= 2) { burst(); toast(`New streak record: ${st.streak} days! 🔥`); } }
+}
+setInterval(() => { tick(); watch(); }, 1000);
+setInterval(() => me && render(), 30000);
+function askStill(m) {
+  const el = Math.floor(elapsed(m) / 1000), start = m.startedAt ? m.startedAt.toMillis() : Date.now();
+  modal.innerHTML = `<div class="back"><div class="sheet"><h3>still studying? 🥺</h3><p class="hint">Your timer has been running for ${fmt(el)}.</p>
+  <button class="btn" id="y1">yes, still going 💪</button><button class="btn ghost" id="y2">no, I forgot to stop</button></div></div>`;
+  $("#y1").onclick = async () => { modal.innerHTML = ""; await DB.checkIn(me.uid); toast("Keep going! 🌟"); };
+  $("#y2").onclick = () => sheet({ title: "when did you stop? ⏱️", note: "Slide down to the time you really studied.", secs: el, max: el,
+    onSave: async sec => { if (sec < 60) await DB.cancelStudy(me.uid); else await DB.addSession(me.uid, start, split(start, sec), sec, true); toast("Saved! 🌟"); } });
+}
 
 // ---------- sheets ----------
 function sheet({ title, note = "", secs = 0, max, date, onSave }) { // max = cap in seconds (edit mode: can only reduce)
