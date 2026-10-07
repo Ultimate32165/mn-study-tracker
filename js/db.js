@@ -27,6 +27,7 @@ export const cancelStudy = uid => updateDoc(userRef(uid), { status: "offline", s
 export const pauseStudy = (uid, accumMs) => updateDoc(userRef(uid), { status: "paused", accum: accumMs, runStart: null, breakAt: null });
 export const resumeStudy = uid => updateDoc(userRef(uid), { status: "studying", runStart: Date.now(), breakAt: null });
 export const updateProfile = (uid, d) => updateDoc(userRef(uid), d);
+export const saveGarden = (uid, ids) => updateDoc(userRef(uid), { garden: ids }); // up to 3 extra pets that live in the shared garden
 
 // Save a finished session (and optionally switch status back to offline).
 export async function addSession(uid, start, days, seconds, stop) {

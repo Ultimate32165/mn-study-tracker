@@ -132,11 +132,14 @@ function playSound(mode) {
 const PETS = { bunny: { e: ["🥚", "🐰", "🐰", "🐇"] }, cat: { e: ["🥚", "🐱", "🐱", "🐈"] }, chick: { e: ["🥚", "🐣", "🐥", "🐔"] }, plant: { e: ["🌰", "🌱", "🪴", "🌳"] } };
 const petOf = u => PETS[u.pet] ? u.pet : "bunny";
 const STAGE = [1800, 18000, 72000]; // seconds studied to reach baby / kid / grown-up
+const totalOf = u => stats(u).total + (u.status === "studying" || u.status === "paused" ? elapsed(u) / 1000 : 0); // seconds studied incl. the running session
+const stageOf = tot => tot >= STAGE[2] ? 3 : tot >= STAGE[1] ? 2 : tot >= STAGE[0] ? 1 : 0;
+const stageNames = t => t === "plant" ? ["seed", "sprout", "sapling", "tree"] : ["egg", "baby", "kid", "grown-up"];
 function petRow(u) {
-  const t = petOf(u), paused = u.status === "paused", on = u.status === "studying", tot = stats(u).total + (on || paused ? elapsed(u) / 1000 : 0);
-  const st = tot >= STAGE[2] ? 3 : tot >= STAGE[1] ? 2 : tot >= STAGE[0] ? 1 : 0, fed = liveToday(u) > 0;
+  const t = petOf(u), paused = u.status === "paused", on = u.status === "studying", tot = totalOf(u);
+  const st = stageOf(tot), fed = liveToday(u) > 0;
   const say = on ? "nom nom 🍓" : paused ? "break time ☕" : fed ? "happy & full 💗" : "sleepy… study to feed me";
-  const names = t === "plant" ? ["seed", "sprout", "sapling", "tree"] : ["egg", "baby", "kid", "grown-up"];
+  const names = stageNames(t);
   return `<div class="petrow ${on ? "feed" : fed || paused ? "" : "sleepy"}"><span class="pet s${st}">${PETS[t].e[st]}</span><div><b>${say}</b><small>${names[st]}${st < 3 ? ` · ${fmt(STAGE[st] - tot)} to grow` : " · fully grown 👑"}</small></div></div>`;
 }
 
@@ -151,6 +154,184 @@ function couple() {
 }
 const coupleCard = () => { const c = couple(); return `<div class="lvl"><div class="lt"><b>💞 Level ${c.lv + 1}</b><span>${c.title}</span></div><div class="lbar"><i style="width:${c.pct}%"></i></div>
   <small>${c.next ? `${fmt(c.sec)} of ${c.next}h together` : `${fmt(c.sec)} together · max level!`}</small></div>`; };
+
+// ---- garden: a shared meadow where everyone's pets wander ----
+// Extra pets you can collect. e = [egg, baby, kid, grown-up]; ok(u) = is it unlocked for user u?
+const EXTRA = {
+  dog: { n: "puppy", e: ["🥚", "🐶", "🐶", "🐕"], req: "study 5 hours in total", ok: u => totalOf(u) >= 18000 },
+  panda: { n: "panda", e: ["🥚", "🐼", "🐼", "🐼"], req: "earn the 3-day streak badge 🔥", ok: u => !!(u.badges && u.badges.s3) },
+  fox: { n: "fox", e: ["🥚", "🦊", "🦊", "🦊"], req: "study 25 hours in total", ok: u => totalOf(u) >= 90000 },
+  frog: { n: "frog", e: ["🥚", "🐸", "🐸", "🐸"], req: "reach couple level 4 💞", ok: () => couple().lv >= 3 },
+  turtle: { n: "turtle", e: ["🥚", "🐢", "🐢", "🐢"], req: "earn the 7-day streak badge ✨", ok: u => !!(u.badges && u.badges.s7) },
+  unicorn: { n: "unicorn", e: ["🥚", "🦄", "🦄", "🦄"], req: "earn the 100 hours badge 👑", ok: u => !!(u.badges && u.badges.h100) }
+};
+const ALLP = { ...PETS, ...EXTRA };
+const petName = t => EXTRA[t] ? EXTRA[t].n : t;
+const MOVE = { bunny: [1.3, 9], cat: [1.1, 5], chick: [1.2, 6], plant: [.3, 3], dog: [1.25, 7], panda: [.65, 4], fox: [1.2, 6], frog: [.9, 11], turtle: [.4, 2], unicorn: [1.1, 6] }; // [speed, hop height px]
+const FACE_RIGHT = new Set(["turtle"]); // emoji that look RIGHT by default (all the others look left). If one walks backwards on your phone, add/remove it here.
+const BASE = .085; // walking speed: scene widths per second (before the per-pet multiplier)
+const BOUNDS = { x0: .1, x1: .9, y0: .6, y1: .9 }; // where pets may stand (fractions of the scene)
+const BUB = { study: "🍓 nom nom", break: "☕", calm: "💗", sleep: "💤" };
+const SAY = { study: "nom nom 🍓", break: "break time ☕", calm: "happy & full 💗", sleep: "sleepy… study to feed me" };
+const RM = matchMedia("(prefers-reduced-motion: reduce)");
+const G = { pets: new Map(), el: null, layer: null, deco: null, fly: null, fx: null, card: null, raf: 0, last: 0, W: 340, H: 408, cardT: 0, decoLv: -1, night: null, ro: null };
+const rnd = (a, b) => a + Math.random() * (b - a);
+const seeded = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+const isEvening = () => { const h = new Date().getHours(); return h >= 18 || h < 6; };
+const moodOf = u => u.status === "studying" ? "study" : u.status === "paused" ? "break" : liveToday(u) > 0 ? "calm" : "sleep";
+const inPond = (x, y) => ((x - .22) / .17) ** 2 + ((y - .74) / .08) ** 2 < 1;
+const nowS = () => performance.now() / 1000;
+
+function pickSpot(p, near) { // random spot on the grass (not in the pond); `near` = small hop around the current spot
+  for (let i = 0; i < 14; i++) {
+    let x = near ? p.x + rnd(-near, near) : rnd(BOUNDS.x0, BOUNDS.x1), y = near ? p.y + rnd(-near * .6, near * .6) : rnd(BOUNDS.y0, BOUNDS.y1);
+    x = Math.min(BOUNDS.x1, Math.max(BOUNDS.x0, x)); y = Math.min(BOUNDS.y1, Math.max(BOUNDS.y0, y));
+    if (!inPond(x, y)) return [x, y];
+  }
+  return [p.x, p.y];
+}
+function buildGarden() { // built ONCE; render() never touches it, so pets never reset
+  const el = document.createElement("div"); el.id = "garden";
+  el.innerHTML = `<div class="gstars"></div><i class="gsun"></i><div class="grain"></div><i class="gcl c1"></i><i class="gcl c2"></i><i class="gcl c3"></i>
+  <div class="ghill h1"></div><div class="gfence"></div><div class="ghill h2"></div><div class="gpond"></div><div class="gdeco"></div><div class="gpets"></div><div class="gfly"></div>
+  <div class="gff">${[...Array(10)].map(() => `<i style="left:${rnd(6, 94).toFixed(1)}%;top:${rnd(52, 94).toFixed(1)}%;animation-delay:${(-rnd(0, 6)).toFixed(1)}s;animation-duration:${rnd(4, 8).toFixed(1)}s"></i>`).join("")}</div>
+  <div class="gfx"></div><div class="gcard" hidden></div>`;
+  G.el = el; G.deco = el.querySelector(".gdeco"); G.layer = el.querySelector(".gpets"); G.fly = el.querySelector(".gfly"); G.fx = el.querySelector(".gfx"); G.card = el.querySelector(".gcard");
+  G.card.onclick = () => { G.card.hidden = true; };
+  G.ro = new ResizeObserver(() => { G.W = el.clientWidth || G.W; G.H = el.clientHeight || G.H; }); G.ro.observe(el);
+  G.decoLv = -1; G.night = null;
+}
+function buildDeco(lv) { // more flowers, butterflies, trees and a rainbow as the couple level grows
+  G.decoLv = lv;
+  const r = seeded(11), FL = ["🌸", "🌼", "🌷", "🌻", "🌺", "🌹"], n = Math.min(22, 4 + lv * 2); let h = "";
+  for (let i = 0; i < 22; i++) { // always draw the same 22 random spots so flowers never move around when new ones appear
+    const x = .05 + r() * .9, y = .56 + r() * .4, f = FL[Math.floor(r() * FL.length)], s = 13 + Math.floor(r() * 9);
+    if (i < n && !inPond(x, y + .02)) h += `<i style="left:${(x * 100).toFixed(1)}%;top:${(y * 100).toFixed(1)}%;font-size:${s}px">${f}</i>`;
+  }
+  if (lv >= 3) h += `<i class="tree" style="left:88%;top:57%">🌳</i>`;
+  if (lv >= 5) h += `<i class="tree" style="left:9%;top:56%">🌲</i>`;
+  G.deco.innerHTML = h;
+  let fl = ""; const nb = lv >= 1 ? Math.min(5, 1 + Math.floor(lv / 2)) : 0;
+  for (let i = 0; i < nb; i++) fl += `<i style="left:${(10 + r() * 60).toFixed(1)}%;top:${(48 + r() * 30).toFixed(1)}%;animation-delay:${(-r() * 8).toFixed(1)}s;animation-duration:${(7 + r() * 5).toFixed(1)}s">🦋</i>`;
+  G.fly.innerHTML = fl;
+  G.el.classList.toggle("rainbow", lv >= 6);
+}
+function gardenList() { // everyone's main pet, then the extra friends they picked (max 3 each), capped at 12 in total
+  const base = [], extra = [];
+  users.slice().sort((a, b) => a.id < b.id ? -1 : 1).forEach(u => {
+    base.push({ key: `${u.id}:${petOf(u)}`, u, type: petOf(u) });
+    [...new Set(Array.isArray(u.garden) ? u.garden : [])].filter(id => EXTRA[id] && EXTRA[id].ok(u)).slice(0, 3).forEach(id => extra.push({ key: `${u.id}:${id}`, u, type: id }));
+  });
+  return [...base, ...extra].slice(0, 12);
+}
+function mkPet(key, u, type) {
+  const el = document.createElement("div"); el.className = "gp"; el.dataset.act = "gpet"; el.dataset.id = key;
+  el.innerHTML = `<i class="gsh"></i><span class="gpe"></span><i class="gbub"></i><b class="gpn"></b>`;
+  const p = { key, uid: u.id, type, el, sh: el.children[0], e: el.children[1], bub: el.children[2], nm: el.children[3], x: 0, y: 0, tx: 0, ty: 0, mode: "rest", until: nowS() + rnd(.4, 2.5),
+    fs: 1, face: 1, ph: Math.random() * 6, hp: 0, jump: -9, heartAt: 0, ht: 0, sig: "", mood: "", st: 0, ta: "", tb: "" };
+  const s = pickSpot(p); p.x = p.tx = s[0]; p.y = p.ty = s[1];
+  el.style.transform = `translate(${(p.x * G.W).toFixed(1)}px,${(p.y * G.H).toFixed(1)}px)`; el.style.zIndex = 10 + Math.round(p.y * 100);
+  G.pets.set(key, p); G.layer.appendChild(el); return p;
+}
+function removePet(p) { clearTimeout(p.ht); p.el.remove(); }
+function clearGarden() { G.pets.forEach(removePet); G.pets.clear(); }
+function setPet(p, u, type) { // refresh look + mood from the owner's live data (only touches the DOM when something changed)
+  const st = stageOf(totalOf(u)), mood = moodOf(u), sig = `${type}|${st}|${mood}|${u.name}`;
+  if (sig === p.sig) return; p.sig = sig; p.type = type; p.st = st;
+  p.e.textContent = ALLP[type].e[st]; p.e.className = "gpe s" + st; p.el.dataset.st = st; p.nm.textContent = u.name || "";
+  if (p.mood !== mood) {
+    p.mood = mood; p.el.dataset.mood = mood; clearTimeout(p.ht);
+    p.bub.className = "gbub " + mood + (mood === "calm" ? "" : " on"); p.bub.textContent = mood === "calm" ? "" : BUB[mood];
+    p.mode = "rest"; p.until = nowS() + rnd(.2, 1.5); p.heartAt = nowS() + rnd(2, 6);
+  }
+}
+function syncGarden() {
+  if (!G.el) return;
+  const list = gardenList(), keep = new Set(list.map(x => x.key));
+  G.pets.forEach((p, k) => { if (!keep.has(k)) { removePet(p); G.pets.delete(k); } });
+  list.forEach(x => setPet(G.pets.get(x.key) || mkPet(x.key, x.u, x.type), x.u, x.type));
+  const lv = couple().lv; if (lv !== G.decoLv) buildDeco(lv);
+  const night = isEvening(); if (night !== G.night) { G.night = night; G.el.classList.toggle("night", night); }
+}
+function stepPet(p, t, dt, still) { // one animation frame for one pet
+  const mv = MOVE[p.type] || [1, 5], mood = p.mood, moving = !still && p.st > 0 && mood !== "break" && mood !== "sleep";
+  let walking = false, lift = 0, rot = 0, sx = 1, sy = 1;
+  if (moving) {
+    if (p.mode === "rest" && t >= p.until) { const s = pickSpot(p, mood === "study" ? .13 : 0); p.tx = s[0]; p.ty = s[1]; p.mode = "walk"; }
+    if (p.mode === "walk") {
+      const dx = (p.tx - p.x) * G.W, dy = (p.ty - p.y) * G.H, d = Math.hypot(dx, dy), step = BASE * mv[0] * G.W * dt * (mood === "study" ? 1.25 : 1);
+      if (d <= step) { p.x = p.tx; p.y = p.ty; p.mode = "rest"; p.until = t + (mood === "study" ? rnd(1, 2.5) : rnd(1.5, 5)); }
+      else { p.x += dx / d * step / G.W; p.y += dy / d * step / G.H; walking = true; if (Math.abs(dx) > 1) p.face = dx > 0 ? -1 : 1; }
+    }
+  }
+  const br = Math.sin(t * 2.2 + p.ph);
+  if (still) lift = (Math.sin(t * 1.4 + p.ph) + 1) * 1.6; // reduced motion: stand still, gentle bobbing only
+  else {
+    if (walking || (moving && mood === "study")) { p.hp += dt * (walking ? 10 : 11); lift = Math.abs(Math.sin(p.hp)) * mv[1] * (mood === "study" ? 1.7 : 1); }
+    if (p.st === 0 && mood !== "sleep") rot = Math.sin(t * 3 + p.ph) * 7;           // eggs rock in place
+    else if (mood === "sleep") { if (p.type !== "plant") rot = -78; sy = 1 + br * .025; } // lying down, breathing slowly
+    else if (mood === "break") { sy = .9 + br * .015; sx = 1.05; }                      // sitting
+    else if (!walking && !lift) { sy = 1 + br * .03; sx = 1 - br * .02; }
+    const jt = t - p.jump; if (jt >= 0 && jt < .55) { const k = Math.sin(Math.PI * jt / .55); lift += k * 30; sy *= 1 + k * .08; } // tap jump
+  }
+  p.fs += (p.face * (FACE_RIGHT.has(p.type) ? -1 : 1) - p.fs) * Math.min(1, dt * 14); // smooth turn-around
+  if (mood === "calm" && t >= p.heartAt) { // a little heart now and then
+    p.heartAt = t + rnd(8, 14); p.bub.textContent = "💗"; p.bub.classList.add("on"); clearTimeout(p.ht); p.ht = setTimeout(() => p.bub.classList.remove("on"), 2200);
+  }
+  const a = `translateY(${(-lift).toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${(p.fs * sx).toFixed(3)},${sy.toFixed(3)})`;
+  if (a !== p.ta) { p.ta = a; p.e.style.transform = a; p.sh.style.transform = `scale(${(1 - Math.min(lift, 40) / 70).toFixed(2)})`; }
+  const b = `translate(${(p.x * G.W).toFixed(1)}px,${(p.y * G.H).toFixed(1)}px)`;
+  if (b !== p.tb) { p.tb = b; p.el.style.transform = b; p.el.style.zIndex = 10 + Math.round(p.y * 100); }
+}
+function gardenLoop(now) {
+  if (!G.el || !G.el.isConnected || document.hidden) { G.raf = 0; return; } // paused when you leave the tab or hide the app
+  const t = now / 1000, dt = Math.min(.05, t - G.last || .016); G.last = t;
+  G.pets.forEach(p => stepPet(p, t, dt, RM.matches));
+  G.raf = requestAnimationFrame(gardenLoop);
+}
+function gardenStart() { if (!G.raf && G.el && G.el.isConnected && !document.hidden) { G.last = 0; G.raf = requestAnimationFrame(gardenLoop); } }
+document.addEventListener("visibilitychange", gardenStart);
+function mountGarden() { // put the one living scene into the freshly rendered page
+  if (!G.el) buildGarden();
+  const slot = $("#gslot"); if (slot) slot.replaceWith(G.el);
+  G.W = G.el.clientWidth || G.W; G.H = G.el.clientHeight || G.H;
+  syncGarden(); gardenStart();
+}
+const gardenPanel = () => `<button class="btn" data-act="gchoose">🐾 choose my garden pets</button><p class="hint">tap a pet to say hi 💗</p>${coupleCard()}`;
+const gardenMain = () => `<h2>our garden</h2><div id="gslot"></div><div id="gpanel">${gardenPanel()}</div>`;
+function gardenTap(key) {
+  const p = G.pets.get(key), u = p && users.find(x => x.id === p.uid); if (!u) return;
+  const tot = totalOf(u), st = stageOf(tot), mood = moodOf(u);
+  p.jump = nowS();
+  const h = document.createElement("i"); h.className = "gheart"; h.textContent = "💗"; h.style.left = (p.x * G.W).toFixed(0) + "px"; h.style.top = (p.y * G.H - 62).toFixed(0) + "px";
+  G.fx.appendChild(h); setTimeout(() => h.remove(), 1100);
+  G.card.innerHTML = `<b>${ALLP[p.type].e[st === 0 ? 0 : 2]} ${esc(u.name)}'s ${esc(petName(p.type))}</b><small>${stageNames(p.type)[st]} · ${st < 3 ? `${fmt(STAGE[st] - tot)} to grow` : "fully grown 👑"}</small><em>${SAY[mood]}</em>`;
+  G.card.hidden = true; void G.card.offsetWidth; G.card.hidden = false;
+  clearTimeout(G.cardT); G.cardT = setTimeout(() => { G.card.hidden = true; }, 4200);
+}
+function gardenSheet(mine) { // "choose my garden pets" modal: locked pets are greyed out with their unlock requirement
+  const sel = new Set((Array.isArray(mine.garden) ? mine.garden : []).filter(id => EXTRA[id] && EXTRA[id].ok(mine)).slice(0, 3));
+  modal.innerHTML = `<div class="back"><div class="sheet"><h3>garden friends 🌳</h3><p class="hint">${ALLP[petOf(mine)].e[2]} always lives in the garden. Pick up to 3 friends to join it!<br><b id="gn"></b></p>
+  <div class="gch">${Object.keys(EXTRA).map(id => { const x = EXTRA[id], ok = x.ok(mine); return `<button class="${ok ? "" : "lock"}" data-g="${id}"><span>${x.e[2]}</span><b>${x.n}</b><small>${ok ? "unlocked ✓" : "🔒 " + x.req}</small></button>`; }).join("")}</div>
+  <div class="row"><button class="btn ghost" id="sx">cancel</button><button class="btn" id="gs">save 💖</button></div></div></div>`;
+  const paint = () => { $("#gn").textContent = `${sel.size} / 3 chosen`; modal.querySelectorAll("[data-g]").forEach(b => b.classList.toggle("sel", sel.has(b.dataset.g))); };
+  modal.querySelectorAll("[data-g]").forEach(b => b.onclick = () => {
+    const id = b.dataset.g, x = EXTRA[id];
+    if (!x.ok(mine)) return toast("🔒 " + x.req);
+    if (sel.has(id)) sel.delete(id); else if (sel.size >= 3) return toast("Max 3 friends 🐾"); else sel.add(id);
+    paint();
+  });
+  $("#sx").onclick = () => modal.innerHTML = "";
+  $("#gs").onclick = async () => { try { await DB.saveGarden(me.uid, [...sel]); modal.innerHTML = ""; toast("Garden updated 🌳"); } catch (e) { toast(errMsg(e)); } };
+  paint();
+}
+let gSeen = null, gSeenFor = "";
+function checkUnlocks(m) { // new garden pet unlocked → confetti once (remembered on this device)
+  if (gSeenFor !== m.id) { gSeenFor = m.id; try { gSeen = new Set(JSON.parse(ls("gunl-" + m.id) || "[]")); } catch { gSeen = new Set(); } }
+  const fresh = Object.keys(EXTRA).filter(id => EXTRA[id].ok(m) && !gSeen.has(id)); if (!fresh.length) return;
+  fresh.forEach(id => gSeen.add(id)); ls("gunl-" + m.id, JSON.stringify([...gSeen])); burst();
+  setTimeout(() => toast(fresh.length > 1 ? `${fresh.length} new garden friends! 🌳` : `New garden friend: ${EXTRA[fresh[0]].e[2]} ${EXTRA[fresh[0]].n}!`), 1800);
+}
 
 // ---- cheers: pop-up card + sticker picker ----
 const short = t => [...String(t)].length <= 2; // an emoji vs a text sticker
@@ -218,9 +399,15 @@ function render() {
   if (!me) return authView();
   const mine = users.find(u => u.id === me.uid);
   if (!mine) return app.innerHTML = `<div class="auth"><div class="logo">📚</div><p class="hint">loading…</p></div>`;
+  if (tab === "garden" && G.el && G.el.isConnected) { // garden is showing: leave the live scene alone, refresh only what sits around it
+    const av = app.querySelector("header .av"); if (av && av.textContent !== mine.emoji) av.textContent = mine.emoji;
+    const gp = $("#gpanel"); if (gp) gp.innerHTML = gardenPanel();
+    syncGarden(); return;
+  }
   app.innerHTML = `<header><h1>MN study tracker</h1><button class="av" data-act="profile">${esc(mine.emoji)}</button></header>
-  <main>${tab === "home" ? homeView(mine) : statsView(mine)}</main>
-  <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button></nav>`;
+  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : statsView(mine)}</main>
+  <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button><button class="${tab === "garden" ? "act" : ""}" data-act="tab" data-id="garden">🌳<span>garden</span></button></nav>`;
+  if (tab === "garden") mountGarden();
   tick();
 }
 const tick = () => {
@@ -250,10 +437,11 @@ function watch() { // runs every second for the logged-in user
     const b = BADGES.find(x => x[0] === id); burst(); setTimeout(() => toast(`Badge unlocked: ${b[1]} ${b[2]}!`), 1800);
   });
   if (sNodes && m.status !== "studying") { stopSound(); render(); }
+  checkUnlocks(m);
   const cl = couple().lv, seen = ls("lvl");
   if (seen == null) ls("lvl", cl); else if (cl > +seen) { ls("lvl", cl); burst(); setTimeout(() => toast(`Level up! ${LV_T[cl]} 🎉`), 1800); }
 }
-setInterval(() => { tick(); watch(); }, 1000);
+setInterval(() => { tick(); watch(); if (G.el && G.el.isConnected) syncGarden(); }, 1000);
 setInterval(() => me && render(), 30000);
 function askStill(m) {
   const el = Math.floor(elapsed(m) / 1000), start = m.startedAt ? m.startedAt.toMillis() : Date.now();
@@ -338,6 +526,8 @@ app.onclick = async e => {
     else if (a === "cheer") { if (Date.now() - lastCheer < 3000) return toast("Slow down, cutie 😄"); lastCheer = Date.now(); await DB.cheer(id, me.uid, mine.name, b.dataset.e); toast("Cheer sent " + b.dataset.e); }
     else if (a === "sound") { const order = ["off", ...Object.keys(SOUNDS)]; if (sound !== "off" && !sNodes) playSound(sound); else { sound = order[(order.indexOf(sound) + 1) % order.length]; ls("sound", sound); playSound(sound); } render(); }
     else if (a === "stickers") stickerSheet(id, mine);
+    else if (a === "gpet") gardenTap(id);
+    else if (a === "gchoose") gardenSheet(mine);
     else if (a === "calnav") { calMonth = Math.min(0, calMonth + +id); render(); }
     else if (a === "day") { const v = +b.dataset.v; toast(`${new Date(id + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${v ? fmt(v) : "no study 💤"}`); }
     else if (a === "discard") { if (confirm("Cancel without saving any time?")) { stopSound(); await DB.cancelStudy(me.uid); } }
@@ -361,7 +551,7 @@ app.onclick = async e => {
 
 // ---------- boot ----------
 DB.watchAuth(u => {
-  unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = [];
+  unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = []; clearGarden();
   if (u) unsubs = [DB.watchUsers(x => { users = x; render(); }), DB.watchSessions(u.uid, x => { sessions = x; render(); }),
     DB.watchCheers(u.uid, list => {
       cheerCard(list); burst(list.map(c => short(c.emoji) ? c.emoji : "💌"), 24);
