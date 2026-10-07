@@ -145,3 +145,25 @@ nav button.act{opacity:1;background:var(--tint);color:var(--main)}
 .fx i{position:absolute;top:-24px;width:10px;height:14px;border-radius:3px;font-style:normal;font-size:1.5rem;line-height:1;animation:fall 3s linear forwards}
 .fx i:not([style*=background]){width:auto;height:auto}
 @keyframes fall{to{transform:translate(var(--x),112vh) rotate(var(--r))}}
+
+/* calendar heatmap */
+.cal{background:var(--card);backdrop-filter:blur(var(--blur));border:2px solid var(--edge);border-radius:var(--r);padding:14px;box-shadow:var(--sh)}
+.calh{display:flex;align-items:center;justify-content:space-between;font-family:var(--hf);font-size:1.05rem;margin-bottom:10px}
+.calh button{background:var(--tint);border-radius:50%;width:36px;height:36px;font-size:1.3rem;line-height:1}.calh button:disabled{opacity:.3}
+.cg{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;text-align:center}
+.cg em{font-style:normal;font-size:.7rem;color:var(--soft)}
+.dy{background:var(--tint)}
+.cg .dy{aspect-ratio:1;border-radius:12px;font-size:.82rem;font-family:var(--hf);color:var(--ink);padding:0}
+.dy.l1{background:color-mix(in srgb,var(--main) 28%,transparent)}.dy.l2{background:color-mix(in srgb,var(--main) 50%,transparent)}
+.dy.l3{background:color-mix(in srgb,var(--main) 75%,transparent)}.dy.l4{background:var(--main)}.cg .dy.l4{color:#fff}
+.dy.today{outline:2px solid var(--alt);outline-offset:1px}.dy.fut{opacity:.35}
+.legend{display:flex;gap:5px;align-items:center;justify-content:center;margin-top:8px;font-size:.7rem;color:var(--soft)}
+.legend i{width:15px;height:15px;border-radius:5px;display:inline-block}
+
+/* badges */
+.badges{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.badge{background:var(--card);backdrop-filter:blur(var(--blur));border:2px solid var(--edge);border-radius:22px;padding:12px 6px;text-align:center;box-shadow:var(--sh-s)}
+.badge span{display:block;font-size:2rem;line-height:1.2}
+.badge b{display:block;font-family:var(--hf);font-size:.8rem;color:var(--ink);margin-top:2px}
+.badge small{display:block;color:var(--soft);font-size:.62rem;margin-top:2px;line-height:1.25}
+.badge.lock{opacity:.5}.badge.lock span{filter:grayscale(1)}

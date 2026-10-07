@@ -60,3 +60,6 @@ export const watchCheers = (uid, cb) => onSnapshot(collection(db, "users", uid, 
   cb(list.map(x => x.data()));
   list.forEach(x => deleteDoc(x.ref).catch(() => {}));
 }, () => {});
+
+// ---- badges ----
+export const unlockBadge = (uid, id) => updateDoc(userRef(uid), { [`badges.${id}`]: Date.now() });
