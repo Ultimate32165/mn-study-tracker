@@ -5,7 +5,10 @@ const $ = s => document.querySelector(s), app = $("#app"), modal = $("#modal");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const EMOJI = ["🐰", "🐻", "🐱", "🦊", "🐼", "🐨", "🦄", "🐥", "🍓", "🌸", "🍒", "⭐"];
 const DAY = 864e5;
-const THEMES = { strawberry: ["🍓", "#ffd6e7"], matcha: ["🍵", "#e0f4d6"], sky: ["☁️", "#d6ecff"], lilac: ["🔮", "#e9dcff"], sunny: ["🍑", "#ffe7bf"], night: ["🌙", "#1e1830"], cocoa: ["🍫", "#2a1f1c"] };
+const THEMES = { strawberry: ["🍓", "#ffd6e7"], matcha: ["🍵", "#e0f4d6"], sky: ["☁️", "#d6ecff"], lilac: ["🔮", "#e9dcff"], sunny: ["🍑", "#ffe7bf"], sakura: ["🌸", "#ffeaf1"], mochi: ["🍡", "#f6ecdf"], ocean: ["🐬", "#d4f3f2"], night: ["🌙", "#1e1830"], cocoa: ["🍫", "#2a1f1c"],
+  "glass-aurora": ["✨", "#d8c6ff"], "glass-sunset": ["🌅", "#ffc0b0"], "glass-lagoon": ["🫧", "#bfe6f2"], "glass-galaxy": ["🌌", "#1b1245"] };
+const GLASS = Object.keys(THEMES).filter(k => k.startsWith("glass-")), CUTE = Object.keys(THEMES).filter(k => !k.startsWith("glass-"));
+const themeBtns = l => l.map(t => `<button class="av ${t === theme ? "sel" : ""}" data-t="${t}" title="${t.replace("glass-", "glass ")}">${t === "auto" ? "🌓" : THEMES[t][0]}</button>`).join("");
 let theme = "strawberry"; try { theme = localStorage.getItem("theme") || theme; } catch {}
 function applyTheme(t) {
   try { localStorage.setItem("theme", t); } catch {}
@@ -168,7 +171,7 @@ function profileSheet(mine) {
   <div class="emojis">${EMOJI.map(e => `<button class="av ${e === mine.emoji ? "sel" : ""}" data-e="${e}">${e}</button>`).join("")}</div>
   <button class="btn ghost" id="gl">🎯 daily goal: ${goalOf(mine) ? fmt(goalOf(mine)) : "off"}</button>
   <button class="btn ghost" id="lm">⏰ still-studying check: ${limitOf(mine) ? "after " + fmt(limitOf(mine)) : "off"}</button>
-  <button class="btn ghost" id="nt">🔔 turn on notifications</button><p class="hint">theme</p><div class="emojis">${["auto", ...Object.keys(THEMES)].map(t => `<button class="av ${t === theme ? "sel" : ""}" data-t="${t}" title="${t}">${t === "auto" ? "🌓" : THEMES[t][0]}</button>`).join("")}</div>
+  <button class="btn ghost" id="nt">🔔 turn on notifications</button><p class="hint">cute themes</p><div class="emojis">${themeBtns(["auto", ...CUTE])}</div><p class="hint">glass themes ✨</p><div class="emojis">${themeBtns(GLASS)}</div>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
   $("#gl").onclick = () => sheet({ title: "daily goal 🎯", note: "How long do you want to study each day? 00:00 turns it off.", secs: goalOf(mine), onSave: sec => DB.updateProfile(me.uid, { goal: sec }) });
