@@ -178,7 +178,7 @@ nav button.act{opacity:1;background:var(--tint);color:var(--main)}
 /* pet */
 .petrow{display:flex;align-items:center;gap:10px;margin-top:11px;background:var(--tint);border-radius:18px;padding:8px 14px}
 .petrow>div{display:flex;flex-direction:column;font-size:.82rem}.petrow b{font-family:var(--hf);font-weight:600}.petrow small{color:var(--soft);font-size:.68rem}
-.pet{display:inline-block;line-height:1;width:40px;text-align:center;animation:petbob 3s ease-in-out infinite;transform-origin:bottom}
+.pet{position:relative;display:inline-block;line-height:1;width:40px;text-align:center;animation:petbob 3s ease-in-out infinite;transform-origin:bottom}
 .pet.s0{font-size:1.5rem}.pet.s1{font-size:1.4rem}.pet.s2{font-size:1.8rem}.pet.s3{font-size:2.2rem}
 .petrow.feed .pet{animation:nom .55s ease-in-out infinite}
 .petrow.sleepy .pet{filter:grayscale(.6);animation:breathe 4s ease-in-out infinite}
@@ -243,7 +243,7 @@ background:linear-gradient(var(--sk1),var(--sk2) 52%)}
 @keyframes gfade{from{opacity:0}}
 .gsh{position:absolute;left:50%;top:45px;width:30px;height:9px;margin-left:-15px;border-radius:50%;background:color-mix(in srgb,var(--ink) 24%,transparent)}
 .gpe{position:relative;display:flex;align-items:flex-end;justify-content:center;height:52px;line-height:1;transform-origin:50% 100%}
-.gpe.s0{font-size:28px}.gpe.s1{font-size:32px}.gpe.s2{font-size:40px}.gpe.s3{font-size:50px}
+.gpe.s0{font-size:28px;--fs:28px}.gpe.s1{font-size:32px;--fs:32px}.gpe.s2{font-size:40px;--fs:40px}.gpe.s3{font-size:50px;--fs:50px}
 .gp[data-mood=sleep] .gpe{filter:grayscale(.65) brightness(.95)}
 .gpn{display:inline-block;margin-top:3px;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--hf);font-weight:600;font-size:.68rem;line-height:1.5;color:var(--ink);background:var(--sheet);border:1px solid var(--edge);border-radius:99px;padding:0 8px}
 .gbub{position:absolute;left:0;right:0;margin:0 auto;top:calc(52px - var(--eh,40px) - 30px);width:max-content;min-width:26px;height:26px;padding:0 7px;display:grid;place-items:center;font-style:normal;font-size:.8rem;line-height:1;white-space:nowrap;
@@ -264,3 +264,84 @@ font-family:var(--hf);color:var(--ink);background:var(--sheet);border:2px solid 
 .gch .sel{outline:3px solid var(--main);background:var(--tint)}
 .gch button:active{transform:scale(.95)}
 #gpanel .btn{margin-top:14px}
+
+/* ===== garden extras: evolutions, decoration shop, weather, buddies ===== */
+:root{--wood:color-mix(in srgb,#c58a54 80%,var(--bg1));--wood-l:color-mix(in srgb,#e0ab74 82%,var(--bg1));--wood-d:color-mix(in srgb,#8a5732 80%,var(--bg1))}
+
+/* evolution accessories (crown, ribbon...) + winter scarf */
+.pet .acc{position:absolute;left:50%;top:-.15em;transform:translateX(-50%);font-size:.5em;font-style:normal;line-height:1;pointer-events:none}
+.gpe .gacc,.gpe .gscf{position:absolute;left:50%;transform:translateX(-50%);font-style:normal;line-height:1;pointer-events:none}
+.gpe .gacc{bottom:calc(var(--fs,40px)*.74);font-size:calc(var(--fs,40px)*.42)}
+.gpe .gscf{display:none;bottom:calc(var(--fs,40px)*.04);font-size:calc(var(--fs,40px)*.5)}
+#garden.wx-snow .gp:not([data-st="0"]) .gscf{display:block}
+.evo{display:flex;align-items:center;justify-content:center;gap:12px;font-size:3rem;line-height:1;padding-top:10px}
+.evo span{position:relative;display:inline-block;opacity:.55}
+.evo .ar{font-style:normal;font-size:1.5rem;color:var(--main);animation:twinkle 1.6s ease-in-out infinite}
+.evo .new{opacity:1;font-size:4.2rem;animation:evo 1.2s cubic-bezier(.3,1.6,.5,1) both}
+.evo .new .acc{position:absolute;left:50%;top:-.12em;transform:translateX(-50%);font-size:.42em;font-style:normal;line-height:1}
+@keyframes evo{from{transform:scale(.2) rotate(-30deg);opacity:0}60%{transform:scale(1.25) rotate(8deg)}}
+
+/* seeds + shop */
+.seedbar{margin-top:14px;text-align:center;font-family:var(--hf);background:var(--tint);border:2px solid var(--edge);border-radius:999px;padding:8px 14px;color:var(--ink)}
+.seedbar b{color:var(--main);font-size:1.15rem}
+.wxrow{display:flex;justify-content:center;margin-top:14px}
+.shopg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0 4px}
+.shopg button{background:var(--card);backdrop-filter:blur(var(--blur));border:2px solid var(--edge);border-radius:22px;padding:12px 6px;box-shadow:var(--sh-s);display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--ink)}
+.shopg b{font-family:var(--hf);font-size:.92rem}.shopg small{font-family:var(--hf);font-size:.85rem;color:var(--main)}
+.shopg .lock{opacity:.55}.shopg button:active{transform:scale(.95)}
+.shopthumb{height:64px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px}
+
+/* decorations in the garden (drawn with CSS so every theme works) */
+.gi{position:absolute;left:0;top:0;width:72px;height:56px;margin:-52px 0 0 -36px;pointer-events:none;user-select:none;-webkit-user-select:none;will-change:transform}
+.gi.t-house{width:84px;margin-left:-42px}
+.gi .gsh{top:46px;width:46px;margin-left:-23px}
+.gart{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;transform-origin:50% 100%}
+.gi.pop .gart{animation:gpop .6s cubic-bezier(.3,1.7,.5,1)}
+@keyframes gpop{from{transform:scale(.3) translateY(-30px);opacity:0}}
+.editing .gp{pointer-events:none}
+.editing .gi.mine{pointer-events:auto;touch-action:none;cursor:grab;outline:2px dashed color-mix(in srgb,var(--main) 55%,transparent);outline-offset:3px;border-radius:14px}
+.editing .gi.mine.sel{outline:3px solid var(--main);background:color-mix(in srgb,var(--main) 16%,transparent)}
+.bench{position:relative;width:54px;height:30px}
+.bench i{position:absolute;display:block}
+.bench .bk{left:2px;right:2px;top:0;height:11px;border-radius:5px 5px 3px 3px;background:var(--wood);box-shadow:inset 0 -3px 0 var(--wood-d)}
+.bench .st{left:0;right:0;top:14px;height:8px;border-radius:4px;background:var(--wood-l);box-shadow:0 2px 0 var(--wood-d)}
+.bench .lg{left:6px;top:21px;width:5px;height:9px;border-radius:2px;background:var(--wood-d)}.bench .lg.r{left:auto;right:6px}
+.lant{position:relative;width:40px;height:56px}
+.lant em{position:absolute;left:50%;top:4px;transform:translateX(-50%);font-style:normal;font-size:30px;line-height:1}
+.lant .pl{position:absolute;left:50%;top:34px;width:5px;height:22px;margin-left:-2.5px;border-radius:3px;background:var(--wood-d)}
+.lant .gl{position:absolute;left:50%;top:-10px;width:78px;height:78px;margin-left:-39px;border-radius:50%;background:radial-gradient(circle,rgba(255,214,120,.7),transparent 68%);opacity:0;transition:opacity 1.5s;pointer-events:none}
+#garden.night .lant .gl{opacity:1;animation:lglow 3s ease-in-out infinite alternate}
+@keyframes lglow{to{opacity:.65;transform:scale(1.12)}}
+.swing{position:relative;width:64px;height:56px}
+.swing i{position:absolute;display:block}
+.swing .fr{top:2px;left:5px;width:5px;height:54px;border-radius:3px;background:var(--wood-d);transform:rotate(8deg);transform-origin:50% 0}
+.swing .fr.r{left:auto;right:5px;transform:rotate(-8deg)}
+.swing .tp{left:2px;right:2px;top:0;height:6px;border-radius:3px;background:var(--wood)}
+.swing .sw{position:absolute;left:50%;top:5px;width:0;height:42px;transform-origin:50% 0;animation:swsw 2.4s ease-in-out infinite alternate}
+.swing .rp{left:-12px;top:0;width:2px;height:34px;background:var(--wood-d)}.swing .rp.r{left:10px}
+.swing .sd{left:-15px;top:33px;width:30px;height:6px;border-radius:3px;background:var(--wood-l);box-shadow:0 2px 0 var(--wood-d)}
+@keyframes swsw{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
+.tiny{font-size:54px;line-height:1;padding-bottom:2px}
+
+/* weather: random, no network */
+.gwx{inset:0;z-index:260;pointer-events:none;overflow:hidden}
+.gwx i{position:absolute;top:0;font-style:normal;line-height:1;animation:wxfall linear infinite;will-change:transform}
+.gwx.snow i{border-radius:50%;background:#fff;box-shadow:0 0 4px rgba(255,255,255,.8);opacity:.92}
+.gwx.rain i{width:2px;border-radius:2px;background:linear-gradient(transparent,rgba(205,232,255,.9));animation-name:wxrain;opacity:.85}
+@keyframes wxfall{from{transform:translate(0,-24px) rotate(0deg)}to{transform:translate(var(--dx,0px),calc(var(--gh,420px) + 30px)) rotate(var(--r,0deg))}}
+@keyframes wxrain{from{transform:translate(0,-24px) rotate(14deg)}to{transform:translate(calc(var(--gh,420px)*.25),calc(var(--gh,420px) + 30px)) rotate(14deg)}}
+@keyframes grip{from{transform:scale(.2);opacity:1}to{transform:scale(1.4);opacity:0}}
+#garden.wx-petals{--gr-b:color-mix(in srgb,#9ceb92 62%,var(--bg2));--gr-f:color-mix(in srgb,#6fdc86 70%,var(--bg1))}
+#garden.wx-leaves{--sk2:color-mix(in srgb,#ffe0b8 60%,var(--glow1));--gr-b:color-mix(in srgb,#d4d97c 60%,var(--bg2));--gr-f:color-mix(in srgb,#e0b45a 58%,var(--bg1))}
+#garden.wx-rain{--sk1:color-mix(in srgb,#8397b4 70%,var(--bg1));--sk2:color-mix(in srgb,#cdd6e6 60%,var(--glow1));--cl:color-mix(in srgb,#9aa6bb 80%,var(--glow1))}
+#garden.wx-snow{--sk1:color-mix(in srgb,#a9bad4 62%,var(--bg1));--sk2:color-mix(in srgb,#f1f4fb 70%,var(--glow1));--gr-b:color-mix(in srgb,#f4f8ff 78%,var(--bg1));--gr-f:color-mix(in srgb,#ffffff 82%,var(--bg1));--fc:color-mix(in srgb,#fff 80%,var(--main))}
+#garden.wx-rain.night{--sk1:color-mix(in srgb,#232a52 80%,var(--bg2));--sk2:color-mix(in srgb,#4a5a86 60%,var(--glow2));--cl:color-mix(in srgb,#8a93b8 50%,var(--bg2))}
+#garden.wx-snow.night{--sk1:color-mix(in srgb,#1d2150 78%,var(--bg2));--sk2:color-mix(in srgb,#5b6aa0 55%,var(--glow2));--gr-b:color-mix(in srgb,#c9d6f2 55%,var(--bg1));--gr-f:color-mix(in srgb,#dfe8fb 60%,var(--bg1))}
+#garden.wx-leaves.night{--gr-b:color-mix(in srgb,#5f7a4a 60%,var(--bg1));--gr-f:color-mix(in srgb,#6f6a3a 62%,var(--bg1))}
+.wx-rain .gsun,.wx-snow .gsun{opacity:.25}
+.wx-rain .gcl,.wx-snow .gcl{opacity:1}
+.wx-rain .gfly,.wx-snow .gfly{opacity:0}
+.gfly{transition:opacity 1s}
+.wx-rain .gpond::before{content:"";position:absolute;left:30%;top:30%;width:34%;height:34%;border-radius:50%;border:2px solid rgba(255,255,255,.7);animation:grip 1.6s ease-out infinite}
+.wx-snow .ghill.h2{box-shadow:inset 0 6px 0 rgba(255,255,255,.9)}
+@media(prefers-reduced-motion:reduce){.gwx{display:none}}

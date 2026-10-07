@@ -28,6 +28,7 @@ export const pauseStudy = (uid, accumMs) => updateDoc(userRef(uid), { status: "p
 export const resumeStudy = uid => updateDoc(userRef(uid), { status: "studying", runStart: Date.now(), breakAt: null });
 export const updateProfile = (uid, d) => updateDoc(userRef(uid), d);
 export const saveGarden = (uid, ids) => updateDoc(userRef(uid), { garden: ids }); // up to 3 extra pets that live in the shared garden
+export const saveDecor = (uid, items) => updateDoc(userRef(uid), { decor: items }); // garden decorations: [{ i: "bench", k: "a1b2c3", x: .42, y: .71 }, ...] (x/y = fraction of the garden scene)
 
 // Save a finished session (and optionally switch status back to offline).
 export async function addSession(uid, start, days, seconds, stop) {

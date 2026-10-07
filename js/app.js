@@ -129,7 +129,15 @@ function playSound(mode) {
 }
 
 // ---- study pet / garden: grows with total hours, sleepy if no study today ----
-const PETS = { bunny: { e: ["🥚", "🐰", "🐰", "🐇"] }, cat: { e: ["🥚", "🐱", "🐱", "🐈"] }, chick: { e: ["🥚", "🐣", "🐥", "🐔"] }, plant: { e: ["🌰", "🌱", "🪴", "🌳"] } };
+// e = the form at each stage [egg, baby, kid, grown-up]; acc = a little accessory that appears on top at that stage (evolutions!)
+const PETS = {
+  bunny: { e: ["🥚", "🐰", "🐇", "🐇"], acc: ["", "", "🎀", "👑"] },
+  cat: { e: ["🥚", "🐱", "🐈", "🦁"], acc: ["", "", "🎀", "👑"] },
+  chick: { e: ["🥚", "🐣", "🐥", "🐔"], acc: ["", "", "", "👑"] },
+  plant: { e: ["🌰", "🌱", "🪴", "🌳"], acc: ["", "", "", "🌸"] }
+};
+const accOf = (t, st) => ((ALLP[t] || {}).acc || [])[st] || "";
+const petFace = (t, st) => ALLP[t].e[st] + (accOf(t, st) ? `<i class="acc">${accOf(t, st)}</i>` : "");
 const petOf = u => PETS[u.pet] ? u.pet : "bunny";
 const STAGE = [1800, 18000, 72000]; // seconds studied to reach baby / kid / grown-up
 const totalOf = u => stats(u).total + (u.status === "studying" || u.status === "paused" ? elapsed(u) / 1000 : 0); // seconds studied incl. the running session
@@ -140,7 +148,7 @@ function petRow(u) {
   const st = stageOf(tot), fed = liveToday(u) > 0;
   const say = on ? "nom nom 🍓" : paused ? "break time ☕" : fed ? "happy & full 💗" : "sleepy… study to feed me";
   const names = stageNames(t);
-  return `<div class="petrow ${on ? "feed" : fed || paused ? "" : "sleepy"}"><span class="pet s${st}">${PETS[t].e[st]}</span><div><b>${say}</b><small>${names[st]}${st < 3 ? ` · ${fmt(STAGE[st] - tot)} to grow` : " · fully grown 👑"}</small></div></div>`;
+  return `<div class="petrow ${on ? "feed" : fed || paused ? "" : "sleepy"}"><span class="pet s${st}">${petFace(t, st)}</span><div><b>${say}</b><small>${names[st]}${st < 3 ? ` · ${fmt(STAGE[st] - tot)} to grow` : " · fully grown 👑"}</small></div></div>`;
 }
 
 // ---- couple level: everyone's hours added together ----
@@ -158,23 +166,29 @@ const coupleCard = () => { const c = couple(); return `<div class="lvl"><div cla
 // ---- garden: a shared meadow where everyone's pets wander ----
 // Extra pets you can collect. e = [egg, baby, kid, grown-up]; ok(u) = is it unlocked for user u?
 const EXTRA = {
-  dog: { n: "puppy", e: ["🥚", "🐶", "🐶", "🐕"], req: "study 5 hours in total", ok: u => totalOf(u) >= 18000 },
-  panda: { n: "panda", e: ["🥚", "🐼", "🐼", "🐼"], req: "earn the 3-day streak badge 🔥", ok: u => !!(u.badges && u.badges.s3) },
-  fox: { n: "fox", e: ["🥚", "🦊", "🦊", "🦊"], req: "study 25 hours in total", ok: u => totalOf(u) >= 90000 },
-  frog: { n: "frog", e: ["🥚", "🐸", "🐸", "🐸"], req: "reach couple level 4 💞", ok: () => couple().lv >= 3 },
-  turtle: { n: "turtle", e: ["🥚", "🐢", "🐢", "🐢"], req: "earn the 7-day streak badge ✨", ok: u => !!(u.badges && u.badges.s7) },
-  unicorn: { n: "unicorn", e: ["🥚", "🦄", "🦄", "🦄"], req: "earn the 100 hours badge 👑", ok: u => !!(u.badges && u.badges.h100) }
+  dog: { n: "puppy", e: ["🥚", "🐶", "🐕", "🦮"], acc: ["", "", "🎀", "👑"], req: "study 5 hours in total", ok: u => totalOf(u) >= 18000 },
+  panda: { n: "panda", e: ["🥚", "🐼", "🐼", "🐼"], acc: ["", "", "🎋", "👑"], req: "earn the 3-day streak badge 🔥", ok: u => !!(u.badges && u.badges.s3) },
+  fox: { n: "fox", e: ["🥚", "🦊", "🦊", "🦊"], acc: ["", "", "🍂", "👑"], req: "study 25 hours in total", ok: u => totalOf(u) >= 90000 },
+  frog: { n: "frog", e: ["🥚", "🐸", "🐸", "🐸"], acc: ["", "", "🍃", "👑"], req: "reach couple level 4 💞", ok: () => couple().lv >= 3 },
+  turtle: { n: "turtle", e: ["🥚", "🐢", "🐢", "🐢"], acc: ["", "", "🌿", "👑"], req: "earn the 7-day streak badge ✨", ok: u => !!(u.badges && u.badges.s7) },
+  unicorn: { n: "unicorn", e: ["🥚", "🦄", "🦄", "🦄"], acc: ["", "", "🌈", "👑"], req: "earn the 100 hours badge 👑", ok: u => !!(u.badges && u.badges.h100) }
 };
 const ALLP = { ...PETS, ...EXTRA };
 const petName = t => EXTRA[t] ? EXTRA[t].n : t;
 const MOVE = { bunny: [1.3, 9], cat: [1.1, 5], chick: [1.2, 6], plant: [.3, 3], dog: [1.25, 7], panda: [.65, 4], fox: [1.2, 6], frog: [.9, 11], turtle: [.4, 2], unicorn: [1.1, 6] }; // [speed, hop height px]
-const FACE_RIGHT = new Set(["turtle"]); // emoji that look RIGHT by default (all the others look left). If one walks backwards on your phone, add/remove it here.
+const FACE_RIGHT = new Set(["🐢"]); // emoji that look RIGHT by default (all the others look left). If one walks backwards on your phone, add/remove its emoji here (e.g. "🐈", "🐕", "🦮").
 const BASE = .085; // walking speed: scene widths per second (before the per-pet multiplier)
 const BOUNDS = { x0: .1, x1: .9, y0: .6, y1: .9 }; // where pets may stand (fractions of the scene)
 const BUB = { study: "🍓 nom nom", break: "☕", calm: "💗", sleep: "💤" };
 const SAY = { study: "nom nom 🍓", break: "break time ☕", calm: "happy & full 💗", sleep: "sleepy… study to feed me" };
 const RM = matchMedia("(prefers-reduced-motion: reduce)");
-const G = { pets: new Map(), el: null, layer: null, deco: null, fly: null, fx: null, card: null, raf: 0, last: 0, W: 340, H: 408, cardT: 0, decoLv: -1, night: null, ro: null };
+// weather is random (no network): sunny / spring petals / rain / snow with scarves / autumn leaves. Re-rolled every 12 min, or pick one with the chip in the garden.
+const WXL = { clear: ["☀️", "sunny"], petals: ["🌸", "spring"], rain: ["🌧️", "rainy"], snow: ["❄️", "snowy"], leaves: ["🍂", "autumn"] };
+const WX_POOL = ["clear", "clear", "petals", "rain", "snow", "leaves"];
+const pickWx = avoid => { const l = WX_POOL.filter(w => w !== avoid); return l[Math.floor(Math.random() * l.length)]; };
+const WX0 = ls("wx");
+const G = { pets: new Map(), el: null, layer: null, deco: null, fly: null, fx: null, card: null, raf: 0, last: 0, W: 340, H: 408, cardT: 0, decoLv: -1, night: null, ro: null,
+  items: new Map(), edit: false, work: null, sel: null, wx: "", wxMode: WX0 === "auto" || WXL[WX0] ? WX0 : "auto", wxAuto: pickWx(), wxAt: Date.now(), wxEl: null, buddyFx: 0 };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const seeded = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
 const isEvening = () => { const h = new Date().getHours(); return h >= 18 || h < 6; };
@@ -195,11 +209,11 @@ function buildGarden() { // built ONCE; render() never touches it, so pets never
   el.innerHTML = `<div class="gstars"></div><i class="gsun"></i><div class="grain"></div><i class="gcl c1"></i><i class="gcl c2"></i><i class="gcl c3"></i>
   <div class="ghill h1"></div><div class="gfence"></div><div class="ghill h2"></div><div class="gpond"></div><div class="gdeco"></div><div class="gpets"></div><div class="gfly"></div>
   <div class="gff">${[...Array(10)].map(() => `<i style="left:${rnd(6, 94).toFixed(1)}%;top:${rnd(52, 94).toFixed(1)}%;animation-delay:${(-rnd(0, 6)).toFixed(1)}s;animation-duration:${rnd(4, 8).toFixed(1)}s"></i>`).join("")}</div>
-  <div class="gfx"></div><div class="gcard" hidden></div>`;
-  G.el = el; G.deco = el.querySelector(".gdeco"); G.layer = el.querySelector(".gpets"); G.fly = el.querySelector(".gfly"); G.fx = el.querySelector(".gfx"); G.card = el.querySelector(".gcard");
+  <div class="gwx"></div><div class="gfx"></div><div class="gcard" hidden></div>`;
+  G.el = el; G.deco = el.querySelector(".gdeco"); G.layer = el.querySelector(".gpets"); G.fly = el.querySelector(".gfly"); G.fx = el.querySelector(".gfx"); G.card = el.querySelector(".gcard"); G.wxEl = el.querySelector(".gwx");
   G.card.onclick = () => { G.card.hidden = true; };
-  G.ro = new ResizeObserver(() => { G.W = el.clientWidth || G.W; G.H = el.clientHeight || G.H; }); G.ro.observe(el);
-  G.decoLv = -1; G.night = null;
+  G.ro = new ResizeObserver(() => { G.W = el.clientWidth || G.W; G.H = el.clientHeight || G.H; el.style.setProperty("--gh", G.H + "px"); syncItems(); }); G.ro.observe(el);
+  G.decoLv = -1; G.night = null; G.wx = ""; G.items.clear();
 }
 function buildDeco(lv) { // more flowers, butterflies, trees and a rainbow as the couple level grows
   G.decoLv = lv;
@@ -228,17 +242,19 @@ function mkPet(key, u, type) {
   const el = document.createElement("div"); el.className = "gp"; el.dataset.act = "gpet"; el.dataset.id = key;
   el.innerHTML = `<i class="gsh"></i><span class="gpe"></span><i class="gbub"></i><b class="gpn"></b>`;
   const p = { key, uid: u.id, type, el, sh: el.children[0], e: el.children[1], bub: el.children[2], nm: el.children[3], x: 0, y: 0, tx: 0, ty: 0, mode: "rest", until: nowS() + rnd(.4, 2.5),
-    fs: 1, face: 1, ph: Math.random() * 6, hp: 0, jump: -9, heartAt: 0, ht: 0, sig: "", mood: "", st: 0, ta: "", tb: "" };
+    fs: 1, face: 1, ph: Math.random() * 6, hp: 0, jump: -9, heartAt: 0, ht: 0, sig: "", mood: "", st: 0, ta: "", tb: "", ov: null, emo: "" };
   const s = pickSpot(p); p.x = p.tx = s[0]; p.y = p.ty = s[1];
   el.style.transform = `translate(${(p.x * G.W).toFixed(1)}px,${(p.y * G.H).toFixed(1)}px)`; el.style.zIndex = 10 + Math.round(p.y * 100);
   G.pets.set(key, p); G.layer.appendChild(el); return p;
 }
 function removePet(p) { clearTimeout(p.ht); p.el.remove(); }
-function clearGarden() { G.pets.forEach(removePet); G.pets.clear(); }
+function clearGarden() { G.pets.forEach(removePet); G.pets.clear(); G.items.forEach(o => o.el.remove()); G.items.clear(); G.edit = false; G.work = null; G.sel = null; if (G.el) G.el.classList.remove("editing"); }
 function setPet(p, u, type) { // refresh look + mood from the owner's live data (only touches the DOM when something changed)
   const st = stageOf(totalOf(u)), mood = moodOf(u), sig = `${type}|${st}|${mood}|${u.name}`;
-  if (sig === p.sig) return; p.sig = sig; p.type = type; p.st = st;
-  p.e.textContent = ALLP[type].e[st]; p.e.className = "gpe s" + st; p.el.dataset.st = st; p.nm.textContent = u.name || "";
+  if (sig === p.sig) return; const evolved = !!p.sig && p.st !== st; p.sig = sig; p.type = type; p.st = st;
+  p.emo = ALLP[type].e[st]; const acc = accOf(type, st);
+  p.e.innerHTML = `${p.emo}${acc ? `<i class="gacc">${acc}</i>` : ""}<i class="gscf">🧣</i>`; p.e.className = "gpe s" + st; p.el.dataset.st = st; p.nm.textContent = u.name || "";
+  if (evolved) p.jump = nowS();
   if (p.mood !== mood) {
     p.mood = mood; p.el.dataset.mood = mood; clearTimeout(p.ht);
     p.bub.className = "gbub " + mood + (mood === "calm" ? "" : " on"); p.bub.textContent = mood === "calm" ? "" : BUB[mood];
@@ -252,10 +268,42 @@ function syncGarden() {
   list.forEach(x => setPet(G.pets.get(x.key) || mkPet(x.key, x.u, x.type), x.u, x.type));
   const lv = couple().lv; if (lv !== G.decoLv) buildDeco(lv);
   const night = isEvening(); if (night !== G.night) { G.night = night; G.el.classList.toggle("night", night); }
+  syncItems(); syncBuddies(); syncWeather(); runVisits();
+}
+function endVisit(p, t) { // a cheer visit is over: guest wanders off again, host is free to move
+  const o = p.ov, h = o && G.pets.get(o.host);
+  if (h && h.ov && h.ov.kind === "host") { h.ov = null; h.mode = "rest"; h.until = t + rnd(.8, 2); }
+  p.ov = null; p.mode = "rest"; p.until = t + rnd(1, 2.5);
 }
 function stepPet(p, t, dt, still) { // one animation frame for one pet
-  const mv = MOVE[p.type] || [1, 5], mood = p.mood, moving = !still && p.st > 0 && mood !== "break" && mood !== "sleep";
-  let walking = false, lift = 0, rot = 0, sx = 1, sy = 1;
+  const mv = MOVE[p.type] || [1, 5], o = p.ov, mood = o && o.kind === "visit" ? "calm" : p.mood, moving = !still && !o && p.st > 0 && mood !== "break" && mood !== "sleep";
+  let walking = false, lift = 0, rot = 0, sx = 1, sy = 1, hop = 0;
+  if (o && !still) { // errands: "visit" = run to a friend's pet and shower it with hearts, "host" = wait for the guest, "buddy" = meet by the pond and hop together
+    if (o.kind === "host") { if (t > o.until) { p.ov = null; p.mode = "rest"; p.until = t + rnd(.5, 1.5); } }
+    else {
+      const h = o.kind === "visit" ? G.pets.get(o.host) : null;
+      if (o.kind === "visit" && (!h || t > o.limit)) endVisit(p, t);
+      else {
+        const tx = h ? h.x + o.side * .085 : o.x, ty = h ? h.y + .004 : o.y, dx = (tx - p.x) * G.W, dy = (ty - p.y) * G.H, d = Math.hypot(dx, dy),
+          step = BASE * Math.max(mv[0], .9) * G.W * dt * (h ? 2.6 : 1.7);
+        if (d <= Math.max(step, 1.5)) { p.x = tx; p.y = ty; if (!o.arrived) o.arrived = t; p.face = h ? (o.side < 0 ? -1 : 1) : o.face; }
+        else { p.x += dx / d * step / G.W; p.y += dy / d * step / G.H; walking = true; if (Math.abs(dx) > 1) p.face = dx > 0 ? -1 : 1; }
+        if (o.arrived) {
+          if (h) { // hop around and float hearts up from the pet that got the cheer
+            hop = Math.abs(Math.sin((t - o.arrived) * 7)) * (mv[1] + 5);
+            if (t >= o.nextHeart) { o.nextHeart = t + .42; spawnHeart(h.x * G.W + rnd(-16, 16), h.y * G.H - 54 - rnd(0, 12), ["💗", "💕", "💖"][Math.floor(rnd(0, 3))]); }
+            if (t > o.arrived + 3.2) endVisit(p, t);
+          } else { // buddies: once BOTH have arrived they hop in sync
+            const m2 = G.pets.get(o.mate);
+            if (m2 && m2.ov && m2.ov.arrived) {
+              hop = Math.abs(Math.sin(t * 6)) * (mv[1] + 6);
+              if (p.key < m2.key && t >= G.buddyFx) { G.buddyFx = t + 1.8; spawnHeart((p.x + m2.x) / 2 * G.W, (p.y + m2.y) / 2 * G.H - 64, "💞"); }
+            }
+          }
+        }
+      }
+    }
+  }
   if (moving) {
     if (p.mode === "rest" && t >= p.until) { const s = pickSpot(p, mood === "study" ? .13 : 0); p.tx = s[0]; p.ty = s[1]; p.mode = "walk"; }
     if (p.mode === "walk") {
@@ -268,14 +316,15 @@ function stepPet(p, t, dt, still) { // one animation frame for one pet
   if (still) lift = (Math.sin(t * 1.4 + p.ph) + 1) * 1.6; // reduced motion: stand still, gentle bobbing only
   else {
     if (walking || (moving && mood === "study")) { p.hp += dt * (walking ? 10 : 11); lift = Math.abs(Math.sin(p.hp)) * mv[1] * (mood === "study" ? 1.7 : 1); }
+    if (hop) lift = hop;
     if (p.st === 0 && mood !== "sleep") rot = Math.sin(t * 3 + p.ph) * 7;           // eggs rock in place
     else if (mood === "sleep") { if (p.type !== "plant") rot = -78; sy = 1 + br * .025; } // lying down, breathing slowly
     else if (mood === "break") { sy = .9 + br * .015; sx = 1.05; }                      // sitting
     else if (!walking && !lift) { sy = 1 + br * .03; sx = 1 - br * .02; }
     const jt = t - p.jump; if (jt >= 0 && jt < .55) { const k = Math.sin(Math.PI * jt / .55); lift += k * 30; sy *= 1 + k * .08; } // tap jump
   }
-  p.fs += (p.face * (FACE_RIGHT.has(p.type) ? -1 : 1) - p.fs) * Math.min(1, dt * 14); // smooth turn-around
-  if (mood === "calm" && t >= p.heartAt) { // a little heart now and then
+  p.fs += (p.face * (FACE_RIGHT.has(p.emo) ? -1 : 1) - p.fs) * Math.min(1, dt * 14); // smooth turn-around
+  if (p.mood === "calm" && !o && t >= p.heartAt) { // a little heart now and then
     p.heartAt = t + rnd(8, 14); p.bub.textContent = "💗"; p.bub.classList.add("on"); clearTimeout(p.ht); p.ht = setTimeout(() => p.bub.classList.remove("on"), 2200);
   }
   const a = `translateY(${(-lift).toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${(p.fs * sx).toFixed(3)},${sy.toFixed(3)})`;
@@ -297,15 +346,172 @@ function mountGarden() { // put the one living scene into the freshly rendered p
   G.W = G.el.clientWidth || G.W; G.H = G.el.clientHeight || G.H;
   syncGarden(); gardenStart();
 }
-const gardenPanel = () => `<button class="btn" data-act="gchoose">🐾 choose my garden pets</button><p class="hint">tap a pet to say hi 💗</p>${coupleCard()}`;
+// ---- seeds + decoration shop: study time earns seeds, seeds buy things you drag into the garden (saved in users/{uid}.decor) ----
+const ITEMS = { bench: { n: "bench", price: 25 }, lantern: { n: "lantern", price: 40 }, swing: { n: "swing", price: 80 }, house: { n: "tiny house", price: 150 } };
+const SEED_SEC = 300, MAX_DECOR = 12; // 1 seed per 5 minutes studied, up to 12 things per person
+const ART = { // little CSS-drawn items (so they follow every theme); the lantern and the house are emoji
+  bench: `<div class="bench"><i class="bk"></i><i class="st"></i><i class="lg"></i><i class="lg r"></i></div>`,
+  lantern: `<div class="lant"><i class="gl"></i><i class="pl"></i><em>🏮</em></div>`,
+  swing: `<div class="swing"><i class="fr"></i><i class="fr r"></i><i class="tp"></i><div class="sw"><i class="rp"></i><i class="rp r"></i><i class="sd"></i></div></div>`,
+  house: `<div class="tiny">🏡</div>`
+};
+const seedsEarned = u => Math.floor(totalOf(u) / SEED_SEC);
+const decorOf = u => (Array.isArray(u.decor) ? u.decor : []).filter(d => d && ITEMS[d.i] && typeof d.k === "string" && Number.isFinite(d.x) && Number.isFinite(d.y)).slice(0, MAX_DECOR);
+const decorNow = u => G.edit && G.work && u.id === me?.uid ? G.work : decorOf(u); // while decorating, your own list is the unsaved working copy
+const seedsLeft = u => Math.max(0, seedsEarned(u) - decorNow(u).reduce((a, d) => a + ITEMS[d.i].price, 0)); // spent seeds are simply the price of everything placed
+const clampX = x => Math.min(.92, Math.max(.08, x)), clampY = y => Math.min(.93, Math.max(.55, y));
+let seedBase = -1, visits = [];
+function checkSeeds(m) { const sd = seedsEarned(m); if (seedBase >= 0 && sd > seedBase && !modal.innerHTML) toast(`+${sd - seedBase} 🌱 seed${sd - seedBase > 1 ? "s" : ""} earned!`); seedBase = sd; }
+
+function refreshPanel() { const gp = $("#gpanel"); if (gp) gp.innerHTML = gardenPanel(); }
+function gardenPanel() {
+  const m = users.find(u => u.id === me?.uid); if (!m) return "";
+  const w = G.wxMode === "auto" ? G.wxAuto : G.wxMode, wl = G.wxMode === "auto" ? `random ${WXL[w][0]}` : `${WXL[w][0]} ${WXL[w][1]}`;
+  if (G.edit) {
+    const sel = (G.work || []).find(d => d.k === G.sel);
+    return `<div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds left</div><p class="hint">${sel ? "drag it where you like ✋ · tap it again to unselect" : "drag your things to move them · tap one to select"}</p>
+    ${sel ? `<button class="btn ghost" data-act="gdel">🗑️ remove ${ITEMS[sel.i].n} (+${ITEMS[sel.i].price} 🌱)</button>` : ""}<button class="btn ghost" data-act="gshop">🛍️ shop</button>
+    <div class="row"><button class="btn ghost" data-act="gcancel">cancel</button><button class="btn" data-act="gdone">done 💖</button></div>`;
+  }
+  return `<div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds</div>
+  <div class="row"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button></div>
+  <button class="btn ghost" data-act="gchoose">🐾 choose my garden pets</button>
+  <div class="wxrow"><button class="chip" data-act="gwx">🌦️ weather: ${wl}</button></div><p class="hint">tap a pet to say hi 💗</p>${coupleCard()}`;
+}
+function enterEdit(m) {
+  G.edit = true; G.work = decorOf(m).map(d => ({ ...d })); G.sel = null;
+  if (G.el) G.el.classList.add("editing"); if (G.card) G.card.hidden = true;
+  syncItems(); refreshPanel();
+}
+async function exitEdit(save) {
+  if (save) {
+    try { await DB.saveDecor(me.uid, G.work.map(d => ({ i: d.i, k: d.k, x: +d.x.toFixed(3), y: +d.y.toFixed(3) }))); toast("Garden decorated 🏡"); }
+    catch (e) { return toast(errMsg(e)); }
+  }
+  G.edit = false; G.work = null; G.sel = null; if (G.el) G.el.classList.remove("editing");
+  syncItems(); refreshPanel();
+}
+function delSel() {
+  const i = (G.work || []).findIndex(d => d.k === G.sel); if (i < 0) return;
+  const d = G.work.splice(i, 1)[0]; G.sel = null; syncItems(); refreshPanel(); toast(`Removed ${ITEMS[d.i].n} · +${ITEMS[d.i].price} 🌱 back`);
+}
+function shopSheet(mine) {
+  const left = seedsLeft(mine);
+  modal.innerHTML = `<div class="back"><div class="sheet"><h3>decoration shop 🛍️</h3><p class="hint">You earn 🌱 1 seed for every 5 minutes you study.<br><b>🌱 ${left} seeds</b> to spend</p>
+  <div class="shopg">${Object.keys(ITEMS).map(id => { const x = ITEMS[id]; return `<button class="${left >= x.price ? "" : "lock"}" data-buy="${id}"><div class="shopthumb">${ART[id]}</div><b>${x.n}</b><small>🌱 ${x.price}</small></button>`; }).join("")}</div>
+  <button class="link" id="sx">close</button></div></div>`;
+  $("#sx").onclick = () => modal.innerHTML = "";
+  modal.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => {
+    const id = b.dataset.buy, x = ITEMS[id], have = seedsLeft(mine);
+    if (decorNow(mine).length >= MAX_DECOR) return toast(`Your garden is full (${MAX_DECOR} things) 🌳`);
+    if (have < x.price) return toast(`${x.price - have} more 🌱 needed — keep studying!`);
+    if (!G.edit) enterEdit(mine);
+    const d = { i: id, k: Math.random().toString(36).slice(2, 8), x: +(.5 + rnd(-.08, .08)).toFixed(3), y: +(.74 + rnd(-.04, .04)).toFixed(3) };
+    G.work.push(d); G.sel = d.k; modal.innerHTML = ""; syncItems(); refreshPanel();
+    const o = G.items.get(`${me.uid}:${d.k}`); if (o) { o.el.classList.add("pop"); setTimeout(() => o.el.classList.remove("pop"), 700); }
+    toast(`New ${x.n}! Drag it where you like ✋`);
+  });
+}
+function mkItem(key, d, uid) {
+  const el = document.createElement("div"); el.className = "gi t-" + d.i;
+  el.innerHTML = `<i class="gsh"></i><div class="gart">${ART[d.i]}</div>`;
+  const o = { key, el, it: d, uid, tb: "" };
+  el.addEventListener("pointerdown", e => itemDown(e, o));
+  G.items.set(key, o); G.layer.appendChild(el); return o;
+}
+function syncItems() { // draw everybody's decorations (yours = the working copy while you decorate)
+  if (!G.el || !G.layer) return;
+  const want = []; users.forEach(u => decorNow(u).forEach(d => want.push({ key: `${u.id}:${d.k}`, d, uid: u.id })));
+  const keep = new Set(want.map(w => w.key));
+  G.items.forEach((o, k) => { if (!keep.has(k)) { o.el.remove(); G.items.delete(k); } });
+  want.forEach(w => {
+    const o = G.items.get(w.key) || mkItem(w.key, w.d, w.uid), mine = w.uid === me?.uid; o.it = w.d;
+    o.el.classList.toggle("mine", mine); o.el.classList.toggle("sel", G.edit && mine && G.sel === w.d.k);
+    const t = `translate(${(w.d.x * G.W).toFixed(1)}px,${(w.d.y * G.H).toFixed(1)}px)`;
+    if (t !== o.tb) { o.tb = t; o.el.style.transform = t; o.el.style.zIndex = 10 + Math.round(w.d.y * 100); }
+  });
+}
+function itemDown(e, o) { // drag-to-place
+  if (!G.edit || o.uid !== me?.uid || !G.el) return;
+  e.preventDefault();
+  const r = G.el.getBoundingClientRect(), d = o.it, wasSel = G.sel === d.k, gx = (e.clientX - r.left) / r.width - d.x, gy = (e.clientY - r.top) / r.height - d.y;
+  let moved = false; G.sel = d.k; syncItems(); refreshPanel();
+  const mv = ev => {
+    const nx = clampX((ev.clientX - r.left) / r.width - gx), ny = clampY((ev.clientY - r.top) / r.height - gy);
+    if (Math.hypot(nx - d.x, ny - d.y) > .004) moved = true;
+    if (inPond(nx, ny - .02)) return; // keep things on the grass
+    d.x = nx; d.y = ny; syncItems();
+  };
+  const up = () => {
+    o.el.removeEventListener("pointermove", mv); o.el.removeEventListener("pointerup", up); o.el.removeEventListener("pointercancel", up);
+    try { o.el.releasePointerCapture(e.pointerId); } catch {}
+    if (!moved && wasSel) { G.sel = null; syncItems(); refreshPanel(); }
+  };
+  try { o.el.setPointerCapture(e.pointerId); } catch {}
+  o.el.addEventListener("pointermove", mv); o.el.addEventListener("pointerup", up); o.el.addEventListener("pointercancel", up);
+}
+
+// ---- weather: pure CSS + a few particles, picked at random ----
+function buildWx(w) {
+  const f = (n, fn) => [...Array(n)].map((_, i) => fn(i)).join(""), L = (a = 0, b = 100) => rnd(a, b).toFixed(1), D = () => (-rnd(0, 10)).toFixed(2);
+  let h = "";
+  if (w === "snow") h = f(30, () => { const z = rnd(3, 7).toFixed(1); return `<i style="left:${L()}%;width:${z}px;height:${z}px;--dx:${rnd(-30, 30).toFixed(0)}px;animation-delay:${D()}s;animation-duration:${rnd(6, 11).toFixed(1)}s"></i>`; });
+  else if (w === "rain") h = f(44, () => `<i style="left:${L(-25)}%;height:${rnd(12, 20).toFixed(0)}px;animation-delay:${D()}s;animation-duration:${rnd(.55, .95).toFixed(2)}s"></i>`);
+  else if (w === "petals" || w === "leaves") { const E = w === "petals" ? ["🌸", "🌸", "💮", "🌷"] : ["🍂", "🍁", "🍂"]; h = f(18, i => `<i style="left:${L()}%;font-size:${rnd(11, 18).toFixed(0)}px;--dx:${rnd(-70, 70).toFixed(0)}px;--r:${rnd(-540, 540).toFixed(0)}deg;animation-delay:${D()}s;animation-duration:${rnd(7, 13).toFixed(1)}s">${E[i % E.length]}</i>`); }
+  G.wxEl.className = "gwx " + w; G.wxEl.innerHTML = h;
+}
+function syncWeather() {
+  if (!G.wxEl) return;
+  if (G.wxMode === "auto" && Date.now() - G.wxAt > 12 * 60000) { G.wxAuto = pickWx(G.wxAuto); G.wxAt = Date.now(); }
+  const w = G.wxMode === "auto" ? G.wxAuto : G.wxMode; if (w === G.wx) return;
+  G.wx = w; Object.keys(WXL).forEach(k => G.el.classList.toggle("wx-" + k, k === w)); buildWx(w);
+}
+function cycleWx() {
+  const order = ["auto", ...Object.keys(WXL)]; G.wxMode = order[(order.indexOf(G.wxMode) + 1) % order.length]; ls("wx", G.wxMode);
+  syncWeather(); refreshPanel(); toast(G.wxMode === "auto" ? "Random weather 🎲" : `${WXL[G.wxMode][0]} ${WXL[G.wxMode][1]}`);
+}
+
+// ---- floating hearts, cheer visits, study buddies ----
+function spawnHeart(px, py, e = "💗") {
+  if (!G.fx) return;
+  const h = document.createElement("i"); h.className = "gheart"; h.textContent = e; h.style.left = px.toFixed(0) + "px"; h.style.top = py.toFixed(0) + "px";
+  G.fx.appendChild(h); setTimeout(() => h.remove(), 1200);
+}
+const mainPet = uid => { const u = users.find(x => x.id === uid); return u ? G.pets.get(`${u.id}:${petOf(u)}`) : null; };
+function queueVisit(from) { if (!from || from === me?.uid) return; visits.push({ from, at: Date.now() }); runVisits(); }
+function runVisits() { // a cheer arrived: the sender's pet runs over to yours (waits up to a minute if the garden isn't open yet)
+  visits = visits.filter(v => Date.now() - v.at < 60000);
+  if (!visits.length || !G.el || !G.el.isConnected || !me) return;
+  for (const p of G.pets.values()) if (p.ov && p.ov.kind === "visit") return; // one visit at a time
+  const v = visits.shift(), guest = mainPet(v.from), host = mainPet(me.uid); if (!guest || !host || guest === host) return;
+  const t = nowS();
+  if (RM.matches) return spawnHeart(host.x * G.W, host.y * G.H - 58);
+  host.ov = { kind: "host", until: t + 14 };
+  guest.ov = { kind: "visit", host: host.key, side: guest.x < host.x ? -1 : 1, limit: t + 14, nextHeart: 0, arrived: 0 };
+}
+const BUDDY = [[.44, .79, .55, .79], [.14, .88, .27, .88]]; // two meeting places on the bank of the pond: [x1, y1, x2, y2]
+function syncBuddies() { // two people studying at the same time → their pets walk to each other and hop together
+  const want = new Map();
+  if (!RM.matches) {
+    const st = users.filter(u => u.status === "studying").sort((a, b) => a.id < b.id ? -1 : 1);
+    for (let i = 0; i + 1 < st.length && i / 2 < BUDDY.length; i += 2) {
+      const pa = mainPet(st[i].id), pb = mainPet(st[i + 1].id), S = BUDDY[i / 2]; if (!pa || !pb || pa.st < 1 || pb.st < 1) continue;
+      want.set(pa.key, { x: S[0], y: S[1], mate: pb.key, face: -1 }); want.set(pb.key, { x: S[2], y: S[3], mate: pa.key, face: 1 });
+    }
+  }
+  G.pets.forEach(p => {
+    const w = want.get(p.key);
+    if (w) { if (!p.ov) p.ov = { kind: "buddy", arrived: 0, ...w }; else if (p.ov.kind === "buddy") Object.assign(p.ov, w); }
+    else if (p.ov && p.ov.kind === "buddy") { p.ov = null; p.mode = "rest"; p.until = nowS() + rnd(.5, 2); }
+  });
+}
 const gardenMain = () => `<h2>our garden</h2><div id="gslot"></div><div id="gpanel">${gardenPanel()}</div>`;
 function gardenTap(key) {
   const p = G.pets.get(key), u = p && users.find(x => x.id === p.uid); if (!u) return;
   const tot = totalOf(u), st = stageOf(tot), mood = moodOf(u);
   p.jump = nowS();
-  const h = document.createElement("i"); h.className = "gheart"; h.textContent = "💗"; h.style.left = (p.x * G.W).toFixed(0) + "px"; h.style.top = (p.y * G.H - 62).toFixed(0) + "px";
-  G.fx.appendChild(h); setTimeout(() => h.remove(), 1100);
-  G.card.innerHTML = `<b>${ALLP[p.type].e[st === 0 ? 0 : 2]} ${esc(u.name)}'s ${esc(petName(p.type))}</b><small>${stageNames(p.type)[st]} · ${st < 3 ? `${fmt(STAGE[st] - tot)} to grow` : "fully grown 👑"}</small><em>${SAY[mood]}</em>`;
+  spawnHeart(p.x * G.W, p.y * G.H - 62);
+  G.card.innerHTML = `<b>${ALLP[p.type].e[st]}${accOf(p.type, st)} ${esc(u.name)}'s ${esc(petName(p.type))}</b><small>${stageNames(p.type)[st]} · ${st < 3 ? `${fmt(STAGE[st] - tot)} to grow` : "fully grown 👑"}</small><em>${SAY[mood]}</em>`;
   G.card.hidden = true; void G.card.offsetWidth; G.card.hidden = false;
   clearTimeout(G.cardT); G.cardT = setTimeout(() => { G.card.hidden = true; }, 4200);
 }
@@ -324,6 +530,18 @@ function gardenSheet(mine) { // "choose my garden pets" modal: locked pets are g
   $("#sx").onclick = () => modal.innerHTML = "";
   $("#gs").onclick = async () => { try { await DB.saveGarden(me.uid, [...sel]); modal.innerHTML = ""; toast("Garden updated 🌳"); } catch (e) { toast(errMsg(e)); } };
   paint();
+}
+// ---- pet evolutions: when the pet reaches a new stage, show the old → new form with confetti (remembered on this device) ----
+function checkEvolve(m) {
+  const st = stageOf(totalOf(m)), k = "stg-" + m.id, seen = ls(k);
+  if (seen == null) { ls(k, st); return; } // first run on this device: remember quietly
+  if (st > +seen) { ls(k, st); evoMoment(m, +seen, st); }
+}
+function evoMoment(m, a, b) {
+  const t = petOf(m), el = document.createElement("div"); el.className = "pop";
+  el.innerHTML = `<div class="popc"><div class="evo"><span>${ALLP[t].e[a]}</span><em class="ar">➜</em><span class="new">${petFace(t, b)}</span></div><b>${esc(m.name)}'s ${esc(petName(t))} evolved!</b><p>${stageNames(t)[b]} ✨</p></div>`;
+  el.onclick = () => el.remove(); document.body.appendChild(el); setTimeout(() => el.remove(), 6000);
+  burst(); setTimeout(() => burst(["✨", "⭐", "🌟", "💖"], 30), 500);
 }
 let gSeen = null, gSeenFor = "";
 function checkUnlocks(m) { // new garden pet unlocked → confetti once (remembered on this device)
@@ -437,7 +655,7 @@ function watch() { // runs every second for the logged-in user
     const b = BADGES.find(x => x[0] === id); burst(); setTimeout(() => toast(`Badge unlocked: ${b[1]} ${b[2]}!`), 1800);
   });
   if (sNodes && m.status !== "studying") { stopSound(); render(); }
-  checkUnlocks(m);
+  checkUnlocks(m); checkEvolve(m); checkSeeds(m);
   const cl = couple().lv, seen = ls("lvl");
   if (seen == null) ls("lvl", cl); else if (cl > +seen) { ls("lvl", cl); burst(); setTimeout(() => toast(`Level up! ${LV_T[cl]} 🎉`), 1800); }
 }
@@ -528,6 +746,12 @@ app.onclick = async e => {
     else if (a === "stickers") stickerSheet(id, mine);
     else if (a === "gpet") gardenTap(id);
     else if (a === "gchoose") gardenSheet(mine);
+    else if (a === "gshop") shopSheet(mine);
+    else if (a === "gedit") enterEdit(mine);
+    else if (a === "gdone") await exitEdit(true);
+    else if (a === "gcancel") await exitEdit(false);
+    else if (a === "gdel") delSel();
+    else if (a === "gwx") cycleWx();
     else if (a === "calnav") { calMonth = Math.min(0, calMonth + +id); render(); }
     else if (a === "day") { const v = +b.dataset.v; toast(`${new Date(id + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${v ? fmt(v) : "no study 💤"}`); }
     else if (a === "discard") { if (confirm("Cancel without saving any time?")) { stopSound(); await DB.cancelStudy(me.uid); } }
@@ -551,10 +775,10 @@ app.onclick = async e => {
 
 // ---------- boot ----------
 DB.watchAuth(u => {
-  unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = []; clearGarden();
+  unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = []; clearGarden(); seedBase = -1; visits = [];
   if (u) unsubs = [DB.watchUsers(x => { users = x; render(); }), DB.watchSessions(u.uid, x => { sessions = x; render(); }),
     DB.watchCheers(u.uid, list => {
-      cheerCard(list); burst(list.map(c => short(c.emoji) ? c.emoji : "💌"), 24);
+      cheerCard(list); list.forEach(c => queueVisit(c.from)); burst(list.map(c => short(c.emoji) ? c.emoji : "💌"), 24);
       notify(`${list[0].name || "Your friend"} sent you a cheer!`, list.map(c => c.emoji).join("  "));
     })];
   render();
