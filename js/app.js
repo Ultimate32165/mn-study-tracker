@@ -56,7 +56,8 @@ function installCard() {
 const runStart = u => u.runStart ?? (u.startedAt ? u.startedAt.toMillis() : Date.now());
 const elapsed = u => (u.accum || 0) + (u.status === "studying" ? Date.now() - runStart(u) : 0); // ms studied so far, excluding breaks
 const live = u => `data-base="${u.accum || 0}" data-run="${u.status === "studying" ? runStart(u) : ""}"`;
-const goalOf = u => u.goal ?? 14400, limitOf = u => u.limit ?? 10800, BREAK = 3e5;
+const goalOf = u => u.goal ?? 14400, limitOf = u => u.limit ?? 10800,
+  focusOf = u => (u.pomoFocus ?? 25) * 60000, restOf = u => (u.pomoRest ?? 5) * 60000;
 const liveToday = u => stats(u).today + (u.status === "studying" || u.status === "paused" ? elapsed(u) / 1000 : 0);
 const ls = (k, v) => { try { return v === undefined ? localStorage.getItem(k) : localStorage.setItem(k, v); } catch {} };
 let pomo = ls("pomo") === "1", lastCheer = 0, askedAt = 0, busy = false, brkSeen = 0, lastBest = 0;
@@ -83,12 +84,12 @@ const card = (u, isMe) => {
 };
 function homeView(mine) {
   const on = mine.status === "studying", br = mine.status === "paused";
-  const hint = br ? (mine.breakAt ? `<p class="hint" data-brk="${mine.breakAt}"></p>` : `<p class="hint">timer paused ☕ take your time</p>`) : `<p class="hint">you're doing great ✨${mine.pomo ? " 🍅" : ""}</p>`;
+  const hint = br ? (mine.breakAt ? `<p class="hint" data-brk="${mine.breakAt}" data-len="${restOf(mine)}"></p>` : `<p class="hint">timer paused ☕ take your time</p>`) : `<p class="hint">you're doing great ✨${mine.pomo ? " 🍅" : ""}</p>`;
   const hero = on || br
     ? `<div class="hero ${br ? "brk" : "on"}"><div class="clock big" ${live(mine)}>00:00:00</div>${hint}
        <div class="duo"><button class="study ${br ? "go" : "pause"}" data-act="${br ? "resume" : "pause"}">${br ? "resume" : "pause"}<span>${br ? "▶️" : "⏸️"}</span></button>
        <button class="study stop" data-act="stop">stop<span>⏹️</span></button></div><button class="link" data-act="discard">cancel without saving</button></div>`
-    : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p><button class="chip" data-act="pomo">🍅 pomodoro: ${pomo ? "on (25 / 5)" : "off"}</button></div>`;
+    : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p><button class="chip" data-act="pomo">🍅 pomodoro: ${pomo ? `on (${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5})` : "off"}</button></div>`;
   const others = users.filter(u => u.id !== me.uid).sort((a, b) => (b.status === "studying") - (a.status === "studying"));
   return `${hero}${installCard()}<h2>${others.length ? "friends" : "no friends yet"}</h2>
   ${others.map(u => card(u, false)).join("") || `<p class="hint">Ask your friend to create an account — they'll show up here!</p>`}<h2>you</h2>${card(mine, true)}`;
@@ -114,15 +115,15 @@ function render() {
 }
 const tick = () => {
   document.querySelectorAll("[data-base]").forEach(e => e.textContent = clock((+e.dataset.base + (e.dataset.run ? Date.now() - e.dataset.run : 0)) / 1000));
-  document.querySelectorAll("[data-brk]").forEach(e => { const r = BREAK - (Date.now() - e.dataset.brk); e.textContent = r > 0 ? `☕ break · ${clock(r / 1000).slice(3)} left` : "break's over, ready to resume? 💪"; });
+  document.querySelectorAll("[data-brk]").forEach(e => { const r = +e.dataset.len - (Date.now() - e.dataset.brk); e.textContent = r > 0 ? `☕ break · ${clock(r / 1000).slice(3)} left` : "break's over, ready to resume? 💪"; });
 };
 function watch() { // runs every second for the logged-in user
   const m = users.find(u => u.id === me?.uid); if (!m) return;
   if (m.pomo && m.status === "studying" && m.nextBreak && elapsed(m) >= m.nextBreak && !busy) { // pomodoro: auto-pause at each 25 min block
-    busy = true; DB.pomoBreak(me.uid, m.nextBreak).catch(() => {}).finally(() => setTimeout(() => busy = false, 2000));
+    busy = true; DB.pomoBreak(me.uid, m.nextBreak, focusOf(m)).catch(() => {}).finally(() => setTimeout(() => busy = false, 2000));
     toast("Break time! ☕"); notify("Break time ☕", "Nice focus! Take 5 minutes.");
   }
-  if (m.status === "paused" && m.breakAt && Date.now() - m.breakAt >= BREAK && brkSeen !== m.breakAt) { brkSeen = m.breakAt; toast("Break's over 💪"); notify("Break's over 💪", "Ready to resume?"); }
+  if (m.status === "paused" && m.breakAt && Date.now() - m.breakAt >= restOf(m) && brkSeen !== m.breakAt) { brkSeen = m.breakAt; toast("Break's over 💪"); notify("Break's over 💪", "Ready to resume?"); }
   const lim = limitOf(m);
   if (m.status === "studying" && lim > 0 && !modal.innerHTML && Date.now() - askedAt > 3e5 && Date.now() >= Math.max(m.checkedAt || 0, runStart(m)) + lim * 1000) {
     askedAt = Date.now(); askStill(m); notify("Still studying? 🥺", "Your timer has been running for a while.");
@@ -171,11 +172,19 @@ function profileSheet(mine) {
   <div class="emojis">${EMOJI.map(e => `<button class="av ${e === mine.emoji ? "sel" : ""}" data-e="${e}">${e}</button>`).join("")}</div>
   <button class="btn ghost" id="gl">🎯 daily goal: ${goalOf(mine) ? fmt(goalOf(mine)) : "off"}</button>
   <button class="btn ghost" id="lm">⏰ still-studying check: ${limitOf(mine) ? "after " + fmt(limitOf(mine)) : "off"}</button>
+  <button class="btn ghost" id="pm">🍅 pomodoro: ${mine.pomoFocus ?? 25} min focus / ${mine.pomoRest ?? 5} min break</button>
   <button class="btn ghost" id="nt">🔔 turn on notifications</button><p class="hint">cute themes</p><div class="emojis">${themeBtns(["auto", ...CUTE])}</div><p class="hint">glass themes ✨</p><div class="emojis">${themeBtns(GLASS)}</div>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
   $("#gl").onclick = () => sheet({ title: "daily goal 🎯", note: "How long do you want to study each day? 00:00 turns it off.", secs: goalOf(mine), onSave: sec => DB.updateProfile(me.uid, { goal: sec }) });
   $("#lm").onclick = () => sheet({ title: "still-studying check ⏰", note: "Ask me “still studying?” when the timer runs this long. 00:00 turns it off.", secs: limitOf(mine), onSave: sec => DB.updateProfile(me.uid, { limit: sec }) });
+  $("#pm").onclick = () => sheet({ title: "focus length 🍅", note: "How long is each study block? (hours : minutes)", secs: (mine.pomoFocus ?? 25) * 60,
+    onSave: async sec => {
+      if (sec < 60) throw Error("Minimum is 1 minute.");
+      await DB.updateProfile(me.uid, { pomoFocus: sec / 60 });
+      setTimeout(() => sheet({ title: "break length ☕", note: "How long is each break?", secs: (mine.pomoRest ?? 5) * 60,
+        onSave: async s2 => { if (s2 < 60) throw Error("Minimum is 1 minute."); await DB.updateProfile(me.uid, { pomoRest: s2 / 60 }); toast("Pomodoro saved! 🍅"); } }), 0);
+    } });
   $("#nt").onclick = async () => { try { toast((await Notification.requestPermission()) === "granted" ? "Notifications on! 🔔" : "Notifications blocked."); } catch { toast("Install the app to your home screen first."); } };
   modal.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { theme = b.dataset.t; applyTheme(theme); modal.querySelectorAll("[data-t]").forEach(x => x.classList.toggle("sel", x === b)); });
   modal.querySelectorAll("[data-e]").forEach(b => b.onclick = () => { em = b.dataset.e; modal.querySelectorAll("[data-e]").forEach(x => x.classList.toggle("sel", x === b)); });
@@ -196,7 +205,7 @@ app.onclick = async e => {
       else { if (SIGNUP_CODE && $("#c").value.trim() !== SIGNUP_CODE) return toast("Wrong secret code."); await DB.signUp(u, p, EMOJI[Math.floor(Math.random() * EMOJI.length)]); }
     } else if (a === "tab") { tab = id; render(); }
     else if (a === "install") { installEvt.prompt(); installEvt = null; render(); }
-    else if (a === "study") { await DB.startStudy(me.uid, pomo); toast("Good luck! 🍀"); }
+    else if (a === "study") { await DB.startStudy(me.uid, pomo, focusOf(mine)); toast("Good luck! 🍀"); }
     else if (a === "pause") await DB.pauseStudy(me.uid, elapsed(mine));
     else if (a === "resume") await DB.resumeStudy(me.uid);
     else if (a === "pomo") { pomo = !pomo; ls("pomo", pomo ? "1" : "0"); render(); }

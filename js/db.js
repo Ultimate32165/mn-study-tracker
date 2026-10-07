@@ -22,8 +22,7 @@ export async function signUp(u, p, emoji) {
 export const watchUsers = cb => onSnapshot(collection(db, "users"), s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
 export const watchSessions = (uid, cb) => onSnapshot(query(collection(db, "users", uid, "sessions"), orderBy("start", "desc"), limit(40)),
   s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
-const POMO = 25 * 60000;
-export const startStudy = (uid, pomo) => updateDoc(userRef(uid), { status: "studying", startedAt: serverTimestamp(), runStart: Date.now(), accum: 0, checkedAt: null, breakAt: null, pomo: !!pomo, nextBreak: pomo ? POMO : null });
+export const startStudy = (uid, pomo, focusMs) => updateDoc(userRef(uid), { status: "studying", startedAt: serverTimestamp(), runStart: Date.now(), accum: 0, checkedAt: null, breakAt: null, pomo: !!pomo, nextBreak: pomo ? focusMs : null });
 export const cancelStudy = uid => updateDoc(userRef(uid), { status: "offline", startedAt: null, runStart: null, accum: 0, breakAt: null, pomo: false });
 export const pauseStudy = (uid, accumMs) => updateDoc(userRef(uid), { status: "paused", accum: accumMs, runStart: null, breakAt: null });
 export const resumeStudy = uid => updateDoc(userRef(uid), { status: "studying", runStart: Date.now(), breakAt: null });
@@ -52,7 +51,7 @@ export async function deleteSession(uid, s) {
 }
 
 // ---- pomodoro, still-studying check, cheers ----
-export const pomoBreak = (uid, nb) => updateDoc(userRef(uid), { status: "paused", accum: nb, runStart: null, breakAt: Date.now(), nextBreak: nb + POMO });
+export const pomoBreak = (uid, nb, focusMs) => updateDoc(userRef(uid), { status: "paused", accum: nb, runStart: null, breakAt: Date.now(), nextBreak: nb + focusMs });
 export const checkIn = uid => updateDoc(userRef(uid), { checkedAt: Date.now() });
 export const cheer = (to, from, name, emoji) => addDoc(collection(db, "users", to, "cheers"), { from, name, emoji, at: serverTimestamp() });
 export const watchCheers = (uid, cb) => onSnapshot(collection(db, "users", uid, "cheers"), s => {
