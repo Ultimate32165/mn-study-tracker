@@ -279,7 +279,7 @@ app.onclick = async e => {
 DB.watchAuth(u => {
   unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = [];
   if (u) unsubs = [DB.watchUsers(x => { users = x; render(); }), DB.watchSessions(u.uid, x => { sessions = x; render(); }),
-    DB.watchCheers(u.uid, list => { toast(`${list[0].name || "Your friend"} cheered you on! ${list.map(c => c.emoji).join("")}`); burst(list.map(c => c.emoji), 24); })];
+    DB.watchCheers(u.uid, list => { toast(`${list[0].name || "Your friend"} cheered you on! ${list.map(c => c.emoji).join("")}`); burst(list.map(c => c.emoji), 24); notify(`${list[0].name || "Your friend"} cheered you on! ${list.map(c => c.emoji).join("")}`, "Keep going, you're doing great ✨"); })];
   render();
 });
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; render(); });
