@@ -74,3 +74,15 @@ nav button span{font-size:.75rem;font-family:"Baloo 2"}nav button.act{opacity:1;
 .col div{height:44px;line-height:44px;scroll-snap-align:center;font-size:1.6rem;font-family:"Baloo 2";opacity:.4;transition:opacity .1s}
 .col div.s{opacity:1;color:var(--main);font-weight:800}
 .wl{display:flex;justify-content:center;gap:50px;font-size:.8rem;color:var(--soft);margin:2px 0 4px}
+.ring{width:58px;height:58px;flex:none;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--main) calc(var(--p)*1%),var(--line) 0)}
+.ring.done{background:var(--live)}.ring.off{background:none}
+.ring .av{width:48px;height:48px}
+.mini small{font-size:.62rem;color:var(--soft);font-weight:600}
+.cheer{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.8rem;color:var(--soft)}.cheer span{flex:1}
+.cheer button{background:var(--tint);border-radius:999px;padding:6px 16px;font-size:1.2rem}.cheer button:active{transform:scale(1.25)}
+.hero .chip{margin-top:6px}
+.sheet .btn.ghost{margin-top:8px;font-size:.95rem;padding:11px}
+.fx{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:20}
+.fx i{position:absolute;top:-24px;width:10px;height:14px;border-radius:3px;font-style:normal;font-size:1.5rem;line-height:1;animation:fall 3s linear forwards}
+.fx i:not([style*=background]){width:auto;height:auto}
+@keyframes fall{to{transform:translate(var(--x),112vh) rotate(var(--r))}}

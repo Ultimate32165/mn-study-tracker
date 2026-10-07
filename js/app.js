@@ -118,9 +118,14 @@ function sheet({ title, note = "", secs = 0, max, date, onSave }) { // max = cap
 function profileSheet(mine) {
   modal.innerHTML = `<div class="back"><div class="sheet"><h3>your profile</h3><input id="pn" value="${esc(mine.name)}" maxlength="20">
   <div class="emojis">${EMOJI.map(e => `<button class="av ${e === mine.emoji ? "sel" : ""}" data-e="${e}">${e}</button>`).join("")}</div>
-  <p class="hint">theme</p><div class="emojis">${["auto", ...Object.keys(THEMES)].map(t => `<button class="av ${t === theme ? "sel" : ""}" data-t="${t}" title="${t}">${t === "auto" ? "🌓" : THEMES[t][0]}</button>`).join("")}</div>
+  <button class="btn ghost" id="gl">🎯 daily goal: ${goalOf(mine) ? fmt(goalOf(mine)) : "off"}</button>
+  <button class="btn ghost" id="lm">⏰ still-studying check: ${limitOf(mine) ? "after " + fmt(limitOf(mine)) : "off"}</button>
+  <button class="btn ghost" id="nt">🔔 turn on notifications</button><p class="hint">theme</p><div class="emojis">${["auto", ...Object.keys(THEMES)].map(t => `<button class="av ${t === theme ? "sel" : ""}" data-t="${t}" title="${t}">${t === "auto" ? "🌓" : THEMES[t][0]}</button>`).join("")}</div>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
+  $("#gl").onclick = () => sheet({ title: "daily goal 🎯", note: "How long do you want to study each day? 00:00 turns it off.", secs: goalOf(mine), onSave: sec => DB.updateProfile(me.uid, { goal: sec }) });
+  $("#lm").onclick = () => sheet({ title: "still-studying check ⏰", note: "Ask me “still studying?” when the timer runs this long. 00:00 turns it off.", secs: limitOf(mine), onSave: sec => DB.updateProfile(me.uid, { limit: sec }) });
+  $("#nt").onclick = async () => { try { toast((await Notification.requestPermission()) === "granted" ? "Notifications on! 🔔" : "Notifications blocked."); } catch { toast("Install the app to your home screen first."); } };
   modal.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { theme = b.dataset.t; applyTheme(theme); modal.querySelectorAll("[data-t]").forEach(x => x.classList.toggle("sel", x === b)); });
   modal.querySelectorAll("[data-e]").forEach(b => b.onclick = () => { em = b.dataset.e; modal.querySelectorAll("[data-e]").forEach(x => x.classList.toggle("sel", x === b)); });
   $("#sx").onclick = () => modal.innerHTML = "";
@@ -140,9 +145,11 @@ app.onclick = async e => {
       else { if (SIGNUP_CODE && $("#c").value.trim() !== SIGNUP_CODE) return toast("Wrong secret code."); await DB.signUp(u, p, EMOJI[Math.floor(Math.random() * EMOJI.length)]); }
     } else if (a === "tab") { tab = id; render(); }
     else if (a === "install") { installEvt.prompt(); installEvt = null; render(); }
-    else if (a === "study") { await DB.startStudy(me.uid); toast("Good luck! 🍀"); }
+    else if (a === "study") { await DB.startStudy(me.uid, pomo); toast("Good luck! 🍀"); }
     else if (a === "pause") await DB.pauseStudy(me.uid, elapsed(mine));
     else if (a === "resume") await DB.resumeStudy(me.uid);
+    else if (a === "pomo") { pomo = !pomo; ls("pomo", pomo ? "1" : "0"); render(); }
+    else if (a === "cheer") { if (Date.now() - lastCheer < 3000) return toast("Slow down, cutie 😄"); lastCheer = Date.now(); await DB.cheer(id, me.uid, mine.name, b.dataset.e); toast("Cheer sent " + b.dataset.e); }
     else if (a === "discard") { if (confirm("Cancel without saving any time?")) await DB.cancelStudy(me.uid); }
     else if (a === "profile") profileSheet(mine);
     else if (a === "stop") {
@@ -164,7 +171,8 @@ app.onclick = async e => {
 // ---------- boot ----------
 DB.watchAuth(u => {
   unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = [];
-  if (u) unsubs = [DB.watchUsers(x => { users = x; render(); }), DB.watchSessions(u.uid, x => { sessions = x; render(); })];
+  if (u) unsubs = [DB.watchUsers(x => { users = x; render(); }), DB.watchSessions(u.uid, x => { sessions = x; render(); }),
+    DB.watchCheers(u.uid, list => { toast(`${list[0].name || "Your friend"} cheered you on! ${list.map(c => c.emoji).join("")}`); burst(list.map(c => c.emoji), 24); })];
   render();
 });
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; render(); });
