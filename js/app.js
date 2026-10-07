@@ -79,8 +79,8 @@ const card = (u, isMe) => {
   const s = stats(u), on = u.status === "studying", br = u.status === "paused", g = goalOf(u), lt = liveToday(u), p = g ? Math.min(100, lt / g * 100) : 0;
   return `<div class="card ${on ? "on" : ""} ${br ? "brk" : ""}"><div class="who"><span class="ring ${!g ? "off" : p >= 100 ? "done" : ""}" style="--p:${p}"><span class="av">${esc(u.emoji)}</span></span><div class="nm"><b>${esc(u.name)}${isMe ? " (you)" : ""}</b>
   <span class="pill ${on ? "live" : ""}">${on ? "studying ✏️" : br ? "on a break ☕" : "resting 💤"}</span></div>${on || br ? `<div class="clock" ${live(u)}>00:00:00</div>` : ""}</div>
-  <div class="mini"><div><b>${fmt(lt)}${g ? `<small> / ${fmt(g)}</small>` : ""}</b>today</div><div><b>${fmt(s.week)}</b>7 days</div><div><b>${s.streak}🔥</b>streak</div><div><b>${fmt(s.total)}</b>total</div></div>
-  ${!isMe && on ? `<div class="cheer"><span>send a cheer</span><button data-act="cheer" data-id="${u.id}" data-e="💖">💖</button><button data-act="cheer" data-id="${u.id}" data-e="🔥">🔥</button></div>` : ""}</div>`;
+  ${petRow(u)}<div class="mini"><div><b>${fmt(lt)}${g ? `<small> / ${fmt(g)}</small>` : ""}</b>today</div><div><b>${fmt(s.week)}</b>7 days</div><div><b>${s.streak}🔥</b>streak</div><div><b>${fmt(s.total)}</b>total</div></div>
+  ${!isMe && on ? `<div class="cheer"><span>send a cheer</span><button data-act="cheer" data-id="${u.id}" data-e="💖">💖</button><button data-act="cheer" data-id="${u.id}" data-e="🔥">🔥</button><button data-act="cheer" data-id="${u.id}" data-e="🧋">🧋</button><button data-act="cheer" data-id="${u.id}" data-e="🫶">🫶</button><button class="t" data-act="stickers" data-id="${u.id}">💌</button></div>` : ""}</div>`;
 };
 function homeView(mine) {
   const on = mine.status === "studying", br = mine.status === "paused";
@@ -88,12 +88,84 @@ function homeView(mine) {
   const hero = on || br
     ? `<div class="hero ${br ? "brk" : "on"}"><div class="clock big" ${live(mine)}>00:00:00</div>${hint}
        <div class="duo"><button class="study ${br ? "go" : "pause"}" data-act="${br ? "resume" : "pause"}">${br ? "resume" : "pause"}<span>${br ? "▶️" : "⏸️"}</span></button>
-       <button class="study stop" data-act="stop">stop<span>⏹️</span></button></div><button class="link" data-act="discard">cancel without saving</button></div>`
-    : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p><button class="chip" data-act="pomo">🍅 pomodoro: ${pomo ? `on (${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5})` : "off"}</button></div>`;
+       <button class="study stop" data-act="stop">stop<span>⏹️</span></button></div><div class="chips"><button class="chip" data-act="sound">${soundLabel()}</button></div><button class="link" data-act="discard">cancel without saving</button></div>`
+    : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p><div class="chips"><button class="chip" data-act="pomo">🍅 pomodoro: ${pomo ? `on (${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5})` : "off"}</button><button class="chip" data-act="sound">${soundLabel()}</button></div></div>`;
   const others = users.filter(u => u.id !== me.uid).sort((a, b) => (b.status === "studying") - (a.status === "studying"));
-  return `${hero}${installCard()}<h2>${others.length ? "friends" : "no friends yet"}</h2>
+  return `${hero}${installCard()}${coupleCard()}<h2>${others.length ? "friends" : "no friends yet"}</h2>
   ${others.map(u => card(u, false)).join("") || `<p class="hint">Ask your friend to create an account — they'll show up here!</p>`}<h2>you</h2>${card(mine, true)}`;
 }
+// ---- cozy sounds (generated with the Web Audio API, no files needed) ----
+const SOUNDS = { rain: "🌧️ rain", cafe: "☕ cafe", ocean: "🌊 ocean" };
+let sound = ls("sound") || "off", actx = null, sNodes = null, sTimer = 0;
+const soundLabel = () => sNodes ? "🎧 " + SOUNDS[sound] : sound !== "off" ? "🎧 " + SOUNDS[sound] + " ▶" : "🎧 sounds: off";
+function noiseBuf(ctx, brown) {
+  const b = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate), d = b.getChannelData(0); let last = 0;
+  for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; if (brown) { last = (last + .02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w; }
+  return b;
+}
+function stopSound() { (sNodes || []).forEach(n => { try { n.stop && n.stop(); n.disconnect(); } catch {} }); sNodes = null; clearTimeout(sTimer); }
+function playSound(mode) {
+  stopSound(); if (mode === "off" || !SOUNDS[mode]) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume();
+    const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain(), nodes = [src, f, g];
+    src.buffer = noiseBuf(actx, mode !== "rain"); src.loop = true;
+    if (mode === "rain") { f.type = "bandpass"; f.frequency.value = 3200; f.Q.value = .35; g.gain.value = .22; }
+    else {
+      f.type = "lowpass"; f.frequency.value = mode === "cafe" ? 1000 : 600; g.gain.value = mode === "cafe" ? .5 : .55;
+      const lfo = actx.createOscillator(), lg = actx.createGain(); lfo.frequency.value = mode === "cafe" ? .35 : .09; lg.gain.value = mode === "cafe" ? .12 : .3;
+      lfo.connect(lg); lg.connect(g.gain); lfo.start(); nodes.push(lfo, lg);
+    }
+    src.connect(f); f.connect(g); g.connect(actx.destination); src.start(); sNodes = nodes;
+    if (mode === "cafe") { // little cup clinks now and then
+      const clink = () => {
+        if (!sNodes) return; const o = actx.createOscillator(), cg = actx.createGain(), t = actx.currentTime;
+        o.frequency.value = 1800 + Math.random() * 1400; cg.gain.setValueAtTime(.05, t); cg.gain.exponentialRampToValueAtTime(.0001, t + .35);
+        o.connect(cg); cg.connect(actx.destination); o.start(); o.stop(t + .4); sTimer = setTimeout(clink, 3000 + Math.random() * 7000);
+      };
+      sTimer = setTimeout(clink, 4000);
+    }
+  } catch {}
+}
+
+// ---- study pet / garden: grows with total hours, sleepy if no study today ----
+const PETS = { bunny: { e: ["🥚", "🐰", "🐰", "🐇"] }, cat: { e: ["🥚", "🐱", "🐱", "🐈"] }, chick: { e: ["🥚", "🐣", "🐥", "🐔"] }, plant: { e: ["🌰", "🌱", "🪴", "🌳"] } };
+const petOf = u => PETS[u.pet] ? u.pet : "bunny";
+const STAGE = [1800, 18000, 72000]; // seconds studied to reach baby / kid / grown-up
+function petRow(u) {
+  const t = petOf(u), paused = u.status === "paused", on = u.status === "studying", tot = stats(u).total + (on || paused ? elapsed(u) / 1000 : 0);
+  const st = tot >= STAGE[2] ? 3 : tot >= STAGE[1] ? 2 : tot >= STAGE[0] ? 1 : 0, fed = liveToday(u) > 0;
+  const say = on ? "nom nom 🍓" : paused ? "break time ☕" : fed ? "happy & full 💗" : "sleepy… study to feed me";
+  const names = t === "plant" ? ["seed", "sprout", "sapling", "tree"] : ["egg", "baby", "kid", "grown-up"];
+  return `<div class="petrow ${on ? "feed" : fed || paused ? "" : "sleepy"}"><span class="pet s${st}">${PETS[t].e[st]}</span><div><b>${say}</b><small>${names[st]}${st < 3 ? ` · ${fmt(STAGE[st] - tot)} to grow` : " · fully grown 👑"}</small></div></div>`;
+}
+
+// ---- couple level: everyone's hours added together ----
+const LV_H = [0, 5, 15, 30, 60, 100, 150, 220, 300, 400];
+const LV_T = ["Tiny Beginners 🐣", "Study Buddies 📚", "Cozy Duo ☕", "Focus Friends 🎧", "Brain Besties 🧠", "Power Pair ⚡", "Study Stars ⭐", "Scholar Squad 🎓", "Genius Gang 🚀", "Dream Team 👑"];
+function couple() {
+  const sec = users.reduce((a, u) => a + stats(u).total + (u.status === "studying" || u.status === "paused" ? elapsed(u) / 1000 : 0), 0), h = sec / 3600;
+  let lv = 0; while (lv + 1 < LV_H.length && h >= LV_H[lv + 1]) lv++;
+  const next = LV_H[lv + 1];
+  return { sec, lv, title: LV_T[lv], next, pct: next ? (h - LV_H[lv]) / (next - LV_H[lv]) * 100 : 100 };
+}
+const coupleCard = () => { const c = couple(); return `<div class="lvl"><div class="lt"><b>💞 Level ${c.lv + 1}</b><span>${c.title}</span></div><div class="lbar"><i style="width:${c.pct}%"></i></div>
+  <small>${c.next ? `${fmt(c.sec)} of ${c.next}h together` : `${fmt(c.sec)} together · max level!`}</small></div>`; };
+
+// ---- cheers: pop-up card + sticker picker ----
+const short = t => [...String(t)].length <= 2; // an emoji vs a text sticker
+const STICKERS = ["you got this! 💪", "proud of you! 🥹", "sending hugs 🤗", "sip some water 💧", "I believe in you ✨", "almost there! 🌟", "you're so smart 🧠", "break soon, I promise 🧃"];
+function cheerCard(list) {
+  const c = list[list.length - 1], el = document.createElement("div"); el.className = "pop";
+  el.innerHTML = `<div class="popc"><div class="pe">${short(c.emoji) ? esc(c.emoji) : "💌"}</div><b>${esc(c.name || "Your friend")}</b><p>${short(c.emoji) ? "sent you a cheer!" : esc(c.emoji)}</p>${list.length > 1 ? `<small>+${list.length - 1} more</small>` : ""}</div>`;
+  el.onclick = () => el.remove(); document.body.appendChild(el); setTimeout(() => el.remove(), 5500);
+}
+function stickerSheet(to, mine) {
+  modal.innerHTML = `<div class="back"><div class="sheet"><h3>send a sticker 💌</h3><div class="stk">${STICKERS.map(t => `<button class="btn ghost" data-s="${esc(t)}">${esc(t)}</button>`).join("")}</div><button class="link" id="sx">close</button></div></div>`;
+  $("#sx").onclick = () => modal.innerHTML = "";
+  modal.querySelectorAll("[data-s]").forEach(b => b.onclick = async () => { modal.innerHTML = ""; try { await DB.cheer(to, me.uid, mine.name, b.dataset.s); toast("Sticker sent 💌"); } catch (e) { toast(errMsg(e)); } });
+}
+
 const BADGES = [ // [id, emoji, name, description, test(ctx)]
   ["first", "🌱", "First step", "Study for the first time", c => c.total > 0],
   ["h10", "🌟", "10 hours", "10 hours studied in total", c => c.total >= 36000],
@@ -177,6 +249,9 @@ function watch() { // runs every second for the logged-in user
     badgeBusy.add(id); DB.unlockBadge(me.uid, id).catch(() => {});
     const b = BADGES.find(x => x[0] === id); burst(); setTimeout(() => toast(`Badge unlocked: ${b[1]} ${b[2]}!`), 1800);
   });
+  if (sNodes && m.status !== "studying") { stopSound(); render(); }
+  const cl = couple().lv, seen = ls("lvl");
+  if (seen == null) ls("lvl", cl); else if (cl > +seen) { ls("lvl", cl); burst(); setTimeout(() => toast(`Level up! ${LV_T[cl]} 🎉`), 1800); }
 }
 setInterval(() => { tick(); watch(); }, 1000);
 setInterval(() => me && render(), 30000);
@@ -217,12 +292,18 @@ function profileSheet(mine) {
   <div class="emojis">${EMOJI.map(e => `<button class="av ${e === mine.emoji ? "sel" : ""}" data-e="${e}">${e}</button>`).join("")}</div>
   <button class="btn ghost" id="gl">🎯 daily goal: ${goalOf(mine) ? fmt(goalOf(mine)) : "off"}</button>
   <button class="btn ghost" id="lm">⏰ still-studying check: ${limitOf(mine) ? "after " + fmt(limitOf(mine)) : "off"}</button>
+  <button class="btn ghost" id="pt">${PETS[petOf(mine)].e[2]} pet: ${petOf(mine)}</button>
   <button class="btn ghost" id="pm">🍅 pomodoro: ${mine.pomoFocus ?? 25} min focus / ${mine.pomoRest ?? 5} min break</button>
   <button class="btn ghost" id="nt">🔔 turn on notifications</button><p class="hint">cute themes</p><div class="emojis">${themeBtns(["auto", ...CUTE])}</div><p class="hint">glass themes ✨</p><div class="emojis">${themeBtns(GLASS)}</div>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
   $("#gl").onclick = () => sheet({ title: "daily goal 🎯", note: "How long do you want to study each day? 00:00 turns it off.", secs: goalOf(mine), onSave: sec => DB.updateProfile(me.uid, { goal: sec }) });
   $("#lm").onclick = () => sheet({ title: "still-studying check ⏰", note: "Ask me “still studying?” when the timer runs this long. 00:00 turns it off.", secs: limitOf(mine), onSave: sec => DB.updateProfile(me.uid, { limit: sec }) });
+  $("#pt").onclick = () => {
+    modal.innerHTML = `<div class="back"><div class="sheet"><h3>pick your pet 🐾</h3><p class="hint">It grows as you study, and gets sleepy if you skip a day.</p><div class="emojis">${Object.keys(PETS).map(t => `<button class="av ${t === petOf(mine) ? "sel" : ""}" data-p="${t}" title="${t}">${PETS[t].e[2]}</button>`).join("")}</div><button class="link" id="sx">close</button></div></div>`;
+    $("#sx").onclick = () => modal.innerHTML = "";
+    modal.querySelectorAll("[data-p]").forEach(b => b.onclick = async () => { await DB.updateProfile(me.uid, { pet: b.dataset.p }); modal.innerHTML = ""; toast("New friend! " + PETS[b.dataset.p].e[2]); });
+  };
   $("#pm").onclick = () => sheet({ title: "focus length 🍅", note: "How long is each study block? (hours : minutes)", secs: (mine.pomoFocus ?? 25) * 60,
     onSave: async sec => {
       if (sec < 60) throw Error("Minimum is 1 minute.");
@@ -250,16 +331,19 @@ app.onclick = async e => {
       else { if (SIGNUP_CODE && $("#c").value.trim() !== SIGNUP_CODE) return toast("Wrong secret code."); await DB.signUp(u, p, EMOJI[Math.floor(Math.random() * EMOJI.length)]); }
     } else if (a === "tab") { tab = id; render(); }
     else if (a === "install") { installEvt.prompt(); installEvt = null; render(); }
-    else if (a === "study") { await DB.startStudy(me.uid, pomo, focusOf(mine)); toast("Good luck! 🍀"); }
-    else if (a === "pause") await DB.pauseStudy(me.uid, elapsed(mine));
-    else if (a === "resume") await DB.resumeStudy(me.uid);
+    else if (a === "study") { playSound(sound); await DB.startStudy(me.uid, pomo, focusOf(mine)); toast("Good luck! 🍀"); }
+    else if (a === "pause") { stopSound(); await DB.pauseStudy(me.uid, elapsed(mine)); }
+    else if (a === "resume") { playSound(sound); await DB.resumeStudy(me.uid); }
     else if (a === "pomo") { pomo = !pomo; ls("pomo", pomo ? "1" : "0"); render(); }
     else if (a === "cheer") { if (Date.now() - lastCheer < 3000) return toast("Slow down, cutie 😄"); lastCheer = Date.now(); await DB.cheer(id, me.uid, mine.name, b.dataset.e); toast("Cheer sent " + b.dataset.e); }
+    else if (a === "sound") { const order = ["off", ...Object.keys(SOUNDS)]; if (sound !== "off" && !sNodes) playSound(sound); else { sound = order[(order.indexOf(sound) + 1) % order.length]; ls("sound", sound); playSound(sound); } render(); }
+    else if (a === "stickers") stickerSheet(id, mine);
     else if (a === "calnav") { calMonth = Math.min(0, calMonth + +id); render(); }
     else if (a === "day") { const v = +b.dataset.v; toast(`${new Date(id + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${v ? fmt(v) : "no study 💤"}`); }
-    else if (a === "discard") { if (confirm("Cancel without saving any time?")) await DB.cancelStudy(me.uid); }
+    else if (a === "discard") { if (confirm("Cancel without saving any time?")) { stopSound(); await DB.cancelStudy(me.uid); } }
     else if (a === "profile") profileSheet(mine);
     else if (a === "stop") {
+      stopSound();
       const start = mine.startedAt ? mine.startedAt.toMillis() : Date.now(), sec = Math.floor(elapsed(mine) / 1000);
       if (sec < 60) { await DB.cancelStudy(me.uid); toast("Under a minute, so nothing was saved."); }
       else { await DB.addSession(me.uid, start, split(start, sec), sec, true); toast("Saved! 🌟"); }
@@ -279,7 +363,10 @@ app.onclick = async e => {
 DB.watchAuth(u => {
   unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = [];
   if (u) unsubs = [DB.watchUsers(x => { users = x; render(); }), DB.watchSessions(u.uid, x => { sessions = x; render(); }),
-    DB.watchCheers(u.uid, list => { toast(`${list[0].name || "Your friend"} cheered you on! ${list.map(c => c.emoji).join("")}`); burst(list.map(c => c.emoji), 24); notify(`${list[0].name || "Your friend"} cheered you on! ${list.map(c => c.emoji).join("")}`, "Keep going, you're doing great ✨"); })];
+    DB.watchCheers(u.uid, list => {
+      cheerCard(list); burst(list.map(c => short(c.emoji) ? c.emoji : "💌"), 24);
+      notify(`${list[0].name || "Your friend"} sent you a cheer!`, list.map(c => c.emoji).join("  "));
+    })];
   render();
 });
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; render(); });

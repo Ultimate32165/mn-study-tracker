@@ -167,3 +167,32 @@ nav button.act{opacity:1;background:var(--tint);color:var(--main)}
 .badge b{display:block;font-family:var(--hf);font-size:.8rem;color:var(--ink);margin-top:2px}
 .badge small{display:block;color:var(--soft);font-size:.62rem;margin-top:2px;line-height:1.25}
 .badge.lock{opacity:.5}.badge.lock span{filter:grayscale(1)}
+
+/* couple level */
+.lvl{background:var(--card);backdrop-filter:blur(var(--blur));border:2px solid var(--edge);border-radius:var(--r);padding:14px 16px;margin-top:18px;box-shadow:var(--sh);text-align:center}
+.lt{display:flex;justify-content:space-between;align-items:center;font-family:var(--hf)}.lt b{font-size:1.05rem}.lt span{color:var(--main);font-size:1rem}
+.lbar{height:14px;background:var(--tint);border-radius:99px;margin:10px 0 6px;overflow:hidden}
+.lbar i{display:block;height:100%;background:linear-gradient(90deg,var(--alt),var(--main));border-radius:99px;transition:width .6s}
+.lvl small{color:var(--soft);font-size:.75rem}
+
+/* pet */
+.petrow{display:flex;align-items:center;gap:10px;margin-top:11px;background:var(--tint);border-radius:18px;padding:8px 14px}
+.petrow>div{display:flex;flex-direction:column;font-size:.82rem}.petrow b{font-family:var(--hf);font-weight:600}.petrow small{color:var(--soft);font-size:.68rem}
+.pet{display:inline-block;line-height:1;width:40px;text-align:center;animation:petbob 3s ease-in-out infinite;transform-origin:bottom}
+.pet.s0{font-size:1.5rem}.pet.s1{font-size:1.4rem}.pet.s2{font-size:1.8rem}.pet.s3{font-size:2.2rem}
+.petrow.feed .pet{animation:nom .55s ease-in-out infinite}
+.petrow.sleepy .pet{filter:grayscale(.6);animation:breathe 4s ease-in-out infinite}
+.petrow.sleepy::after{content:"💤";margin-left:auto;font-size:1.2rem;animation:twinkle 2.5s ease-in-out infinite}
+@keyframes petbob{50%{transform:translateY(-3px) rotate(-4deg)}}@keyframes nom{50%{transform:scale(1.18,.86)}}@keyframes breathe{50%{transform:scale(1.06,.95)}}
+
+/* cheer pop-up card + stickers */
+.pop{position:fixed;inset:0;display:grid;place-items:center;z-index:30;background:#0003;backdrop-filter:blur(2px);animation:fade .2s}
+.popc{background:var(--sheet);border:2px solid var(--edge);backdrop-filter:blur(var(--blur));border-radius:32px;padding:26px 32px;text-align:center;max-width:300px;box-shadow:0 20px 50px #0004;animation:pip .45s cubic-bezier(.3,1.6,.5,1)}
+.pe{font-size:4.4rem;line-height:1.1;animation:bob 2s ease-in-out infinite}
+.popc b{font-family:var(--hf);font-size:1.15rem;display:block;margin-top:4px}
+.popc p{margin:6px 0 0;color:var(--main);font-family:var(--hf);font-size:1.2rem}
+.popc small{color:var(--soft);font-size:.75rem;display:block;margin-top:6px}
+@keyframes fade{from{opacity:0}}@keyframes pip{from{transform:scale(.5) rotate(-8deg);opacity:0}}
+.cheer{flex-wrap:wrap}.cheer button.t{font-size:1.1rem}
+.stk{display:flex;flex-direction:column;gap:2px;margin:12px 0 4px}
+.hero .chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}.hero .chips .chip{margin-top:0}
