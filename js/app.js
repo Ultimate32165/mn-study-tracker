@@ -177,8 +177,11 @@ const ALLP = { ...PETS, ...EXTRA };
 const petName = t => EXTRA[t] ? EXTRA[t].n : t;
 const MOVE = { bunny: [1.3, 9], cat: [1.1, 5], chick: [1.2, 6], plant: [.3, 3], dog: [1.25, 7], panda: [.65, 4], fox: [1.2, 6], frog: [.9, 11], turtle: [.4, 2], unicorn: [1.1, 6] }; // [speed, hop height px]
 const FACE_RIGHT = new Set(["🐢"]); // emoji that look RIGHT by default (all the others look left). If one walks backwards on your phone, add/remove its emoji here (e.g. "🐈", "🐕", "🦮").
-const BASE = .085; // walking speed: scene widths per second (before the per-pet multiplier)
-const BOUNDS = { x0: .1, x1: .9, y0: .6, y1: .9 }; // where pets may stand (fractions of the scene)
+// The garden is a big WORLD (WW x WH px) seen through a small window (the same 5:6 box as before) that you pan around by dragging.
+// Pet / item positions are fractions of the world. The window size only decides how much you see at once.
+const WW = 980, WH = 680, POND = { x: 300, y: 500, rx: 80, ry: 44 }; // pond centre + radii in world px (keep in sync with .gpond in the CSS)
+const BASE = 29; // walking speed in px per second (before the per-pet multiplier)
+const BOUNDS = { x0: .05, x1: .95, y0: .4, y1: .95 }; // where pets may stand (fractions of the world)
 const BUB = { study: "🍓 nom nom", break: "☕", calm: "💗", sleep: "💤" };
 const SAY = { study: "nom nom 🍓", break: "break time ☕", calm: "happy & full 💗", sleep: "sleepy… study to feed me" };
 const RM = matchMedia("(prefers-reduced-motion: reduce)");
@@ -187,18 +190,22 @@ const WXL = { clear: ["☀️", "sunny"], petals: ["🌸", "spring"], rain: ["�
 const WX_POOL = ["clear", "clear", "petals", "rain", "snow", "leaves"];
 const pickWx = avoid => { const l = WX_POOL.filter(w => w !== avoid); return l[Math.floor(Math.random() * l.length)]; };
 const WX0 = ls("wx");
-const G = { pets: new Map(), el: null, layer: null, deco: null, fly: null, fx: null, card: null, raf: 0, last: 0, W: 340, H: 408, cardT: 0, decoLv: -1, night: null, ro: null,
+const G = { pets: new Map(), el: null, layer: null, deco: null, fly: null, fx: null, card: null, raf: 0, last: 0, W: WW, H: WH, vw: 340, vh: 408, cardT: 0, decoLv: -1, night: null, ro: null,
+  world: null, cam: { x: 0, y: 0, tx: 0, ty: 0, vx: 0, vy: 0, glide: false }, camInit: false, camT: "", pan: null, drag: null, noClick: -1e9, findI: -1, vis: null, visAt: 0,
   items: new Map(), edit: false, work: null, sel: null, wx: "", wxMode: WX0 === "auto" || WXL[WX0] ? WX0 : "auto", wxAuto: pickWx(), wxAt: Date.now(), wxEl: null, buddyFx: 0 };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const seeded = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
 const isEvening = () => { const h = new Date().getHours(); return h >= 18 || h < 6; };
 const moodOf = u => u.status === "studying" ? "study" : u.status === "paused" ? "break" : liveToday(u) > 0 ? "calm" : "sleep";
-const inPond = (x, y) => ((x - .22) / .17) ** 2 + ((y - .74) / .08) ** 2 < 1;
+const inPond = (x, y) => ((x * WW - POND.x) / POND.rx) ** 2 + ((y * WH - POND.y) / POND.ry) ** 2 < 1;
 const nowS = () => performance.now() / 1000;
 
-function pickSpot(p, near) { // random spot on the grass (not in the pond); `near` = small hop around the current spot
+function pickSpot(p, near) { // random spot on the grass (not in the pond). `near` = small hop (in px) around the current spot; otherwise roam around the pet's own corner of the world
   for (let i = 0; i < 14; i++) {
-    let x = near ? p.x + rnd(-near, near) : rnd(BOUNDS.x0, BOUNDS.x1), y = near ? p.y + rnd(-near * .6, near * .6) : rnd(BOUNDS.y0, BOUNDS.y1);
+    let x, y;
+    if (near) { x = p.x + rnd(-near, near) / G.W; y = p.y + rnd(-near * .6, near * .6) / G.H; }
+    else if (Math.random() < .12) { x = rnd(BOUNDS.x0, BOUNDS.x1); y = rnd(BOUNDS.y0, BOUNDS.y1); } // now and then wander far
+    else { x = p.hx + rnd(-230, 230) / G.W; y = p.hy + rnd(-110, 110) / G.H; }
     x = Math.min(BOUNDS.x1, Math.max(BOUNDS.x0, x)); y = Math.min(BOUNDS.y1, Math.max(BOUNDS.y0, y));
     if (!inPond(x, y)) return [x, y];
   }
@@ -206,27 +213,71 @@ function pickSpot(p, near) { // random spot on the grass (not in the pond); `nea
 }
 function buildGarden() { // built ONCE; render() never touches it, so pets never reset
   const el = document.createElement("div"); el.id = "garden";
-  el.innerHTML = `<div class="gstars"></div><i class="gsun"></i><div class="grain"></div><i class="gcl c1"></i><i class="gcl c2"></i><i class="gcl c3"></i>
+  el.innerHTML = `<div class="gworld"><div class="gstars"></div><i class="gsun"></i><div class="grain"></div><i class="gcl c1"></i><i class="gcl c2"></i><i class="gcl c3"></i><i class="gcl c4"></i><i class="gcl c5"></i>
   <div class="ghill h1"></div><div class="gfence"></div><div class="ghill h2"></div><div class="gpond"></div><div class="gdeco"></div><div class="gpets"></div><div class="gfly"></div>
-  <div class="gff">${[...Array(10)].map(() => `<i style="left:${rnd(6, 94).toFixed(1)}%;top:${rnd(52, 94).toFixed(1)}%;animation-delay:${(-rnd(0, 6)).toFixed(1)}s;animation-duration:${rnd(4, 8).toFixed(1)}s"></i>`).join("")}</div>
-  <div class="gwx"></div><div class="gfx"></div><div class="gcard" hidden></div>`;
-  G.el = el; G.deco = el.querySelector(".gdeco"); G.layer = el.querySelector(".gpets"); G.fly = el.querySelector(".gfly"); G.fx = el.querySelector(".gfx"); G.card = el.querySelector(".gcard"); G.wxEl = el.querySelector(".gwx");
+  <div class="gff">${[...Array(28)].map(() => `<i style="left:${rnd(4, 96).toFixed(1)}%;top:${rnd(36, 96).toFixed(1)}%;animation-delay:${(-rnd(0, 6)).toFixed(1)}s;animation-duration:${rnd(4, 8).toFixed(1)}s"></i>`).join("")}</div>
+  <div class="gfx"></div></div><div class="gwx"></div><div class="gcard" hidden></div><button class="gfind" data-act="gfind" aria-label="find my pets">📍</button>`;
+  G.el = el; G.world = el.querySelector(".gworld"); G.deco = el.querySelector(".gdeco"); G.layer = el.querySelector(".gpets"); G.fly = el.querySelector(".gfly"); G.fx = el.querySelector(".gfx");
+  G.card = el.querySelector(".gcard"); G.wxEl = el.querySelector(".gwx");
   G.card.onclick = () => { G.card.hidden = true; };
-  G.ro = new ResizeObserver(() => { G.W = el.clientWidth || G.W; G.H = el.clientHeight || G.H; el.style.setProperty("--gh", G.H + "px"); syncItems(); }); G.ro.observe(el);
+  G.ro = new ResizeObserver(() => { G.vw = el.clientWidth || G.vw; G.vh = el.clientHeight || G.vh; el.style.setProperty("--gh", G.vh + "px"); }); G.ro.observe(el);
+  el.addEventListener("pointerdown", panDown); el.addEventListener("pointermove", panMove); el.addEventListener("pointerup", panUp); el.addEventListener("pointercancel", panUp);
   G.decoLv = -1; G.night = null; G.wx = ""; G.items.clear();
+}
+// ---- camera: drag to look around (with a little inertia), or glide to a spot ----
+const clampCam = () => { const c = G.cam; c.x = Math.min(Math.max(0, G.W - G.vw), Math.max(0, c.x)); c.y = Math.min(Math.max(0, G.H - G.vh), Math.max(0, c.y)); };
+function camTo(px, py, instant) { // centre the window on a world position
+  const c = G.cam; c.tx = px - G.vw / 2; c.ty = py - G.vh * .55; c.vx = c.vy = 0;
+  c.tx = Math.min(Math.max(0, G.W - G.vw), Math.max(0, c.tx)); c.ty = Math.min(Math.max(0, G.H - G.vh), Math.max(0, c.ty));
+  if (instant || RM.matches) { c.x = c.tx; c.y = c.ty; c.glide = false; } else c.glide = true;
+}
+function panDown(e) {
+  if (e.button > 0 || G.drag || !G.el) return;
+  const c = G.cam; c.vx = c.vy = 0; c.glide = false;
+  G.pan = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: c.x, cy: c.y, moved: false, lt: performance.now(), lx: c.x, ly: c.y, vx: 0, vy: 0 };
+}
+function panMove(e) {
+  const p = G.pan; if (!p || e.pointerId !== p.id || G.drag) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  if (!p.moved) { if (Math.hypot(dx, dy) < 7) return; p.moved = true; try { G.el.setPointerCapture(e.pointerId); } catch {} G.el.classList.add("panning"); }
+  const c = G.cam, now = performance.now(), dt = Math.max(.001, (now - p.lt) / 1000), nx = p.cx - dx, ny = p.cy - dy;
+  p.vx = p.vx * .55 + (nx - p.lx) / dt * .45; p.vy = p.vy * .55 + (ny - p.ly) / dt * .45; p.lt = now; p.lx = nx; p.ly = ny;
+  c.x = nx; c.y = ny; clampCam();
+}
+function panUp(e) {
+  const p = G.pan; if (!p || e.pointerId !== p.id) return; G.pan = null;
+  if (!p.moved) return;
+  try { G.el.releasePointerCapture(e.pointerId); } catch {}
+  G.el.classList.remove("panning"); G.noClick = performance.now();
+  const c = G.cam, fast = Math.hypot(p.vx, p.vy) > 60 && performance.now() - p.lt < 90; c.vx = fast && !RM.matches ? p.vx : 0; c.vy = fast && !RM.matches ? p.vy : 0;
+}
+function camStep(dt) {
+  const c = G.cam;
+  if (G.drag) { // dragging a decoration near the edge scrolls the window
+    const g = G.drag, r = G.el.getBoundingClientRect(), ex = g.px - r.left < 36 ? -1 : g.px - r.left > r.width - 36 ? 1 : 0, ey = g.py - r.top < 36 ? -1 : g.py - r.top > r.height - 36 ? 1 : 0;
+    if (ex || ey) { c.x += ex * 240 * dt; c.y += ey * 240 * dt; c.glide = false; clampCam(); }
+    dragApply();
+  } else if (G.pan && G.pan.moved) { /* the finger is steering */ }
+  else if (c.glide) { const k = Math.min(1, dt * 5); c.x += (c.tx - c.x) * k; c.y += (c.ty - c.y) * k; if (Math.abs(c.tx - c.x) < .5 && Math.abs(c.ty - c.y) < .5) c.glide = false; }
+  else if (c.vx || c.vy) { c.x += c.vx * dt; c.y += c.vy * dt; const k = Math.pow(.02, dt); c.vx *= k; c.vy *= k; if (Math.abs(c.vx) < 8 && Math.abs(c.vy) < 8) c.vx = c.vy = 0; }
+  clampCam();
+  const t = `translate(${(-c.x).toFixed(1)}px,${(-c.y).toFixed(1)}px)`; if (t !== G.camT) { G.camT = t; G.world.style.transform = t; }
+}
+function findPet() { // the 📍 button: glide to the next pet (yours first)
+  const list = [...G.pets.values()].sort((a, b) => (b.uid === me?.uid) - (a.uid === me?.uid) || (a.key < b.key ? -1 : 1)); if (!list.length) return;
+  G.findI = (G.findI + 1) % list.length; const p = list[G.findI]; camTo(p.x * G.W, p.y * G.H);
 }
 function buildDeco(lv) { // more flowers, butterflies, trees and a rainbow as the couple level grows
   G.decoLv = lv;
-  const r = seeded(11), FL = ["🌸", "🌼", "🌷", "🌻", "🌺", "🌹"], n = Math.min(22, 4 + lv * 2); let h = "";
-  for (let i = 0; i < 22; i++) { // always draw the same 22 random spots so flowers never move around when new ones appear
-    const x = .05 + r() * .9, y = .56 + r() * .4, f = FL[Math.floor(r() * FL.length)], s = 13 + Math.floor(r() * 9);
+  const r = seeded(11), FL = ["🌸", "🌼", "🌷", "🌻", "🌺", "🌹"], n = Math.min(60, 10 + lv * 5); let h = "";
+  for (let i = 0; i < 60; i++) { // always draw the same 60 random spots so flowers never move around when new ones appear
+    const x = .03 + r() * .94, y = .4 + r() * .56, f = FL[Math.floor(r() * FL.length)], s = 13 + Math.floor(r() * 9);
     if (i < n && !inPond(x, y + .02)) h += `<i style="left:${(x * 100).toFixed(1)}%;top:${(y * 100).toFixed(1)}%;font-size:${s}px">${f}</i>`;
   }
-  if (lv >= 3) h += `<i class="tree" style="left:88%;top:57%">🌳</i>`;
-  if (lv >= 5) h += `<i class="tree" style="left:9%;top:56%">🌲</i>`;
+  [[880, 275, "🌳", 3], [80, 275, "🌲", 5], [520, 282, "🌳", 7], [940, 440, "🌲", 8], [40, 540, "🌳", 9], [660, 300, "🌲", 10]].forEach(([x, y, e, need]) => { if (lv >= need) h += `<i class="tree" style="left:${x}px;top:${y}px">${e}</i>`; });
   G.deco.innerHTML = h;
-  let fl = ""; const nb = lv >= 1 ? Math.min(5, 1 + Math.floor(lv / 2)) : 0;
-  for (let i = 0; i < nb; i++) fl += `<i style="left:${(10 + r() * 60).toFixed(1)}%;top:${(48 + r() * 30).toFixed(1)}%;animation-delay:${(-r() * 8).toFixed(1)}s;animation-duration:${(7 + r() * 5).toFixed(1)}s">🦋</i>`;
+  let fl = ""; const nb = lv >= 1 ? Math.min(9, 1 + Math.floor(lv / 2) * 2) : 0;
+  for (let i = 0; i < nb; i++) fl += `<i style="left:${(6 + r() * 84).toFixed(1)}%;top:${(38 + r() * 42).toFixed(1)}%;animation-delay:${(-r() * 8).toFixed(1)}s;animation-duration:${(7 + r() * 5).toFixed(1)}s">🦋</i>`;
   G.fly.innerHTML = fl;
   G.el.classList.toggle("rainbow", lv >= 6);
 }
@@ -242,13 +293,13 @@ function mkPet(key, u, type) {
   const el = document.createElement("div"); el.className = "gp"; el.dataset.act = "gpet"; el.dataset.id = key;
   el.innerHTML = `<i class="gsh"></i><span class="gpe"></span><i class="gbub"></i><b class="gpn"></b>`;
   const p = { key, uid: u.id, type, el, sh: el.children[0], e: el.children[1], bub: el.children[2], nm: el.children[3], x: 0, y: 0, tx: 0, ty: 0, mode: "rest", until: nowS() + rnd(.4, 2.5),
-    fs: 1, face: 1, ph: Math.random() * 6, hp: 0, jump: -9, heartAt: 0, ht: 0, sig: "", mood: "", st: 0, ta: "", tb: "", ov: null, emo: "" };
+    fs: 1, face: 1, ph: Math.random() * 6, hp: 0, jump: -9, heartAt: 0, ht: 0, sig: "", mood: "", st: 0, ta: "", tb: "", ov: null, emo: "", hx: rnd(.2, .65), hy: rnd(.6, .9), spin: -9, yawn: -9, nb: false, nt: 0 };
   const s = pickSpot(p); p.x = p.tx = s[0]; p.y = p.ty = s[1];
-  el.style.transform = `translate(${(p.x * G.W).toFixed(1)}px,${(p.y * G.H).toFixed(1)}px)`; el.style.zIndex = 10 + Math.round(p.y * 100);
+  el.style.transform = `translate(${(p.x * G.W).toFixed(1)}px,${(p.y * G.H).toFixed(1)}px)`; el.style.zIndex = 10 + Math.round(p.y * G.H);
   G.pets.set(key, p); G.layer.appendChild(el); return p;
 }
 function removePet(p) { clearTimeout(p.ht); p.el.remove(); }
-function clearGarden() { G.pets.forEach(removePet); G.pets.clear(); G.items.forEach(o => o.el.remove()); G.items.clear(); G.edit = false; G.work = null; G.sel = null; if (G.el) G.el.classList.remove("editing"); }
+function clearGarden() { if (G.vis) { G.vis.el.remove(); G.vis = null; } G.camInit = false; G.pets.forEach(removePet); G.pets.clear(); G.items.forEach(o => o.el.remove()); G.items.clear(); G.edit = false; G.work = null; G.sel = null; if (G.el) G.el.classList.remove("editing"); }
 function setPet(p, u, type) { // refresh look + mood from the owner's live data (only touches the DOM when something changed)
   const st = stageOf(totalOf(u)), mood = moodOf(u), sig = `${type}|${st}|${mood}|${u.name}`;
   if (sig === p.sig) return; const evolved = !!p.sig && p.st !== st; p.sig = sig; p.type = type; p.st = st;
@@ -268,8 +319,9 @@ function syncGarden() {
   list.forEach(x => setPet(G.pets.get(x.key) || mkPet(x.key, x.u, x.type), x.u, x.type));
   const lv = couple().lv; if (lv !== G.decoLv) buildDeco(lv);
   const night = isEvening(); if (night !== G.night) { G.night = night; G.el.classList.toggle("night", night); }
-  syncItems(); syncBuddies(); syncWeather(); runVisits();
+  syncItems(); syncBuddies(); syncWeather(); runVisits(); syncVisitor();
 }
+function restoreBub(p) { p.bub.className = "gbub " + p.mood + (p.mood === "calm" ? "" : " on"); p.bub.textContent = p.mood === "calm" ? "" : BUB[p.mood]; }
 function endVisit(p, t) { // a cheer visit is over: guest wanders off again, host is free to move
   const o = p.ov, h = o && G.pets.get(o.host);
   if (h && h.ov && h.ov.kind === "host") { h.ov = null; h.mode = "rest"; h.until = t + rnd(.8, 2); }
@@ -284,8 +336,8 @@ function stepPet(p, t, dt, still) { // one animation frame for one pet
       const h = o.kind === "visit" ? G.pets.get(o.host) : null;
       if (o.kind === "visit" && (!h || t > o.limit)) endVisit(p, t);
       else {
-        const tx = h ? h.x + o.side * .085 : o.x, ty = h ? h.y + .004 : o.y, dx = (tx - p.x) * G.W, dy = (ty - p.y) * G.H, d = Math.hypot(dx, dy),
-          step = BASE * Math.max(mv[0], .9) * G.W * dt * (h ? 2.6 : 1.7);
+        const tx = h ? h.x + o.side * 62 / G.W : o.x, ty = h ? h.y + 3 / G.H : o.y, dx = (tx - p.x) * G.W, dy = (ty - p.y) * G.H, d = Math.hypot(dx, dy),
+          step = BASE * Math.max(mv[0], .9) * dt * (h ? 2.6 : 1.7);
         if (d <= Math.max(step, 1.5)) { p.x = tx; p.y = ty; if (!o.arrived) o.arrived = t; p.face = h ? (o.side < 0 ? -1 : 1) : o.face; }
         else { p.x += dx / d * step / G.W; p.y += dy / d * step / G.H; walking = true; if (Math.abs(dx) > 1) p.face = dx > 0 ? -1 : 1; }
         if (o.arrived) {
@@ -293,6 +345,8 @@ function stepPet(p, t, dt, still) { // one animation frame for one pet
             hop = Math.abs(Math.sin((t - o.arrived) * 7)) * (mv[1] + 5);
             if (t >= o.nextHeart) { o.nextHeart = t + .42; spawnHeart(h.x * G.W + rnd(-16, 16), h.y * G.H - 54 - rnd(0, 12), ["💗", "💕", "💖"][Math.floor(rnd(0, 3))]); }
             if (t > o.arrived + 3.2) endVisit(p, t);
+          } else if (o.kind === "nap") { // both on a break: curl up side by side
+            if (!p.nb) { p.nb = true; p.bub.className = "gbub sleep on"; p.bub.textContent = "💤"; }
           } else { // buddies: once BOTH have arrived they hop in sync
             const m2 = G.pets.get(o.mate);
             if (m2 && m2.ov && m2.ov.arrived) {
@@ -305,9 +359,9 @@ function stepPet(p, t, dt, still) { // one animation frame for one pet
     }
   }
   if (moving) {
-    if (p.mode === "rest" && t >= p.until) { const s = pickSpot(p, mood === "study" ? .13 : 0); p.tx = s[0]; p.ty = s[1]; p.mode = "walk"; }
+    if (p.mode === "rest" && t >= p.until) { const s = pickSpot(p, mood === "study" ? 46 : 0); p.tx = s[0]; p.ty = s[1]; p.mode = "walk"; }
     if (p.mode === "walk") {
-      const dx = (p.tx - p.x) * G.W, dy = (p.ty - p.y) * G.H, d = Math.hypot(dx, dy), step = BASE * mv[0] * G.W * dt * (mood === "study" ? 1.25 : 1);
+      const dx = (p.tx - p.x) * G.W, dy = (p.ty - p.y) * G.H, d = Math.hypot(dx, dy), step = BASE * mv[0] * dt * (mood === "study" ? 1.25 : 1) * (G.night ? .75 : 1);
       if (d <= step) { p.x = p.tx; p.y = p.ty; p.mode = "rest"; p.until = t + (mood === "study" ? rnd(1, 2.5) : rnd(1.5, 5)); }
       else { p.x += dx / d * step / G.W; p.y += dy / d * step / G.H; walking = true; if (Math.abs(dx) > 1) p.face = dx > 0 ? -1 : 1; }
     }
@@ -317,25 +371,30 @@ function stepPet(p, t, dt, still) { // one animation frame for one pet
   else {
     if (walking || (moving && mood === "study")) { p.hp += dt * (walking ? 10 : 11); lift = Math.abs(Math.sin(p.hp)) * mv[1] * (mood === "study" ? 1.7 : 1); }
     if (hop) lift = hop;
+    const napping = o && o.kind === "nap" && o.arrived;
     if (p.st === 0 && mood !== "sleep") rot = Math.sin(t * 3 + p.ph) * 7;           // eggs rock in place
-    else if (mood === "sleep") { if (p.type !== "plant") rot = -78; sy = 1 + br * .025; } // lying down, breathing slowly
+    else if (mood === "sleep" || napping) { if (p.type !== "plant") rot = napping ? o.rot : -78; sy = 1 + br * .025; } // lying down, breathing slowly
     else if (mood === "break") { sy = .9 + br * .015; sx = 1.05; }                      // sitting
     else if (!walking && !lift) { sy = 1 + br * .03; sx = 1 - br * .02; }
     const jt = t - p.jump; if (jt >= 0 && jt < .55) { const k = Math.sin(Math.PI * jt / .55); lift += k * 30; sy *= 1 + k * .08; } // tap jump
+    const sp = (t - p.spin) / .9; if (sp >= 0 && sp < 1) { rot += 360 * (1 - (1 - sp) ** 2); lift += Math.sin(Math.PI * sp) * 30; }  // treat: happy spin
+    const yt = (t - p.yawn) / 1.6; if (yt >= 0 && yt < 1) { const k = Math.sin(Math.PI * yt); sy *= 1 + k * .13; sx *= 1 - k * .05; }  // night: stretch + yawn
   }
   p.fs += (p.face * (FACE_RIGHT.has(p.emo) ? -1 : 1) - p.fs) * Math.min(1, dt * 14); // smooth turn-around
-  if (p.mood === "calm" && !o && t >= p.heartAt) { // a little heart now and then
-    p.heartAt = t + rnd(8, 14); p.bub.textContent = "💗"; p.bub.classList.add("on"); clearTimeout(p.ht); p.ht = setTimeout(() => p.bub.classList.remove("on"), 2200);
+  if (!o && t >= p.heartAt && (p.mood === "calm" || (G.night && p.mood === "break"))) { // a little heart now and then (at night: sleepy yawns 🥱)
+    p.heartAt = t + rnd(8, 14); const yawn = G.night && Math.random() < .6; if (yawn) p.yawn = t;
+    p.bub.textContent = yawn ? "🥱" : "💗"; p.bub.classList.add("on"); clearTimeout(p.ht); p.ht = setTimeout(() => p.mood === "calm" ? p.bub.classList.remove("on") : restoreBub(p), 2200);
   }
   const a = `translateY(${(-lift).toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${(p.fs * sx).toFixed(3)},${sy.toFixed(3)})`;
   if (a !== p.ta) { p.ta = a; p.e.style.transform = a; p.sh.style.transform = `scale(${(1 - Math.min(lift, 40) / 70).toFixed(2)})`; }
   const b = `translate(${(p.x * G.W).toFixed(1)}px,${(p.y * G.H).toFixed(1)}px)`;
-  if (b !== p.tb) { p.tb = b; p.el.style.transform = b; p.el.style.zIndex = 10 + Math.round(p.y * 100); }
+  if (b !== p.tb) { p.tb = b; p.el.style.transform = b; p.el.style.zIndex = 10 + Math.round(p.y * G.H); }
 }
 function gardenLoop(now) {
   if (!G.el || !G.el.isConnected || document.hidden) { G.raf = 0; return; } // paused when you leave the tab or hide the app
   const t = now / 1000, dt = Math.min(.05, t - G.last || .016); G.last = t;
   G.pets.forEach(p => stepPet(p, t, dt, RM.matches));
+  visStep(t, dt); camStep(dt);
   G.raf = requestAnimationFrame(gardenLoop);
 }
 function gardenStart() { if (!G.raf && G.el && G.el.isConnected && !document.hidden) { G.last = 0; G.raf = requestAnimationFrame(gardenLoop); } }
@@ -343,23 +402,37 @@ document.addEventListener("visibilitychange", gardenStart);
 function mountGarden() { // put the one living scene into the freshly rendered page
   if (!G.el) buildGarden();
   const slot = $("#gslot"); if (slot) slot.replaceWith(G.el);
-  G.W = G.el.clientWidth || G.W; G.H = G.el.clientHeight || G.H;
-  syncGarden(); gardenStart();
+  G.vw = G.el.clientWidth || G.vw; G.vh = G.el.clientHeight || G.vh; G.el.style.setProperty("--gh", G.vh + "px");
+  syncGarden();
+  if (!G.camInit) { const p = me && mainPet(me.uid); camTo(p ? p.x * G.W : G.W * .4, p ? p.y * G.H : G.H * .75, true); G.camInit = true; } // first look: centred on your pet
+  gardenStart();
 }
 // ---- seeds + decoration shop: study time earns seeds, seeds buy things you drag into the garden (saved in users/{uid}.decor) ----
-const ITEMS = { bench: { n: "bench", price: 25 }, lantern: { n: "lantern", price: 40 }, swing: { n: "swing", price: 80 }, house: { n: "tiny house", price: 150 } };
+// flat = lies on the ground (pets walk over it), water = only goes on the pond. Order here = order in the shop.
+const ITEMS = { lily: { n: "lily pads", price: 20, flat: true, water: true }, bench: { n: "bench", price: 25 }, bed: { n: "flower bed", price: 30, flat: true }, lantern: { n: "lantern", price: 40 },
+  blanket: { n: "picnic blanket", price: 45, flat: true }, fairy: { n: "fairy lights", price: 60 }, swing: { n: "swing", price: 80 }, fountain: { n: "fountain", price: 120 }, house: { n: "tiny house", price: 150 } };
 const SEED_SEC = 300, MAX_DECOR = 12; // 1 seed per 5 minutes studied, up to 12 things per person
 const ART = { // little CSS-drawn items (so they follow every theme); the lantern and the house are emoji
   bench: `<div class="bench"><i class="bk"></i><i class="st"></i><i class="lg"></i><i class="lg r"></i></div>`,
   lantern: `<div class="lant"><i class="gl"></i><i class="pl"></i><em>🏮</em></div>`,
   swing: `<div class="swing"><i class="fr"></i><i class="fr r"></i><i class="tp"></i><div class="sw"><i class="rp"></i><i class="rp r"></i><i class="sd"></i></div></div>`,
-  house: `<div class="tiny">🏡</div>`
+  house: `<div class="tiny">🏡</div>`,
+  bed: `<div class="fbed"><i class="soil"></i><em>🌷🌼🌸</em></div>`,
+  blanket: `<div class="blank"><i class="bl"></i><em>🧺</em><u>🍓</u></div>`,
+  fairy: `<div class="fairy"><i class="fp"></i><i class="fp r"></i><i class="fs"></i>${[0, 1, 2, 3, 4, 5, 6].map(i => `<b style="left:${8 + i * 16}px;top:${(5 + 20 * (1 - ((i - 3) / 3) ** 2)).toFixed(0)}px;--c:${["#ff9ccb", "#ffd36f", "#9be37f", "#7fd0ff", "#b79cf5"][i % 5]}"></b>`).join("")}</div>`,
+  lily: `<div class="lily"><i class="lp a"></i><i class="lp b"></i><i class="lp c"></i><em>🌸</em></div>`,
+  fountain: `<div class="fount"><i class="fb"></i><i class="fw"></i><i class="fc"></i><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i></div>`
 };
-const seedsEarned = u => Math.floor(totalOf(u) / SEED_SEC);
-const decorOf = u => (Array.isArray(u.decor) ? u.decor : []).filter(d => d && ITEMS[d.i] && typeof d.k === "string" && Number.isFinite(d.x) && Number.isFinite(d.y)).slice(0, MAX_DECOR);
+const TREAT = 1, VIS_DAY = 6; // a treat costs 1 seed; at most 6 visitor seeds a day on this device
+// seeds = study time + visitor bonuses (u.bonus) - treats given (u.treats); spent decoration is subtracted in seedsLeft
+const seedsEarned = u => Math.floor(totalOf(u) / SEED_SEC) + (u.bonus || 0) - (u.treats || 0);
+// the first version of the garden stored x/y as fractions of the small 340x408 scene; carry those over into the big world (v:2)
+const upgradeD = d => d.v === 2 ? d : { ...d, v: 2, x: (d.x * 340 + 225) / WW, y: (d.y * 408 + 198) / WH };
+const decorOf = u => (Array.isArray(u.decor) ? u.decor : []).filter(d => d && ITEMS[d.i] && typeof d.k === "string" && Number.isFinite(d.x) && Number.isFinite(d.y)).slice(0, MAX_DECOR).map(upgradeD);
 const decorNow = u => G.edit && G.work && u.id === me?.uid ? G.work : decorOf(u); // while decorating, your own list is the unsaved working copy
 const seedsLeft = u => Math.max(0, seedsEarned(u) - decorNow(u).reduce((a, d) => a + ITEMS[d.i].price, 0)); // spent seeds are simply the price of everything placed
-const clampX = x => Math.min(.92, Math.max(.08, x)), clampY = y => Math.min(.93, Math.max(.55, y));
+const clampX = x => Math.min(.96, Math.max(.04, x)), clampY = y => Math.min(.95, Math.max(.38, y));
+const okSpot = (id, x, y) => ITEMS[id].water ? inPond(x, y) : !inPond(x, y - .02); // lily pads only on the pond, everything else on the grass
 let seedBase = -1, visits = [];
 function checkSeeds(m) { const sd = seedsEarned(m); if (seedBase >= 0 && sd > seedBase && !modal.innerHTML) toast(`+${sd - seedBase} 🌱 seed${sd - seedBase > 1 ? "s" : ""} earned!`); seedBase = sd; }
 
@@ -369,14 +442,14 @@ function gardenPanel() {
   const w = G.wxMode === "auto" ? G.wxAuto : G.wxMode, wl = G.wxMode === "auto" ? `random ${WXL[w][0]}` : `${WXL[w][0]} ${WXL[w][1]}`;
   if (G.edit) {
     const sel = (G.work || []).find(d => d.k === G.sel);
-    return `<div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds left</div><p class="hint">${sel ? "drag it where you like ✋ · tap it again to unselect" : "drag your things to move them · tap one to select"}</p>
+    return `<div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds left</div><p class="hint">${sel ? "drag it where you like ✋ (near the edge scrolls) · tap it again to unselect" : "drag your things to move them · drag the ground to look around"}</p>
     ${sel ? `<button class="btn ghost" data-act="gdel">🗑️ remove ${ITEMS[sel.i].n} (+${ITEMS[sel.i].price} 🌱)</button>` : ""}<button class="btn ghost" data-act="gshop">🛍️ shop</button>
     <div class="row"><button class="btn ghost" data-act="gcancel">cancel</button><button class="btn" data-act="gdone">done 💖</button></div>`;
   }
   return `<div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds</div>
   <div class="row"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button></div>
   <button class="btn ghost" data-act="gchoose">🐾 choose my garden pets</button>
-  <div class="wxrow"><button class="chip" data-act="gwx">🌦️ weather: ${wl}</button></div><p class="hint">tap a pet to say hi 💗</p>${coupleCard()}`;
+  <div class="wxrow"><button class="chip" data-act="gwx">🌦️ weather: ${wl}</button></div><p class="hint">drag the garden to look around ✋ · tap a pet to say hi 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
 }
 function enterEdit(m) {
   G.edit = true; G.work = decorOf(m).map(d => ({ ...d })); G.sel = null;
@@ -385,7 +458,7 @@ function enterEdit(m) {
 }
 async function exitEdit(save) {
   if (save) {
-    try { await DB.saveDecor(me.uid, G.work.map(d => ({ i: d.i, k: d.k, x: +d.x.toFixed(3), y: +d.y.toFixed(3) }))); toast("Garden decorated 🏡"); }
+    try { await DB.saveDecor(me.uid, G.work.map(d => ({ i: d.i, k: d.k, v: 2, x: +d.x.toFixed(3), y: +d.y.toFixed(3) }))); toast("Garden decorated 🏡"); }
     catch (e) { return toast(errMsg(e)); }
   }
   G.edit = false; G.work = null; G.sel = null; if (G.el) G.el.classList.remove("editing");
@@ -397,7 +470,7 @@ function delSel() {
 }
 function shopSheet(mine) {
   const left = seedsLeft(mine);
-  modal.innerHTML = `<div class="back"><div class="sheet"><h3>decoration shop 🛍️</h3><p class="hint">You earn 🌱 1 seed for every 5 minutes you study.<br><b>🌱 ${left} seeds</b> to spend</p>
+  modal.innerHTML = `<div class="back"><div class="sheet"><h3>decoration shop 🛍️</h3><p class="hint">You earn 🌱 1 seed for every 5 minutes you study (and from garden visitors).<br><b>🌱 ${left} seeds</b> to spend</p>
   <div class="shopg">${Object.keys(ITEMS).map(id => { const x = ITEMS[id]; return `<button class="${left >= x.price ? "" : "lock"}" data-buy="${id}"><div class="shopthumb">${ART[id]}</div><b>${x.n}</b><small>🌱 ${x.price}</small></button>`; }).join("")}</div>
   <button class="link" id="sx">close</button></div></div>`;
   $("#sx").onclick = () => modal.innerHTML = "";
@@ -406,14 +479,17 @@ function shopSheet(mine) {
     if (decorNow(mine).length >= MAX_DECOR) return toast(`Your garden is full (${MAX_DECOR} things) 🌳`);
     if (have < x.price) return toast(`${x.price - have} more 🌱 needed — keep studying!`);
     if (!G.edit) enterEdit(mine);
-    const d = { i: id, k: Math.random().toString(36).slice(2, 8), x: +(.5 + rnd(-.08, .08)).toFixed(3), y: +(.74 + rnd(-.04, .04)).toFixed(3) };
+    let sx = (G.cam.x + G.vw / 2 + rnd(-30, 30)) / G.W, sy = (G.cam.y + G.vh * .62 + rnd(-20, 20)) / G.H;
+    if (x.water) { sx = (POND.x + rnd(-30, 30)) / G.W; sy = (POND.y + rnd(-12, 12)) / G.H; camTo(POND.x, POND.y); }
+    else { sx = clampX(sx); sy = clampY(sy); for (let i = 0; i < 12 && !okSpot(id, sx, sy); i++) sy = clampY(sy + .03); }
+    const d = { i: id, k: Math.random().toString(36).slice(2, 8), v: 2, x: +sx.toFixed(3), y: +sy.toFixed(3) };
     G.work.push(d); G.sel = d.k; modal.innerHTML = ""; syncItems(); refreshPanel();
     const o = G.items.get(`${me.uid}:${d.k}`); if (o) { o.el.classList.add("pop"); setTimeout(() => o.el.classList.remove("pop"), 700); }
     toast(`New ${x.n}! Drag it where you like ✋`);
   });
 }
 function mkItem(key, d, uid) {
-  const el = document.createElement("div"); el.className = "gi t-" + d.i;
+  const el = document.createElement("div"); el.className = "gi t-" + d.i + (ITEMS[d.i].flat ? " flat" : "");
   el.innerHTML = `<i class="gsh"></i><div class="gart">${ART[d.i]}</div>`;
   const o = { key, el, it: d, uid, tb: "" };
   el.addEventListener("pointerdown", e => itemDown(e, o));
@@ -428,24 +504,27 @@ function syncItems() { // draw everybody's decorations (yours = the working copy
     const o = G.items.get(w.key) || mkItem(w.key, w.d, w.uid), mine = w.uid === me?.uid; o.it = w.d;
     o.el.classList.toggle("mine", mine); o.el.classList.toggle("sel", G.edit && mine && G.sel === w.d.k);
     const t = `translate(${(w.d.x * G.W).toFixed(1)}px,${(w.d.y * G.H).toFixed(1)}px)`;
-    if (t !== o.tb) { o.tb = t; o.el.style.transform = t; o.el.style.zIndex = 10 + Math.round(w.d.y * 100); }
+    if (t !== o.tb) { o.tb = t; o.el.style.transform = t; o.el.style.zIndex = ITEMS[w.d.i].flat ? 1 : 10 + Math.round(w.d.y * G.H); }
   });
+}
+function dragApply() { // the item follows the finger, in world coordinates (so it keeps up while the window scrolls)
+  const g = G.drag; if (!g || !G.el) return;
+  const r = G.el.getBoundingClientRect(), d = g.o.it, nx = clampX((g.px - r.left + G.cam.x) / G.W - g.gx), ny = clampY((g.py - r.top + G.cam.y) / G.H - g.gy);
+  if (Math.hypot(nx - d.x, ny - d.y) > .003) g.moved = true;
+  if (!okSpot(d.i, nx, ny)) return; // keep things on the grass (lily pads: on the pond)
+  if (nx !== d.x || ny !== d.y) { d.x = nx; d.y = ny; syncItems(); }
 }
 function itemDown(e, o) { // drag-to-place
   if (!G.edit || o.uid !== me?.uid || !G.el) return;
-  e.preventDefault();
-  const r = G.el.getBoundingClientRect(), d = o.it, wasSel = G.sel === d.k, gx = (e.clientX - r.left) / r.width - d.x, gy = (e.clientY - r.top) / r.height - d.y;
-  let moved = false; G.sel = d.k; syncItems(); refreshPanel();
-  const mv = ev => {
-    const nx = clampX((ev.clientX - r.left) / r.width - gx), ny = clampY((ev.clientY - r.top) / r.height - gy);
-    if (Math.hypot(nx - d.x, ny - d.y) > .004) moved = true;
-    if (inPond(nx, ny - .02)) return; // keep things on the grass
-    d.x = nx; d.y = ny; syncItems();
-  };
+  e.preventDefault(); e.stopPropagation();
+  const r = G.el.getBoundingClientRect(), d = o.it, wasSel = G.sel === d.k;
+  G.drag = { o, wasSel, moved: false, px: e.clientX, py: e.clientY, gx: (e.clientX - r.left + G.cam.x) / G.W - d.x, gy: (e.clientY - r.top + G.cam.y) / G.H - d.y };
+  G.sel = d.k; G.cam.vx = G.cam.vy = 0; G.cam.glide = false; syncItems(); refreshPanel();
+  const mv = ev => { if (G.drag) { G.drag.px = ev.clientX; G.drag.py = ev.clientY; dragApply(); } };
   const up = () => {
     o.el.removeEventListener("pointermove", mv); o.el.removeEventListener("pointerup", up); o.el.removeEventListener("pointercancel", up);
     try { o.el.releasePointerCapture(e.pointerId); } catch {}
-    if (!moved && wasSel) { G.sel = null; syncItems(); refreshPanel(); }
+    const g = G.drag; G.drag = null; if (g && !g.moved && g.wasSel) { G.sel = null; syncItems(); refreshPanel(); }
   };
   try { o.el.setPointerCapture(e.pointerId); } catch {}
   o.el.addEventListener("pointermove", mv); o.el.addEventListener("pointerup", up); o.el.addEventListener("pointercancel", up);
@@ -486,34 +565,82 @@ function runVisits() { // a cheer arrived: the sender's pet runs over to yours (
   const v = visits.shift(), guest = mainPet(v.from), host = mainPet(me.uid); if (!guest || !host || guest === host) return;
   const t = nowS();
   if (RM.matches) return spawnHeart(host.x * G.W, host.y * G.H - 58);
-  host.ov = { kind: "host", until: t + 14 };
+  host.ov = { kind: "host", until: t + 14 }; camTo(host.x * G.W, host.y * G.H);
   guest.ov = { kind: "visit", host: host.key, side: guest.x < host.x ? -1 : 1, limit: t + 14, nextHeart: 0, arrived: 0 };
 }
-const BUDDY = [[.44, .79, .55, .79], [.14, .88, .27, .88]]; // two meeting places on the bank of the pond: [x1, y1, x2, y2]
-function syncBuddies() { // two people studying at the same time → their pets walk to each other and hop together
+const BUDDY = [[395, 548, 470, 548], [140, 548, 70, 548]]; // study-buddy meeting places on the banks of the pond: [x1, y1, x2, y2] in world px
+const NAP = [[800, 350, 872, 350], [560, 350, 632, 350]];    // cosy nap places under the trees
+function syncBuddies() { // two studying → their pets meet by the pond and hop. Two on a break → they curl up for a nap together.
   const want = new Map();
   if (!RM.matches) {
-    const st = users.filter(u => u.status === "studying").sort((a, b) => a.id < b.id ? -1 : 1);
-    for (let i = 0; i + 1 < st.length && i / 2 < BUDDY.length; i += 2) {
-      const pa = mainPet(st[i].id), pb = mainPet(st[i + 1].id), S = BUDDY[i / 2]; if (!pa || !pb || pa.st < 1 || pb.st < 1) continue;
-      want.set(pa.key, { x: S[0], y: S[1], mate: pb.key, face: -1 }); want.set(pb.key, { x: S[2], y: S[3], mate: pa.key, face: 1 });
-    }
+    const pair = (status, kind, spots) => {
+      const l = users.filter(u => u.status === status).sort((a, b) => a.id < b.id ? -1 : 1);
+      for (let i = 0; i + 1 < l.length && i / 2 < spots.length; i += 2) {
+        const pa = mainPet(l[i].id), pb = mainPet(l[i + 1].id), S = spots[i / 2]; if (!pa || !pb || pa.st < 1 || pb.st < 1) continue;
+        want.set(pa.key, { kind, x: S[0] / G.W, y: S[1] / G.H, mate: pb.key, face: -1, rot: -78 }); want.set(pb.key, { kind, x: S[2] / G.W, y: S[3] / G.H, mate: pa.key, face: 1, rot: 78 });
+      }
+    };
+    pair("studying", "buddy", BUDDY); pair("paused", "nap", NAP);
   }
   G.pets.forEach(p => {
-    const w = want.get(p.key);
-    if (w) { if (!p.ov) p.ov = { kind: "buddy", arrived: 0, ...w }; else if (p.ov.kind === "buddy") Object.assign(p.ov, w); }
-    else if (p.ov && p.ov.kind === "buddy") { p.ov = null; p.mode = "rest"; p.until = nowS() + rnd(.5, 2); }
+    const w = want.get(p.key), o = p.ov, mine = o && (o.kind === "buddy" || o.kind === "nap");
+    if (w && (!o || (mine && o.kind !== w.kind))) { if (p.nb) { p.nb = false; restoreBub(p); } p.ov = { arrived: 0, ...w }; }
+    else if (w && mine) Object.assign(o, w);
+    else if (!w && mine) { p.ov = null; p.mode = "rest"; p.until = nowS() + rnd(.5, 2); if (p.nb) { p.nb = false; restoreBub(p); } }
   });
+}
+
+// ---- treats (feed your pet: costs a seed, happy spin) ----
+async function treat(key, m) {
+  const p = G.pets.get(key); if (!p || p.uid !== m.id) return;
+  if (seedsLeft(m) < TREAT) return toast(`A treat costs ${TREAT} 🌱 — keep studying!`);
+  try { await DB.giveTreat(m.id); } catch (e) { return toast(errMsg(e)); }
+  p.spin = nowS(); p.bub.textContent = "😋"; p.bub.classList.add("on"); clearTimeout(p.ht); p.ht = setTimeout(() => restoreBub(p), 3000);
+  spawnHeart(p.x * G.W, p.y * G.H - 62, "🍪"); setTimeout(() => spawnHeart(p.x * G.W + 14, p.y * G.H - 52, "💗"), 250);
+  G.card.hidden = true;
+}
+
+// ---- garden visitors: a butterfly, bird or hedgehog drops by now and then; tap it for a seed ----
+const VIS = [["🦋", "butterfly", 60], ["🐦", "bird", 42], ["🦔", "hedgehog", 16]]; // [emoji, name, speed px/s]
+const visKey = () => "vis-" + new Date().toDateString().replace(/ /g, "-");
+function syncVisitor() {
+  const v = G.vis, t = nowS();
+  if (v && (t > v.until || !G.el.isConnected)) { v.el.remove(); G.vis = null; }
+  if (G.vis || document.hidden || G.edit || !G.el.isConnected || !G.layer) return;
+  if (!G.visAt) G.visAt = t + rnd(25, 50);
+  if (t < G.visAt || (+ls(visKey()) || 0) >= VIS_DAY) return;
+  G.visAt = t + rnd(50, 110);
+  const k = VIS[Math.floor(Math.random() * VIS.length)], el = document.createElement("div"); el.className = "gvis"; el.dataset.act = "gvis"; el.innerHTML = `<span>${k[0]}</span>`;
+  const x = Math.min(BOUNDS.x1, Math.max(BOUNDS.x0, (G.cam.x + rnd(.2, .8) * G.vw) / G.W)), y = Math.min(BOUNDS.y1, Math.max(BOUNDS.y0 + .05, (G.cam.y + rnd(.45, .85) * G.vh) / G.H));
+  G.vis = { el, x, y, tx: x, ty: y, sp: k[2], kind: k[1], until: t + 28, nt: 0, ph: rnd(0, 6), fs: 1, face: 1 }; G.layer.appendChild(el);
+}
+function visStep(t, dt) {
+  const v = G.vis; if (!v) return;
+  if (t >= v.nt) { const far = v.kind === "butterfly" ? 130 : v.kind === "bird" ? 70 : 60; v.tx = Math.min(BOUNDS.x1, Math.max(BOUNDS.x0, v.x + rnd(-far, far) / G.W)); v.ty = Math.min(BOUNDS.y1, Math.max(BOUNDS.y0, v.y + rnd(-far * .5, far * .5) / G.H)); v.nt = t + rnd(1.4, 3.2); }
+  const dx = (v.tx - v.x) * G.W, dy = (v.ty - v.y) * G.H, d = Math.hypot(dx, dy), step = v.sp * dt, moving = d > 2 && !RM.matches;
+  if (moving) { const k = Math.min(1, step / d); v.x += (v.tx - v.x) * k; v.y += (v.ty - v.y) * k; if (Math.abs(dx) > 1) v.face = dx > 0 ? -1 : 1; }
+  v.fs += (v.face - v.fs) * Math.min(1, dt * 12);
+  const bob = RM.matches ? 0 : v.kind === "butterfly" ? Math.sin(t * 6 + v.ph) * 9 + 14 : v.kind === "bird" ? (moving ? Math.abs(Math.sin(t * 10)) * 7 : 0) : (moving ? Math.sin(t * 9) * 2 : 0);
+  v.el.style.transform = `translate(${(v.x * G.W).toFixed(1)}px,${(v.y * G.H).toFixed(1)}px)`; v.el.style.zIndex = 20 + Math.round(v.y * G.H);
+  v.el.firstChild.style.transform = `translateY(${(-bob).toFixed(1)}px) scaleX(${v.fs.toFixed(2)})`;
+  v.el.classList.toggle("leave", v.until - t < 2.5);
+}
+async function collectVisitor(m) {
+  const v = G.vis; if (!v) return; G.vis = null; v.el.classList.add("got"); setTimeout(() => v.el.remove(), 450);
+  const n = Math.random() < .2 ? 2 : 1; ls(visKey(), (+ls(visKey()) || 0) + 1);
+  spawnHeart(v.x * G.W, v.y * G.H - 40, `+${n}🌱`); burst(["🌱", "✨"], 14);
+  try { await DB.addBonus(m.id, n); } catch (e) { toast(errMsg(e)); }
 }
 const gardenMain = () => `<h2>our garden</h2><div id="gslot"></div><div id="gpanel">${gardenPanel()}</div>`;
 function gardenTap(key) {
   const p = G.pets.get(key), u = p && users.find(x => x.id === p.uid); if (!u) return;
-  const tot = totalOf(u), st = stageOf(tot), mood = moodOf(u);
+  if (performance.now() - G.noClick < 300) return; // that was the end of a drag, not a tap
+  const tot = totalOf(u), st = stageOf(tot), mood = moodOf(u), own = u.id === me?.uid;
   p.jump = nowS();
   spawnHeart(p.x * G.W, p.y * G.H - 62);
-  G.card.innerHTML = `<b>${ALLP[p.type].e[st]}${accOf(p.type, st)} ${esc(u.name)}'s ${esc(petName(p.type))}</b><small>${stageNames(p.type)[st]} · ${st < 3 ? `${fmt(STAGE[st] - tot)} to grow` : "fully grown 👑"}</small><em>${SAY[mood]}</em>`;
+  G.card.innerHTML = `<b>${ALLP[p.type].e[st]}${accOf(p.type, st)} ${esc(u.name)}'s ${esc(petName(p.type))}</b><small>${stageNames(p.type)[st]} · ${st < 3 ? `${fmt(STAGE[st] - tot)} to grow` : "fully grown 👑"}</small><em>${SAY[mood]}</em>${own ? `<button class="gtreat" data-act="gtreat" data-id="${esc(key)}">🍪 give a treat · ${TREAT} 🌱</button>` : ""}`;
   G.card.hidden = true; void G.card.offsetWidth; G.card.hidden = false;
-  clearTimeout(G.cardT); G.cardT = setTimeout(() => { G.card.hidden = true; }, 4200);
+  clearTimeout(G.cardT); G.cardT = setTimeout(() => { G.card.hidden = true; }, own ? 6500 : 4200);
 }
 function gardenSheet(mine) { // "choose my garden pets" modal: locked pets are greyed out with their unlock requirement
   const sel = new Set((Array.isArray(mine.garden) ? mine.garden : []).filter(id => EXTRA[id] && EXTRA[id].ok(mine)).slice(0, 3));
@@ -752,6 +879,9 @@ app.onclick = async e => {
     else if (a === "gcancel") await exitEdit(false);
     else if (a === "gdel") delSel();
     else if (a === "gwx") cycleWx();
+    else if (a === "gtreat") await treat(id, mine);
+    else if (a === "gvis") await collectVisitor(mine);
+    else if (a === "gfind") findPet();
     else if (a === "calnav") { calMonth = Math.min(0, calMonth + +id); render(); }
     else if (a === "day") { const v = +b.dataset.v; toast(`${new Date(id + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${v ? fmt(v) : "no study 💤"}`); }
     else if (a === "discard") { if (confirm("Cancel without saving any time?")) { stopSound(); await DB.cancelStudy(me.uid); } }
