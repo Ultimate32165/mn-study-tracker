@@ -514,3 +514,15 @@ h2.fold.shut .fbtn i{transform:rotate(-90deg)}
 .fprev{display:flex;justify-content:center}.fprev svg{height:150px;width:auto}
 .fbar{height:12px;border-radius:99px;background:var(--tint);border:2px solid var(--edge);overflow:hidden;margin:10px 0}
 .fbar i{display:block;height:100%;background:linear-gradient(90deg,var(--main-l),var(--main));border-radius:99px}
+/* forest life: swaying crowns, planting pop, drifting leaves, night fireflies (all off with "motion off") */
+.sway{transform-box:fill-box;transform-origin:50% 100%;animation:fsw 5s ease-in-out infinite}
+@keyframes fsw{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
+.ftree.pop{transform-box:fill-box;transform-origin:50% 100%;animation:fpop .6s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes fpop{0%{transform:scale(.15);opacity:0}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}
+.fx{pointer-events:none}
+.lf{fill:color-mix(in srgb,var(--c) 70%,#fff);opacity:0;animation:flf 11s linear infinite}
+@keyframes flf{0%{opacity:0;transform:translate(0,0) rotate(0)}12%{opacity:.9}85%{opacity:.8}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(300deg)}}
+.ff{fill:#fff3a0;opacity:0;filter:drop-shadow(0 0 3px #ffe66d);animation:fff 6s ease-in-out infinite}
+@keyframes fff{0%,100%{opacity:0;transform:translate(0,0)}25%{opacity:1;transform:translate(8px,-6px)}50%{opacity:.3;transform:translate(-4px,-14px)}75%{opacity:1;transform:translate(6px,-8px)}}
+[data-motion=off] .sway,[data-motion=off] .ftree.pop{animation:none}
+[data-motion=off] .fx{display:none}

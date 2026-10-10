@@ -1,3 +1,4 @@
+import { treeParts, cellPos, SPECIES, GRID } from "./forest.js";
 // Photocard: draws a shareable "cozy dashboard" image on a canvas.
 // Pure drawing code: numbers and colours in, pixels out. No DOM, no Firebase (app.js collects the data and the theme colours).
 // The garden is redrawn from the same data as the live scene, shrunk to fit. Keep WW/WH/POND in sync with js/app.js and the garden CSS.
@@ -85,7 +86,32 @@ function drawPet(ctx, p, px, py, s, wx) { // p = { emo, acc, st, flip, sleep }
   if (p.acc) emoji(ctx, p.acc, px, cy - size * .62, size * .42);
 }
 
+// ---------------------------------------------------------------- forest (the same isometric blocks as the forest tab, see js/forest.js)
+const mixc = (a, b, t) => { const p = a.match(/[\d.]+/g).map(Number), q = b.match(/[\d.]+/g).map(Number); return `rgba(${[0, 1, 2].map(i => Math.round(p[i] * (1 - t) + q[i] * t)).join(",")},${p[3] ?? 1})`; };
+function drawForest(ctx, x, y, w, h, g, pal) { // g.forest = [{ s: species, c: tile, st: stage }], g.night
+  ctx.save(); rr(ctx, x, y, w, h, 36); ctx.clip();
+  const sky = ctx.createLinearGradient(0, y, 0, y + h); sky.addColorStop(0, pal.sk1); sky.addColorStop(1, pal.sk2); ctx.fillStyle = sky; ctx.fillRect(x, y, w, h);
+  const s = Math.min(w / 384, h / 292) * .98, ox = x + w / 2 - 192 * s, oy = y + h / 2 - 150 * s, R = seeded(11), night = !!g.night, BLK = "rgba(0,0,0,1)", WHT = "rgba(255,255,255,1)";
+  if (night) { for (let i = 0; i < 40; i++) { ctx.globalAlpha = .35 + R() * .6; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x + R() * w, y + R() * h * .55, (.8 + R() * 1.4) * Math.max(.8, s * 1.4), 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1; }
+  glow(ctx, x + w * .84, y + h * .17, Math.min(w, h) * .13, night ? "255,246,214" : "255,233,168", night ? .55 : .7);
+  ctx.fillStyle = night ? "#fff6d6" : "#fff0b8"; ctx.beginPath(); ctx.arc(x + w * .84, y + h * .17, Math.min(w, h) * .034, 0, Math.PI * 2); ctx.fill();
+  const poly = (pts, col) => { ctx.beginPath(); pts.forEach(([px, py], i) => ctx[i ? "lineTo" : "moveTo"](ox + px * s, oy + py * s)); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke(); }; // same-colour stroke hides seams
+  const box = (cx, by, bw, bh, col) => { const a = bw / 2, d = bw / 4, t = by - bh;
+    poly([[cx - a, by], [cx, by + d], [cx, t + d], [cx - a, t]], col);
+    poly([[cx + a, by], [cx, by + d], [cx, t + d], [cx + a, t]], mixc(col, BLK, .24));
+    poly([[cx, t - d], [cx + a, t], [cx, t + d], [cx - a, t]], mixc(col, WHT, .34)); };
+  const wood = mixc(mixc(pal.sub, pal.main, .3), BLK, .1), m = new Map((g.forest || []).map(t => [t.c, t]));
+  for (let d = 0; d < 2 * GRID - 1; d++) for (let r = 0; r < GRID; r++) { // back to front
+    const c = d - r; if (c < 0 || c >= GRID) continue;
+    const i = r * GRID + c, [cx, ys] = cellPos(i), t = m.get(i);
+    box(cx, ys + 10, 64, 10, mixc(pal.bg2, pal.live, (r + c) % 2 ? .30 : .38));
+    if (t && SPECIES[t.s]) { let yy = ys; for (const [bw, bh, k] of treeParts(t.s, t.st)) { box(cx, yy, bw, bh, k === "wood" ? wood : pal[SPECIES[t.s].c.slice(2)]); yy -= bh; } }
+  }
+  if (night) for (let i = 0; i < 14; i++) glow(ctx, x + R() * w, y + h * (.3 + R() * .6), (5 + R() * 5) * Math.max(1, s * 1.4), "255,235,140", .75);
+  ctx.restore();
+}
 function drawScene(ctx, x, y, w, h, g, pal) {
+  if (g.forest) return drawForest(ctx, x, y, w, h, g, pal);
   ctx.save(); rr(ctx, x, y, w, h, 36); ctx.clip();
   const s = Math.min(w / WW, h / WH), ox = x + (w - WW * s) / 2, oy = y + h - WH * s, X = v => ox + v * s, Y = v => oy + v * s, night = !!g.night, R = seeded(7);
   // sky

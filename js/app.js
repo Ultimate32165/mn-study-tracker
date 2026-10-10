@@ -1,6 +1,6 @@
 import * as DB from "./db.js";
 import { drawCard } from "./card.js";
-import { forestMain, forestAct, forestGrow, forestCost } from "./forest.js";
+import { forestMain, forestAct, forestGrow, forestCost, forestSnap } from "./forest.js";
 import { SIGNUP_CODE } from "./firebase-config.js";
 
 const $ = s => document.querySelector(s), app = $("#app"), modal = $("#modal");
@@ -770,7 +770,7 @@ function calView(mine) {
 // the latest milestone (pet evolved / streak record / couple level) is remembered on this device so you can still make its card later
 const loadMs = () => { try { const m = JSON.parse(ls("lastMs") || "null"); return m && ["evolve", "streak", "level"].includes(m.type) ? m : null; } catch { return null; } };
 const saveMs = ms => ls("lastMs", JSON.stringify(ms));
-const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today", mode: "me", fid: "", period: "week", ms: loadMs() };
+const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today", mode: "me", fid: "", period: "week", ms: loadMs(), scene: ls("cardScene") === "forest" ? "forest" : "garden" };
 const gfmt = t => t % 3600 === 0 ? `${t / 3600}h` : fmt(t);
 let cardUrl = "", cardBlob = null, cardCv = null, cardSeq = 0, lastGift = 0;
 const dayLong = t => new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
@@ -877,6 +877,7 @@ async function renderCard() {
   catch { if (seq === cardSeq) { toast("Couldn't draw that card 😢"); if (ld) ld.hidden = true; } return; }
   if (seq !== cardSeq) return;
   const cv = document.createElement("canvas");
+  if (cardOpt.scene === "forest") { const fm = users.find(u => u.id === me.uid); if (fm) data.garden = { ...data.garden, forest: forestSnap(fm, totalOf(fm)) }; } // forest instead of garden
   drawCard(cv, data, cardPal(data.garden.night, data.garden.wx));
   cv.toBlob(b => {
     if (seq !== cardSeq || !b) return;
@@ -903,6 +904,7 @@ function cardSheet(mode) {
   <div class="seg" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>
   <div class="seg" id="cper">${Object.keys(PD).map(k => `<button data-per="${k}" class="${k === cardOpt.period ? "sel" : ""}">${PD[k]}</button>`).join("")}</div>
   <div class="seg">${Object.keys(SH).map(k => `<button data-shape="${k}" class="${k === cardOpt.shape ? "sel" : ""}">${SH[k]}</button>`).join("")}</div>
+  <div class="seg" id="cscene">${[["garden", "🌳 garden"], ["forest", "🌲 forest"]].map(([k, l]) => `<button data-scene="${k}" class="${k === cardOpt.scene ? "sel" : ""}">${l}</button>`).join("")}</div>
   <select id="csel" aria-label="which session"><option value="today">Today (all sessions)</option>${sess.map(x => `<option value="${esc(x.id)}" ${x.id === cardOpt.sid ? "selected" : ""}>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} · ${fmt(x.seconds)}</option>`).join("")}</select>
   <select id="cfr" aria-label="which friend">${friends.map(u => `<option value="${esc(u.id)}" ${u.id === cardOpt.fid ? "selected" : ""}>${esc(u.emoji)} ${esc(u.name)}</option>`).join("")}</select>
   <div class="cprev"><div class="cload">drawing your card…</div><img id="cimg" alt="photocard preview"></div>
@@ -915,6 +917,7 @@ function cardSheet(mode) {
   modal.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { cardOpt.mode = b.dataset.mode; modal.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("sel", x === b)); vis(); renderCard(); });
   modal.querySelectorAll("[data-per]").forEach(b => b.onclick = () => { cardOpt.period = b.dataset.per; modal.querySelectorAll("[data-per]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
   modal.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => { cardOpt.shape = b.dataset.shape; ls("cardShape", cardOpt.shape); modal.querySelectorAll("[data-shape]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
+  modal.querySelectorAll("[data-scene]").forEach(b => b.onclick = () => { cardOpt.scene = b.dataset.scene; ls("cardScene", cardOpt.scene); modal.querySelectorAll("[data-scene]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
   $("#csel").onchange = e => { cardOpt.sid = e.target.value; renderCard(); };
   $("#cfr").onchange = e => { cardOpt.fid = e.target.value; sendLbl(); if (cardOpt.mode === "together") renderCard(); };
   const file = () => new File([cardBlob], `study${cardOpt.mode === "me" ? "" : "-" + cardOpt.mode}-${key(Date.now())}.png`, { type: "image/png" });
@@ -978,7 +981,7 @@ function render() {
     syncGarden(); return;
   }
   app.innerHTML = `<header><h1>MN study tracker</h1><div class="hr">${tab === "home" ? `<button class="mtog ${compact ? "on" : ""}" data-act="compact" data-id="${compact ? 0 : 1}" role="switch" aria-checked="${compact}" title="shorter home tab"><em>short</em><i></i></button>` : ""}<button class="av" data-act="profile">${esc(mine.emoji)}</button></div></header>
-  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine)) : statsView(mine)}</main>
+  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine), isEvening() || /night|cocoa|berry|forest|deepsea|ink|galaxy/.test(document.documentElement.dataset.theme || "")) : statsView(mine)}</main>
   <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button><button class="${tab === "garden" ? "act" : ""}" data-act="tab" data-id="garden">🌳<span>garden</span></button><button class="${tab === "forest" ? "act" : ""}" data-act="tab" data-id="forest">🌲<span>forest</span></button></nav>`;
   if (tab === "garden") mountGarden();
   tick();
@@ -1107,7 +1110,7 @@ app.onclick = async e => {
     else if (a === "gpet") gardenTap(id);
     else if (a === "gchoose") gardenSheet(mine);
     else if (a === "gshop") shopSheet(mine);
-    else if (a === "fcell") forestAct(+id, { u: mine, total: totalOf(mine), left: seedsLeft(mine), modal, toast, err: errMsg, fmt, save: t => DB.saveForest(me.uid, t) });
+    else if (a === "fcell") forestAct(+id, { u: mine, total: totalOf(mine), left: seedsLeft(mine), modal, toast, err: errMsg, fmt, burst, save: t => DB.saveForest(me.uid, t) });
     else if (a === "gedit") enterEdit(mine);
     else if (a === "gdone") await exitEdit(true);
     else if (a === "gcancel") await exitEdit(false);
