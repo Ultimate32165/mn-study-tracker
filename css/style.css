@@ -353,8 +353,8 @@ font-family:var(--hf);color:var(--ink);background:var(--sheet);border:2px solid 
 .tiny{font-size:54px;line-height:1;padding-bottom:2px}
 
 /* weather: random, no network */
-.gwx{inset:0;z-index:260;pointer-events:none;overflow:hidden}
-.gwx i{position:absolute;top:0;font-style:normal;line-height:1;animation:wxfall linear infinite;will-change:transform}
+.gwx{inset:0;z-index:260;pointer-events:none;overflow:hidden;--gh:var(--wh)} /* lives inside .gworld, so it pans with the garden; --gh = how far a flake falls = world height */
+.gwx i{position:absolute;top:0;font-style:normal;line-height:1;animation:wxfall linear infinite}
 .gwx.snow i{border-radius:50%;background:#fff;box-shadow:0 0 4px rgba(255,255,255,.8);opacity:.92}
 .gwx.rain i{width:2px;border-radius:2px;background:linear-gradient(transparent,rgba(205,232,255,.9));animation-name:wxrain;opacity:.85}
 @keyframes wxfall{from{transform:translate(0,-24px) rotate(0deg)}to{transform:translate(var(--dx,0px),calc(var(--gh,420px) + 30px)) rotate(var(--r,0deg))}}

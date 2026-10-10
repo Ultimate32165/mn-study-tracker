@@ -241,7 +241,7 @@ function buildGarden() { // built ONCE; render() never touches it, so pets never
   el.innerHTML = `<div class="gworld"><div class="gstars"></div><i class="gsun"></i><div class="grain"></div><i class="gcl c1"></i><i class="gcl c2"></i><i class="gcl c3"></i><i class="gcl c4"></i><i class="gcl c5"></i>
   <div class="ghill h1"></div><div class="gfence"></div><div class="ghill h2"></div><div class="gpond"></div><div class="gdeco"></div><div class="gpets"></div><div class="gfly"></div>
   <div class="gff">${[...Array(28)].map(() => `<i style="left:${rnd(4, 96).toFixed(1)}%;top:${rnd(36, 96).toFixed(1)}%;animation-delay:${(-rnd(0, 6)).toFixed(1)}s;animation-duration:${rnd(4, 8).toFixed(1)}s"></i>`).join("")}</div>
-  <div class="gfx"></div></div><div class="gwx"></div><div class="gcard" hidden></div><button class="gfind" data-act="gfind" aria-label="find my pets">📍</button>`;
+  <div class="gwx"></div><div class="gfx"></div></div><div class="gcard" hidden></div><button class="gfind" data-act="gfind" aria-label="find my pets">📍</button>`;
   G.el = el; G.world = el.querySelector(".gworld"); G.deco = el.querySelector(".gdeco"); G.layer = el.querySelector(".gpets"); G.fly = el.querySelector(".gfly"); G.fx = el.querySelector(".gfx");
   G.card = el.querySelector(".gcard"); G.wxEl = el.querySelector(".gwx");
   G.card.onclick = () => { G.card.hidden = true; };
@@ -558,9 +558,9 @@ function itemDown(e, o) { // drag-to-place
 function buildWx(w) {
   const f = (n, fn) => [...Array(n)].map((_, i) => fn(i)).join(""), L = (a = 0, b = 100) => rnd(a, b).toFixed(1), D = () => (-rnd(0, 10)).toFixed(2);
   let h = "";
-  if (w === "snow") h = f(30, () => { const z = rnd(3, 7).toFixed(1); return `<i style="left:${L()}%;width:${z}px;height:${z}px;--dx:${rnd(-30, 30).toFixed(0)}px;animation-delay:${D()}s;animation-duration:${rnd(6, 11).toFixed(1)}s"></i>`; });
-  else if (w === "rain") h = f(44, () => `<i style="left:${L(-25)}%;height:${rnd(12, 20).toFixed(0)}px;animation-delay:${D()}s;animation-duration:${rnd(.55, .95).toFixed(2)}s"></i>`);
-  else if (w === "petals" || w === "leaves") { const E = w === "petals" ? ["🌸", "🌸", "💮", "🌷"] : ["🍂", "🍁", "🍂"]; h = f(18, i => `<i style="left:${L()}%;font-size:${rnd(11, 18).toFixed(0)}px;--dx:${rnd(-70, 70).toFixed(0)}px;--r:${rnd(-540, 540).toFixed(0)}deg;animation-delay:${D()}s;animation-duration:${rnd(7, 13).toFixed(1)}s">${E[i % E.length]}</i>`); }
+  if (w === "snow") h = f(90, () => { const z = rnd(3, 7).toFixed(1); return `<i style="left:${L()}%;width:${z}px;height:${z}px;--dx:${rnd(-30, 30).toFixed(0)}px;animation-delay:${(-rnd(0, 16)).toFixed(2)}s;animation-duration:${rnd(10, 18).toFixed(1)}s"></i>`; });
+  else if (w === "rain") h = f(130, () => `<i style="left:${L(-18)}%;height:${rnd(12, 20).toFixed(0)}px;animation-delay:${D()}s;animation-duration:${rnd(.9, 1.5).toFixed(2)}s"></i>`);
+  else if (w === "petals" || w === "leaves") { const E = w === "petals" ? ["🌸", "🌸", "💮", "🌷"] : ["🍂", "🍁", "🍂"]; h = f(50, i => `<i style="left:${L()}%;font-size:${rnd(11, 18).toFixed(0)}px;--dx:${rnd(-70, 70).toFixed(0)}px;--r:${rnd(-540, 540).toFixed(0)}deg;animation-delay:${(-rnd(0, 22)).toFixed(2)}s;animation-duration:${rnd(12, 22).toFixed(1)}s">${E[i % E.length]}</i>`); }
   G.wxEl.className = "gwx " + w; G.wxEl.innerHTML = h;
 }
 function syncWeather() {
@@ -792,10 +792,18 @@ function cardPal(night, wx) { // read the CURRENT theme's colours (also the gard
 function gardenSnap() { // the saved garden as plain data (live pet positions when the garden is open, tidy spots otherwise)
   const night = isEvening(), wx = G.wxMode === "auto" ? G.wxAuto : G.wxMode, R = seeded(3), items = [];
   users.forEach(u => decorOf(u).forEach(d => items.push({ i: d.i, x: d.x, y: d.y })));
-  const pets = gardenList().map(e => {
-    const live = G.pets.get(e.key), st = stageOf(totalOf(e.u)); let x, y;
-    if (live) { x = live.x; y = live.y; } else { x = .3 + R() * .4; y = .68 + R() * .22; for (let i = 0; i < 20 && inPond(x, y); i++) { x = .3 + R() * .4; y = .68 + R() * .22; } }
-    return { emo: ALLP[e.type].e[st], acc: accOf(e.type, st), st, x, y, flip: live ? live.fs < 0 : R() < .5, sleep: moodOf(e.u) === "sleep" };
+  const list = gardenList(), n = list.length, placed = [];
+  const pets = list.map((e, i) => { // scattered: one slot per animal across the width, random depth, away from the pond, decorations and each other
+    const st = stageOf(totalOf(e.u)), slot = (i + .5) / n; let x = slot, y = .7;
+    for (let t = 0; t < 40; t++) {
+      x = Math.min(.93, Math.max(.07, .06 + slot * .88 + (R() - .5) * (.7 / n))); y = .64 + R() * .29;
+      if (inPond(x, y) || inPond(x, y - .04)) continue;
+      if (items.some(d => Math.abs(d.x - x) < .055 && Math.abs(d.y - y) < .07)) continue;
+      if (placed.some(q => Math.abs(q.x - x) < .08 && Math.abs(q.y - y) < .09)) continue;
+      break;
+    }
+    placed.push({ x, y });
+    return { emo: ALLP[e.type].e[st], acc: accOf(e.type, st), st, x, y, flip: x < .5, sleep: moodOf(e.u) === "sleep" }; // animals on the left look right, on the right look left: everyone faces the middle
   });
   return { night, wx, lv: couple().lv, items, pets };
 }
