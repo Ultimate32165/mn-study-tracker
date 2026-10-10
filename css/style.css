@@ -488,3 +488,30 @@ h2.fold.shut .fb i{transform:rotate(-90deg)}
 #gpanel .gbtns.one{grid-template-columns:1fr}
 #gpanel .gbtns .btn{margin:0;padding:10px 8px;font-size:.9rem}
 #gpanel .hint{font-size:.78rem;margin:8px 0 4px}
+
+/* reduce-motion setting: stops every endless looping animation (one-shot ones like confetti and sheets still play) */
+[data-motion=off] body::before,
+[data-motion=off] body::after,
+[data-motion=off] .hero::before,
+[data-motion=off] .hero::after,
+[data-motion=off] .study,
+[data-motion=off] .logo,
+[data-motion=off] .pet,
+[data-motion=off] .petrow.feed .pet,
+[data-motion=off] .petrow.sleepy .pet,
+[data-motion=off] .petrow.sleepy::after,
+[data-motion=off] .pe,
+[data-motion=off] .gcl,
+[data-motion=off] .gpond::after,
+[data-motion=off] .gfly i,
+[data-motion=off] .gff i,
+[data-motion=off] .gbub.study.on,
+[data-motion=off] .gbub.sleep.on,
+[data-motion=off] .evo .ar,
+[data-motion=off] #garden.night .lant .gl,
+[data-motion=off] .swing .sw,
+[data-motion=off] .wx-rain .gpond::before,
+[data-motion=off] .gvis::after,
+[data-motion=off] #garden.night .fairy b,
+[data-motion=off] .fount .d{animation:none!important}
+[data-motion=off] .gwx,[data-motion=off] .gfly,[data-motion=off] .gff,[data-motion=off] .fount .d,[data-motion=off] .wx-rain .gpond::before{display:none}

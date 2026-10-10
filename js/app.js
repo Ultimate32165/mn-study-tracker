@@ -72,6 +72,9 @@ const ls = (k, v) => { try { return v === undefined ? localStorage.getItem(k) : 
 const foldSet = (() => { try { return new Set(JSON.parse(ls("fold") || "[]")); } catch { return new Set(); } })();
 const sec = (id, title, extra, body) => { const shut = foldSet.has(id); return `<h2 class="fold${shut ? " shut" : ""}"><button class="fb" data-act="fold" data-id="${id}" aria-expanded="${!shut}"><i>▾</i>${title}</button>${extra || ""}</h2>${shut ? "" : body}`; };
 let compact = ls("compact") === "1";
+let calm = ls("motion") === "off"; // "reduce motion": turns off the endless bobbing / drifting / twinkling
+const applyMotion = () => { document.documentElement.dataset.motion = calm ? "off" : "on"; };
+applyMotion();
 let pomo = ls("pomo") === "1", lastCheer = 0, askedAt = 0, busy = false, brkSeen = 0, lastBest = 0;
 
 function burst(emojis, n = 70) { // confetti (colored bits) or floating emojis
@@ -1043,7 +1046,8 @@ function profileSheet(mine) {
   <button class="btn ghost" id="lm">⏰ still-studying: ${limitOf(mine) ? "after " + fmt(limitOf(mine)) : "off"}</button>
   <button class="btn ghost" id="pt">${PETS[petOf(mine)].e[2]} pet: ${petOf(mine)}</button>
   <button class="btn ghost" id="pm">🍅 pomodoro: ${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5} min</button>
-  <button class="btn ghost" id="nt">🔔 notifications</button></div>
+  <button class="btn ghost" id="nt">🔔 notifications</button>
+  <button class="btn ghost" id="rm">🍃 reduce motion: ${calm ? "on" : "off"}</button></div>
   <p class="hint">cute themes</p><div class="emojis">${themeBtns(["auto", ...CUTE])}</div><p class="hint">dark themes 🌙</p><div class="emojis">${themeBtns(DARK)}</div><p class="hint">seasons 🍃 · light, then dark</p><div class="emojis">${themeBtns(SEASON)}</div><p class="hint">glass themes ✨</p><div class="emojis">${themeBtns(GLASS)}</div>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
@@ -1061,6 +1065,7 @@ function profileSheet(mine) {
       setTimeout(() => sheet({ title: "break length ☕", note: "How long is each break?", secs: (mine.pomoRest ?? 5) * 60,
         onSave: async s2 => { if (s2 < 60) throw Error("Minimum is 1 minute."); await DB.updateProfile(me.uid, { pomoRest: s2 / 60 }); toast("Pomodoro saved! 🍅"); } }), 0);
     } });
+  $("#rm").onclick = () => { calm = !calm; ls("motion", calm ? "off" : "on"); applyMotion(); $("#rm").textContent = `🍃 reduce motion: ${calm ? "on" : "off"}`; toast(calm ? "Motion reduced 🍃" : "Motion back on ✨"); };
   $("#nt").onclick = async () => { try { toast((await Notification.requestPermission()) === "granted" ? "Notifications on! 🔔" : "Notifications blocked."); } catch { toast("Install the app to your home screen first."); } };
   modal.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { theme = b.dataset.t; applyTheme(theme); modal.querySelectorAll("[data-t]").forEach(x => x.classList.toggle("sel", x === b)); });
   modal.querySelectorAll("[data-e]").forEach(b => b.onclick = () => { em = b.dataset.e; modal.querySelectorAll("[data-e]").forEach(x => x.classList.toggle("sel", x === b)); });
