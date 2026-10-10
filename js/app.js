@@ -1,4 +1,5 @@
 import * as DB from "./db.js";
+import { drawCard } from "./card.js";
 import { SIGNUP_CODE } from "./firebase-config.js";
 
 const $ = s => document.querySelector(s), app = $("#app"), modal = $("#modal");
@@ -449,6 +450,7 @@ function gardenPanel() {
   return `<div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds</div>
   <div class="row"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button></div>
   <button class="btn ghost" data-act="gchoose">🐾 choose my garden pets</button>
+  <button class="btn ghost" data-act="card">📸 make a photocard</button>
   <div class="wxrow"><button class="chip" data-act="gwx">🌦️ weather: ${wl}</button></div><p class="hint">drag the garden to look around ✋ · tap a pet to say hi 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
 }
 function enterEdit(m) {
@@ -730,11 +732,90 @@ function calView(mine) {
   <p class="hint">${days} study days · ${fmt(tot)} this month</p>
   <div class="legend">less ${[0, 1, 2, 3, 4].map(l => `<i class="dy l${l}"></i>`).join("")} more</div></div>`;
 }
+// ---- photocard: a shareable image of your session, stats and garden (drawn by js/card.js) ----
+const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today" };
+let cardUrl = "", cardBlob = null, cardSeq = 0;
+const dayLong = t => new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+const hhmm = t => new Date(t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+const pxc = document.createElement("canvas"); pxc.width = pxc.height = 1; const pxx = pxc.getContext("2d", { willReadFrequently: true });
+function norm(c) { pxx.clearRect(0, 0, 1, 1); pxx.fillStyle = "#000"; pxx.fillStyle = c; pxx.fillRect(0, 0, 1, 1); const [r, g, b, a] = pxx.getImageData(0, 0, 1, 1).data; return { s: `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`, rgb: `${r},${g},${b}` }; }
+function cardPal(night, wx) { // read the CURRENT theme's colours (also the garden's sky / grass for the right time of day and weather)
+  const tmp = document.createElement("div"); tmp.id = "garden"; tmp.className = [night ? "night" : "", wx && wx !== "clear" ? "wx-" + wx : ""].join(" ").trim();
+  tmp.style.cssText = "position:fixed;left:-9999px;top:0;width:10px;height:10px;visibility:hidden;pointer-events:none"; document.body.appendChild(tmp);
+  const c = e => { const i = document.createElement("i"); i.style.color = e; tmp.appendChild(i); return norm(getComputedStyle(i).color); }, v = n => c(`var(${n})`);
+  const pal = {
+    bg1: v("--bg1").s, bg2: v("--bg2").s, card: v("--card").s, ink: v("--ink").s, sub: v("--soft").s, main: v("--main").s, alt: v("--alt").s, tint: v("--tint").s, edge: v("--edge").s,
+    sk1: v("--sk1").s, sk2: v("--sk2").s, cl: v("--cl").s, grB: v("--gr-b").s, grF: v("--gr-f").s, wood: v("--wood").s, woodL: v("--wood-l").s, woodD: v("--wood-d").s,
+    soil: c("color-mix(in srgb,#8a5732 80%,var(--bg1))").s, cloth: c("color-mix(in srgb,#fff 88%,var(--main))").s, pad: c("color-mix(in srgb,#5fcf74 80%,var(--bg1))").s,
+    stone: c("color-mix(in srgb,#cfd3dc 75%,var(--bg1))").s, water: c("color-mix(in srgb,#8fd3ff 80%,var(--bg1))").s, water2: c("color-mix(in srgb,#4fb0e8 78%,var(--bg1))").s,
+    glow1: v("--glow1").rgb, glow2: v("--glow2").rgb, hf: (getComputedStyle(document.documentElement).getPropertyValue("--hf").trim() || "Fredoka, sans-serif"), bf: "Nunito, system-ui, sans-serif"
+  };
+  tmp.remove(); return pal;
+}
+function gardenSnap() { // the saved garden as plain data (live pet positions when the garden is open, tidy spots otherwise)
+  const night = isEvening(), wx = G.wxMode === "auto" ? G.wxAuto : G.wxMode, R = seeded(3), items = [];
+  users.forEach(u => decorOf(u).forEach(d => items.push({ i: d.i, x: d.x, y: d.y })));
+  const pets = gardenList().map(e => {
+    const live = G.pets.get(e.key), st = stageOf(totalOf(e.u)); let x, y;
+    if (live) { x = live.x; y = live.y; } else { x = .3 + R() * .4; y = .68 + R() * .22; for (let i = 0; i < 20 && inPond(x, y); i++) { x = .3 + R() * .4; y = .68 + R() * .22; } }
+    return { emo: ALLP[e.type].e[st], acc: accOf(e.type, st), st, x, y, flip: live ? live.fs < 0 : R() < .5, sleep: moodOf(e.u) === "sleep" };
+  });
+  return { night, wx, lv: couple().lv, items, pets };
+}
+function cardData(shape, sid) {
+  const m = users.find(u => u.id === me.uid), s = stats(m), d = m.daily || {}, now = Date.now(), goal = goalOf(m), sx = sessions.find(x => x.id === sid), gfmt = t => t % 3600 === 0 ? `${t / 3600}h` : fmt(t);
+  let ses, date = dayLong(now);
+  if (sx) {
+    const t0 = sx.start.toMillis(), dayTot = d[key(t0)] || sx.seconds; date = dayLong(t0);
+    ses = { label: "Study session", time: fmt(sx.seconds), sub: `${hhmm(t0)} → ${hhmm(t0 + sx.seconds * 1000)}`, pct: goal ? dayTot / goal : null, goalText: `of ${gfmt(goal)} day goal` };
+  } else {
+    const tod = liveToday(m), cnt = sessions.filter(x => key(x.start.toMillis()) === key(now)).length;
+    ses = { label: "Today's studying", time: fmt(tod), sub: cnt ? `${cnt} session${cnt > 1 ? "s" : ""} so far` : "every minute counts ✨", pct: goal ? tod / goal : null, goalText: `of ${gfmt(goal)} goal` };
+  }
+  const week = [...Array(7)].map((_, i) => { const t = now - (6 - i) * DAY, v = d[key(t)] || 0; return { l: new Date(t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2), v, t: v ? fmt(v) : "", today: i === 6 }; });
+  return { shape, name: m.name || "you", avatar: m.emoji || "📚", pet: ALLP[petOf(m)].e[stageOf(totalOf(m))], date, session: ses, todayLabel: "today", todayText: fmt(liveToday(m)),
+    streakText: `${s.streak} day${s.streak === 1 ? "" : "s"} 🔥`, week, weekTotal: fmt(week.reduce((a, k) => a + k.v, 0)), garden: gardenSnap() };
+}
+async function renderCard() {
+  const seq = ++cardSeq, img = $("#cimg"), ld = $(".cload"); if (!img) return;
+  if (ld) ld.hidden = false;
+  try { await Promise.race([Promise.all([document.fonts.load("700 48px Fredoka"), document.fonts.load("800 28px Nunito")]), new Promise(r => setTimeout(r, 1500))]); } catch {}
+  if (seq !== cardSeq) return;
+  const data = cardData(cardOpt.shape, cardOpt.sid), cv = document.createElement("canvas");
+  drawCard(cv, data, cardPal(data.garden.night, data.garden.wx));
+  cv.toBlob(b => {
+    if (seq !== cardSeq || !b) return;
+    if (cardUrl) URL.revokeObjectURL(cardUrl);
+    cardBlob = b; cardUrl = URL.createObjectURL(b); img.src = cardUrl; if (ld) ld.hidden = true;
+  }, "image/png");
+}
+function cardSheet() {
+  const sess = sessions.slice(0, 12), canShare = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File([""], "a.png", { type: "image/png" })] })); } catch { return false; } })();
+  if (!sess.some(x => x.id === cardOpt.sid)) cardOpt.sid = "today";
+  const SH = { square: "▫️ square", portrait: "🖼️ 4:5", story: "📱 story" };
+  modal.innerHTML = `<div class="back"><div class="sheet cardsheet"><h3>photocard 📸</h3>
+  <div class="seg">${Object.keys(SH).map(k => `<button data-shape="${k}" class="${k === cardOpt.shape ? "sel" : ""}">${SH[k]}</button>`).join("")}</div>
+  <select id="csel" aria-label="which session"><option value="today">Today (all sessions)</option>${sess.map(x => `<option value="${esc(x.id)}" ${x.id === cardOpt.sid ? "selected" : ""}>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} · ${fmt(x.seconds)}</option>`).join("")}</select>
+  <div class="cprev"><div class="cload">drawing your card…</div><img id="cimg" alt="photocard preview"></div>
+  <div class="row"><button class="btn ghost" id="cclose">close</button>${canShare ? `<button class="btn" id="cshare">share 💖</button>` : ""}<button class="btn ${canShare ? "ghost" : ""}" id="csave">save ⬇️</button></div></div></div>`;
+  const done = () => { cardSeq++; if (cardUrl) { URL.revokeObjectURL(cardUrl); cardUrl = ""; } cardBlob = null; modal.innerHTML = ""; };
+  $("#cclose").onclick = done;
+  modal.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => { cardOpt.shape = b.dataset.shape; ls("cardShape", cardOpt.shape); modal.querySelectorAll("[data-shape]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
+  $("#csel").onchange = e => { cardOpt.sid = e.target.value; renderCard(); };
+  const file = () => new File([cardBlob], `study-${key(Date.now())}.png`, { type: "image/png" });
+  $("#csave").onclick = () => { if (!cardBlob) return toast("One sec, still drawing…"); const a = document.createElement("a"); a.href = cardUrl; a.download = file().name; document.body.appendChild(a); a.click(); a.remove(); toast("Saved 📸"); };
+  const sh = $("#cshare"); if (sh) sh.onclick = async () => {
+    if (!cardBlob) return toast("One sec, still drawing…");
+    try { await navigator.share({ files: [file()], title: "MN Study Tracker" }); } catch (e) { if (e && e.name !== "AbortError") toast("Couldn't open sharing — try save instead"); }
+  };
+  renderCard();
+}
+
 function statsView(mine) {
   const s = stats(mine), d = mine.daily || {}, now = Date.now();
   const days = [...Array(7)].map((_, i) => { const t = now - (6 - i) * DAY; return { l: new Date(t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2), v: d[key(t)] || 0 }; });
   const max = Math.max(...days.map(x => x.v), 1);
-  return `<h2>last 7 days</h2><div class="bars">${days.map(x => `<div class="bar"><i style="height:${Math.max(4, x.v / max * 100)}%"></i><em>${x.v ? fmt(x.v) : ""}</em><span>${x.l}</span></div>`).join("")}</div>
+  return `<h2>last 7 days <button class="chip" data-act="card">📸 photocard</button></h2><div class="bars">${days.map(x => `<div class="bar"><i style="height:${Math.max(4, x.v / max * 100)}%"></i><em>${x.v ? fmt(x.v) : ""}</em><span>${x.l}</span></div>`).join("")}</div>
   <div class="tiles"><div><b>${fmt(s.today)}</b>today</div><div><b>${fmt(s.week)}</b>this week</div><div><b>${s.streak}🔥</b>day streak</div><div><b>${fmt(s.total)}</b>all time</div></div>
   ${calView(mine)}${badgeView(mine)}<h2>sessions <button class="chip" data-act="add">+ add time</button></h2>
   ${sessions.map(x => `<div class="sess"><div><b>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</b>
@@ -882,6 +963,7 @@ app.onclick = async e => {
     else if (a === "gtreat") await treat(id, mine);
     else if (a === "gvis") await collectVisitor(mine);
     else if (a === "gfind") findPet();
+    else if (a === "card") cardSheet();
     else if (a === "calnav") { calMonth = Math.min(0, calMonth + +id); render(); }
     else if (a === "day") { const v = +b.dataset.v; toast(`${new Date(id + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${v ? fmt(v) : "no study 💤"}`); }
     else if (a === "discard") { if (confirm("Cancel without saving any time?")) { stopSound(); await DB.cancelStudy(me.uid); } }

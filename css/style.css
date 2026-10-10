@@ -393,3 +393,16 @@ font-family:var(--hf);color:var(--ink);background:var(--sheet);border:2px solid 
 .fount .d1{--dx:-15px}.fount .d2{--dx:0px;animation-delay:-.45s}.fount .d3{--dx:15px;animation-delay:-.9s}
 @keyframes fdrop{0%{transform:translate(0,0);opacity:1}100%{transform:translate(var(--dx,0),26px);opacity:0}}
 #garden.night .lant .gl{filter:brightness(1.1)}
+
+/* ===== photocard sheet ===== */
+.cardsheet{max-width:440px}
+.seg{display:flex;gap:8px;margin:10px 0 4px}
+.seg button{flex:1;padding:10px 6px;border-radius:16px;border:2px solid var(--edge);background:var(--card);color:var(--ink);font-family:var(--hf);font-size:.88rem;box-shadow:var(--sh-s)}
+.seg button.sel{border-color:var(--main);background:var(--tint);color:var(--main-d)}
+.seg button:active{transform:scale(.96)}
+select#csel{width:100%;padding:12px 16px;margin-top:10px;border-radius:18px;border:2px solid var(--edge);background:var(--card);color:var(--ink);font:inherit;color-scheme:light dark}
+.cprev{position:relative;margin-top:12px;min-height:120px;display:grid;place-items:center}
+.cprev img{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:18px;box-shadow:var(--sh-s)}
+.cprev img:not([src]){display:none}
+.cload{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--hf);color:var(--soft);background:var(--tint);border-radius:18px}
+.cload[hidden]{display:none}
