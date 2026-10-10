@@ -140,12 +140,12 @@ function drawScene(ctx, x, y, w, h, g, pal) {
 }
 
 // ---------------------------------------------------------------- the card
-function layout(shape, W, H) {
-  const pad = 54, gap = 22, stamp = 54, share = shape === "story" ? .34 : shape === "portrait" ? .38 : .32, gh = Math.round(H * share);
-  const gy = H - pad - stamp - gh, avail = gy - gap - pad - 3 * gap, wt = [1, 2.8, 1.1, 3.2], sum = wt.reduce((a, b) => a + b, 0), cap = [120, 340, 130, 290];
-  const hs = wt.map((k, i) => Math.min(cap[i], Math.round(avail * k / sum))), used = hs.reduce((a, b) => a + b, 0) + 3 * gap, gp = gap + Math.max(0, (avail + 3 * gap - used) / 4);
+function layout(shape, W, H, wt = [1, 2.8, 1.1, 3.2], cap = [120, 340, 130, 290], keys = ["head", "ses", "chips", "chart"], gs) { // gs = garden share of the height (optional)
+  const pad = 54, gap = 22, stamp = 54, share = gs != null ? gs : shape === "story" ? .34 : shape === "portrait" ? .38 : .32, gh = Math.round(H * share), n = wt.length;
+  const gy = H - pad - stamp - gh, avail = gy - gap - pad - (n - 1) * gap, sum = wt.reduce((a, b) => a + b, 0);
+  const hs = wt.map((k, i) => Math.min(cap[i], Math.round(avail * k / sum))), used = hs.reduce((a, b) => a + b, 0) + (n - 1) * gap, gp = gap + Math.max(0, (avail + (n - 1) * gap - used) / n);
   let y = pad + (gp - gap) / 2; const out = { pad, W, H, gh, gy };
-  [["head", 0], ["ses", 1], ["chips", 2], ["chart", 3]].forEach(([k, i]) => { out[k] = { y, h: hs[i] }; y += hs[i] + gp; });
+  keys.forEach((k, i) => { out[k] = { y, h: hs[i] }; y += hs[i] + gp; });
   out.garden = { y: gy, h: gh }; out.stampY = H - pad - stamp / 2 + 8; return out;
 }
 function tile(ctx, x, y, w, h, pal) {
@@ -208,6 +208,85 @@ function drawTogether(ctx, d, pal, W, H) {
   text(ctx, "🍓 MN Study Tracker", W / 2, H - pad - stamp / 2 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
 }
 
+// ---------------------------------------------------------------- shared pieces for the recap + milestone cards
+function drawHead(ctx, L, pal, W, avatar, title, date) { // avatar circle + title (left), date (right)
+  const { y, h } = L.head, pad = L.pad, cw = W - pad * 2, av = Math.min(h, 84), cy = y + h / 2, dateW = Math.min(cw * .34, 330);
+  ctx.beginPath(); ctx.arc(pad + av / 2, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = pal.edge; ctx.stroke();
+  emoji(ctx, avatar, pad + av / 2, cy + 2, av * .56);
+  text(ctx, date, W - pad, cy, { size: Math.min(h * .5, 30), font: pal.bf, weight: 700, color: pal.sub, align: "right", base: "middle", max: dateW });
+  text(ctx, title, pad + av + 20, cy, { size: Math.min(h * .72, 48), font: pal.hf, weight: 700, color: pal.ink, base: "middle", max: cw - av - 40 - dateW });
+}
+function drawStat(ctx, x, y, w, h, pal, t) { // a stat tile: small label, big value, small note underneath
+  tile(ctx, x, y, w, h, pal); const inner = Math.min(28, w * .06), mw = w - inner * 2;
+  text(ctx, t.l, x + inner, y + h * .24, { size: Math.min(h * .17, 26), font: pal.bf, weight: 800, color: pal.sub, base: "middle", max: mw });
+  text(ctx, t.v, x + inner, y + h * .56, { size: Math.min(h * .38, 56), font: pal.hf, weight: 700, color: pal.ink, base: "middle", max: mw });
+  if (t.s) text(ctx, t.s, x + inner, y + h * .85, { size: Math.min(h * .15, 22), font: pal.bf, weight: 700, color: pal.sub, base: "middle", max: mw });
+}
+function drawBars(ctx, pad, y, cw, h, pal, d) { // bar chart tile for 7 or 30 days: d.label, d.weekTotal, d.bars = [{ v, l, t, today }]
+  const hf = pal.hf, bf = pal.bf; tile(ctx, pad, y, cw, h, pal);
+  const inner = h < 200 ? 24 : 30, ts = Math.min(h * .13, 28);
+  text(ctx, d.label, pad + inner, y + inner + ts * .6, { size: ts, font: bf, weight: 800, color: pal.sub });
+  text(ctx, d.weekTotal, pad + cw - inner, y + inner + ts * .6, { size: ts * 1.15, font: hf, weight: 700, color: pal.ink, align: "right" });
+  const top = y + inner + ts * 1.35 + 8, lblH = Math.min(h * .13, 30), bottom = y + h - inner * .8 - lblH, bh = Math.max(20, bottom - top), n = d.bars.length, gp = n > 10 ? 5 : 18, bw = (cw - inner * 2 - gp * (n - 1)) / n, mx = Math.max(1, ...d.bars.map(k => k.v));
+  d.bars.forEach((k, i) => {
+    const x = pad + inner + i * (bw + gp), v = k.v ? Math.max(.06, k.v / mx) : 0, bhh = Math.max(8, v * (bh - (bh > 90 ? 26 : 0)));
+    rr(ctx, x, bottom - 8, bw, 8, Math.min(4, bw / 2)); ctx.fillStyle = pal.tint; ctx.fill();
+    if (v) { rr(ctx, x, bottom - bhh, bw, bhh, Math.min(14, bw / 2)); const gr = ctx.createLinearGradient(0, bottom - bhh, 0, bottom); gr.addColorStop(0, k.today ? pal.main : pal.alt); gr.addColorStop(1, k.today ? pal.alt : pal.tint); ctx.fillStyle = gr; ctx.fill(); }
+    if (bh > 90 && k.v && k.t) text(ctx, k.t, x + bw / 2, bottom - bhh - 8, { size: Math.min(lblH * .85, 22), font: bf, weight: 800, color: pal.sub, align: "center", max: bw + gp - 2 });
+    if (k.l) text(ctx, k.l, x + bw / 2, bottom + lblH * .85, { size: lblH * .9, font: bf, weight: k.today ? 800 : 700, color: k.today ? pal.ink : pal.sub, align: "center", max: bw + gp * 2 });
+  });
+}
+
+// ---------------------------------------------------------------- recap card: last 7 / 30 days
+function drawRecap(ctx, d, pal, W, H) {
+  const L = layout(d.shape, W, H, [.9, 2.2, 3.1, 2.8], [120, 300, 300, 290], ["head", "ses", "chips", "chart"], d.shape === "story" ? .28 : d.shape === "portrait" ? .26 : .19), pad = L.pad, cw = W - pad * 2, hf = pal.hf, bf = pal.bf;
+  drawHead(ctx, L, pal, W, d.avatar, d.title, d.date);
+  { const { y, h } = L.ses; tile(ctx, pad, y, cw, h, pal);
+    const inner = h < 200 ? 26 : 34, rD = Math.min(h - inner * 2, 230), r0 = rD / 2, rcx = pad + cw - inner - r0, rcy = y + h / 2, tw = cw - inner * 2 - rD - 30;
+    text(ctx, d.label, pad + inner, y + inner + h * .06, { size: Math.min(h * .115, 30), font: bf, weight: 800, color: pal.sub, max: tw });
+    text(ctx, d.total, pad + inner, y + h * .63, { size: Math.min(h * .46, 150), font: hf, weight: 700, color: pal.ink, max: tw });
+    text(ctx, d.sub, pad + inner, y + h - inner - h * .02, { size: Math.min(h * .115, 30), font: bf, weight: 700, color: pal.sub, max: tw });
+    const lw = Math.max(14, r0 * .17); ring(ctx, rcx, rcy, r0 - lw / 2, lw, d.studied / d.n, pal);
+    text(ctx, `${d.studied}/${d.n}`, rcx, rcy - r0 * .04, { size: r0 * .5, font: hf, weight: 700, color: pal.ink, align: "center", base: "middle", max: r0 * 1.2 });
+    text(ctx, "days studied", rcx, rcy + r0 * .42, { size: Math.max(14, r0 * .17), font: bf, weight: 800, color: pal.sub, align: "center", base: "middle", max: r0 * 1.3 }); }
+  { const { y, h } = L.chips, g2 = 22, tw = (cw - g2) / 2, th = (h - g2) / 2;
+    d.tiles.forEach((t, i) => drawStat(ctx, pad + (i % 2) * (tw + g2), y + Math.floor(i / 2) * (th + g2), tw, th, pal, t)); }
+  drawBars(ctx, pad, L.chart.y, cw, L.chart.h, pal, d);
+  drawScene(ctx, pad, L.garden.y, cw, L.garden.h, d.garden, pal);
+  text(ctx, "🍓 MN Study Tracker", W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
+}
+
+// ---------------------------------------------------------------- milestone card: pet evolved / streak record / couple level
+function drawMilestone(ctx, d, pal, W, H) {
+  const L = layout(d.shape, W, H, [1, 6, 1.1], [120, 520, 130], ["head", "hero", "chips"]), pad = L.pad, cw = W - pad * 2, hf = pal.hf, bf = pal.bf;
+  drawHead(ctx, L, pal, W, d.avatar, `${d.name}'s big moment`, d.date);
+  { const { y, h } = L.hero, cx = pad + cw / 2, es = Math.min(h * .36, 250), cyE = y + h * .36; tile(ctx, pad, y, cw, h, pal);
+    ctx.save(); rr(ctx, pad, y, cw, h, 34); ctx.clip(); glow(ctx, cx, cyE, Math.min(cw, h) * .55, pal.glow1, .8); ctx.restore();
+    const R = seeded(19), sp = d.spark && d.spark.length ? d.spark : ["✨"];
+    for (let i = 0; i < 18; i++) { // sparkles sprinkled around (never on top of the big emoji)
+      const sx = pad + 36 + R() * (cw - 72), sy = y + 34 + R() * (h * .5), sz = 20 + R() * 22, al = .45 + R() * .5, rot = (R() - .5) * .8;
+      if (Math.abs(sx - cx) < es * 1.15 && Math.abs(sy - cyE) < es * .75) continue;
+      emoji(ctx, sp[i % sp.length], sx, sy, sz, { alpha: al, rot });
+    }
+    if (d.from) { // evolution: old form → new form (+ accessory)
+      emoji(ctx, d.from, cx - es * .8, cyE + es * .12, es * .55, { alpha: .5 });
+      text(ctx, "→", cx - es * .3, cyE, { size: es * .3, font: bf, weight: 800, color: pal.main, align: "center", base: "middle" });
+      emoji(ctx, d.emo, cx + es * .5, cyE, es);
+      if (d.acc) emoji(ctx, d.acc, cx + es * .5, cyE - es * .62, es * .42);
+    } else emoji(ctx, d.emo, cx, cyE, es);
+    text(ctx, d.title, cx, y + h * .75, { size: Math.min(h * .115, 58), font: hf, weight: 700, color: pal.ink, align: "center", base: "middle", max: cw - 80 });
+    text(ctx, d.sub, cx, y + h * .88, { size: Math.min(h * .07, 32), font: bf, weight: 800, color: pal.sub, align: "center", base: "middle", max: cw - 80 }); }
+  { const { y, h } = L.chips, cwid = (cw - 22) / 2;
+    d.chips.forEach(([lab, val], i) => {
+      const x = pad + i * (cwid + 22); tile(ctx, x, y, cwid, h, pal); const fs = Math.min(h * .46, 54);
+      text(ctx, lab, x + 28, y + h / 2, { size: Math.min(h * .3, 28), font: bf, weight: 800, color: pal.sub, base: "middle" });
+      ctx.font = `700 ${Math.min(h * .3, 28)}px ${bf}`; const lw = ctx.measureText(lab).width;
+      text(ctx, val, x + cwid - 28, y + h / 2, { size: fs, font: hf, weight: 700, color: pal.ink, align: "right", base: "middle", max: cwid - 56 - lw - 10 });
+    }); }
+  drawScene(ctx, pad, L.garden.y, cw, L.garden.h, d.garden, pal);
+  text(ctx, "🍓 MN Study Tracker", W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
+}
+
 export function drawCard(cv, d, pal) {
   const [W, H] = SIZES[d.shape] || SIZES.square; cv.width = W; cv.height = H;
   const ctx = cv.getContext("2d"), L = layout(d.shape, W, H), hf = pal.hf, bf = pal.bf, pad = L.pad, cw = W - pad * 2;
@@ -217,6 +296,8 @@ export function drawCard(cv, d, pal) {
   ctx.fillStyle = pal.main; ctx.globalAlpha = .07; for (let yy = 30; yy < H; yy += 70) for (let xx = (yy / 70 % 2) * 35 + 20; xx < W; xx += 70) { ctx.beginPath(); ctx.arc(xx, yy, 5, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1;
 
   if (d.kind === "together") { drawTogether(ctx, d, pal, W, H); return; }
+  if (d.kind === "recap") { drawRecap(ctx, d, pal, W, H); return; }
+  if (d.kind === "milestone") { drawMilestone(ctx, d, pal, W, H); return; }
   // header: avatar + title (left), date (right)
   { const { y, h } = L.head, av = Math.min(h, 84), cy = y + h / 2;
     ctx.beginPath(); ctx.arc(pad + av / 2, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = pal.edge; ctx.stroke();

@@ -13,6 +13,20 @@ service cloud.firestore {
                       && request.resource.data.emoji is string && request.resource.data.emoji.size() <= 40;
         allow read, delete: if request.auth != null && request.auth.uid == uid;
       }
+      // a photocard sent from a friend (small jpeg as text). Anyone signed in can send; only the owner can read, mark as seen, or delete.
+      match /gifts/{gid} {
+        allow create: if request.auth != null && request.resource.data.from == request.auth.uid
+                      && request.resource.data.keys().hasOnly(['from', 'name', 'emoji', 'kind', 'img', 'seen', 'at'])
+                      && request.resource.data.at == request.time
+                      && request.resource.data.seen == false
+                      && request.resource.data.name is string && request.resource.data.name.size() <= 40
+                      && request.resource.data.emoji is string && request.resource.data.emoji.size() <= 40
+                      && request.resource.data.kind is string && request.resource.data.kind.size() <= 12
+                      && request.resource.data.img is string && request.resource.data.img.size() < 700000;
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+        allow update: if request.auth != null && request.auth.uid == uid
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen']);
+      }
     }
   }
 }

@@ -3,7 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore, doc, collection, setDoc, updateDoc, onSnapshot, query, orderBy, limit, addDoc, deleteDoc,
-  serverTimestamp, Timestamp, increment, writeBatch } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  serverTimestamp, Timestamp, increment, writeBatch, getDocs, where } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig), auth = getAuth(app), db = getFirestore(app);
@@ -33,9 +33,9 @@ export const addBonus = (uid, n) => updateDoc(userRef(uid), { bonus: increment(n
 export const saveDecor = (uid, items) => updateDoc(userRef(uid), { decor: items }); // garden decorations: [{ i: "bench", k: "a1b2c3", x: .42, y: .71 }, ...] (x/y = fraction of the garden scene)
 
 // Save a finished session (and optionally switch status back to offline).
-export async function addSession(uid, start, days, seconds, stop) {
+export async function addSession(uid, start, days, seconds, stop, manual) { // manual = typed in by hand ("+ add time"), so its start time means nothing
   const b = writeBatch(db);
-  b.set(doc(collection(db, "users", uid, "sessions")), { start: Timestamp.fromMillis(start), seconds, days });
+  b.set(doc(collection(db, "users", uid, "sessions")), { start: Timestamp.fromMillis(start), seconds, days, ...(manual ? { manual: true } : {}) });
   bump(b, uid, days, 1);
   if (stop) b.update(userRef(uid), { status: "offline", startedAt: null, runStart: null, accum: 0, breakAt: null, pomo: false });
   await b.commit();
@@ -67,3 +67,16 @@ export const watchCheers = (uid, cb) => onSnapshot(collection(db, "users", uid, 
 
 // ---- badges ----
 export const unlockBadge = (uid, id) => updateDoc(userRef(uid), { [`badges.${id}`]: Date.now() });
+
+// ---- recap: every session that started on or after `ms` (the normal session list only keeps the latest 40) ----
+export async function getSessionsSince(uid, ms) {
+  const s = await getDocs(query(collection(db, "users", uid, "sessions"), where("start", ">=", Timestamp.fromMillis(ms)), orderBy("start", "desc"), limit(500)));
+  return s.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// ---- cards sent to a friend: users/{friend}/gifts/{id} = { from, name, emoji, kind, img (small jpeg data-url), seen, at } ----
+export const sendGift = (to, from, name, emoji, kind, img) => addDoc(collection(db, "users", to, "gifts"), { from, name, emoji, kind, img, seen: false, at: serverTimestamp() });
+export const watchGifts = (uid, cb) => onSnapshot(query(collection(db, "users", uid, "gifts"), orderBy("at", "desc"), limit(20)),
+  s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+export const markGift = (uid, id) => updateDoc(doc(db, "users", uid, "gifts", id), { seen: true });
+export const deleteGift = (uid, id) => deleteDoc(doc(db, "users", uid, "gifts", id));

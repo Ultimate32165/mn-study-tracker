@@ -407,3 +407,19 @@ select#csel{width:100%;padding:12px 16px;margin-top:10px;border-radius:18px;bord
 .cload{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--hf);color:var(--soft);background:var(--tint);border-radius:18px}
 .cload[hidden]{display:none}
 select#cfr{width:100%;padding:12px 16px;margin-top:10px;border-radius:18px;border:2px solid var(--edge);background:var(--card);color:var(--ink);font:inherit;color-scheme:light dark}
+
+/* ===== cards for you (inbox), recap + milestone cards ===== */
+h2 .chip+.chip{margin-left:6px}
+.gifts{display:flex;gap:10px;overflow-x:auto;padding:6px 4px 12px;scrollbar-width:none}
+.gifts::-webkit-scrollbar{display:none}
+.gift{position:relative;flex:none;width:112px;background:var(--card);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur));border:2px solid var(--edge);border-radius:20px;padding:6px 6px 8px;box-shadow:var(--sh-s);color:var(--ink);text-align:center}
+.gift img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;object-position:top;border-radius:14px;background:var(--tint)}
+.gift span{display:block;margin-top:5px;font-family:var(--hf);font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gift.new{border-color:var(--main)}
+.gift.new::after{content:"";position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:var(--main);border:3px solid var(--card)}
+.gift:active{transform:scale(.96)}
+.popc .chip{display:block;margin:14px auto 0}
+.seg[hidden]{display:none}
+.cardsheet .seg button{font-size:.78rem;padding:10px 2px}
+#csend{margin-top:12px}
+#csend:disabled{opacity:.5}

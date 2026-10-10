@@ -19,7 +19,7 @@ function applyTheme(t) {
 }
 applyTheme(theme);
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => theme === "auto" && applyTheme("auto"));
-let me = null, users = [], sessions = [], tab = "home", unsubs = [], installEvt = null;
+let me = null, users = [], sessions = [], gifts = [], tab = "home", unsubs = [], installEvt = null;
 
 // ---------- helpers ----------
 const key = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -38,7 +38,7 @@ function stats(u) {
   return { today: d[key(now)] || 0, week, total, streak };
 }
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.className = "show"; clearTimeout(toast.t); toast.t = setTimeout(() => t.className = "", 2600); }
-const errMsg = e => ({ "auth/email-already-in-use": "That username is taken.", "auth/invalid-credential": "Wrong username or password.", "auth/weak-password": "Password needs at least 6 characters.", "auth/network-request-failed": "No internet connection." }[e.code] || e.message);
+const errMsg = e => ({ "auth/email-already-in-use": "That username is taken.", "auth/invalid-credential": "Wrong username or password.", "auth/weak-password": "Password needs at least 6 characters.", "auth/network-request-failed": "No internet connection.", "permission-denied": "Not allowed. Did you publish the new firestore.rules?" }[e.code] || e.message);
 
 // ---------- views ----------
 function authView() {
@@ -92,7 +92,7 @@ function homeView(mine) {
        <button class="study stop" data-act="stop">stop<span>⏹️</span></button></div><div class="chips"><button class="chip" data-act="sound">${soundLabel()}</button></div><button class="link" data-act="discard">cancel without saving</button></div>`
     : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p><div class="chips"><button class="chip" data-act="pomo">🍅 pomodoro: ${pomo ? `on (${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5})` : "off"}</button><button class="chip" data-act="sound">${soundLabel()}</button></div></div>`;
   const others = users.filter(u => u.id !== me.uid).sort((a, b) => (b.status === "studying") - (a.status === "studying"));
-  return `${hero}${installCard()}${coupleCard()}<h2>${others.length ? `friends <button class="chip" data-act="card" data-id="together">📸 photocard</button>` : "no friends yet"}</h2>
+  return `${hero}${installCard()}${coupleCard()}${giftsView()}<h2>${others.length ? `friends <button class="chip" data-act="card" data-id="together">📸 photocard</button>` : "no friends yet"}</h2>
   ${others.map(u => card(u, false)).join("") || `<p class="hint">Ask your friend to create an account — they'll show up here!</p>`}<h2>you</h2>${card(mine, true)}`;
 }
 // ---- cozy sounds (generated with the Web Audio API, no files needed) ----
@@ -669,8 +669,19 @@ function checkEvolve(m) {
 function evoMoment(m, a, b) {
   const t = petOf(m), el = document.createElement("div"); el.className = "pop";
   el.innerHTML = `<div class="popc"><div class="evo"><span>${ALLP[t].e[a]}</span><em class="ar">➜</em><span class="new">${petFace(t, b)}</span></div><b>${esc(m.name)}'s ${esc(petName(t))} evolved!</b><p>${stageNames(t)[b]} ✨</p></div>`;
-  el.onclick = () => el.remove(); document.body.appendChild(el); setTimeout(() => el.remove(), 6000);
+  const ms = { type: "evolve", pet: t, a, b, at: Date.now() }; saveMs(ms);
+  el.onclick = () => el.remove(); document.body.appendChild(el); addCardBtn(el, ms); setTimeout(() => el.remove(), 9000);
   burst(); setTimeout(() => burst(["✨", "⭐", "🌟", "💖"], 30), 500);
+}
+function addCardBtn(el, ms) { // "make a card" button inside a milestone pop-up
+  const b = document.createElement("button"); b.className = "chip"; b.textContent = "📸 make a card";
+  b.onclick = e => { e.stopPropagation(); el.remove(); cardOpt.ms = ms; cardSheet("milestone"); };
+  el.querySelector(".popc").appendChild(b);
+}
+function milestonePop(ms) { // streak record / couple level up
+  const [e, t, sub] = ms.type === "streak" ? ["🔥", `${ms.n}-day streak!`, "a new personal record"] : ["💞", `Level ${ms.lv + 1}!`, LV_T[ms.lv]], el = document.createElement("div"); el.className = "pop";
+  el.innerHTML = `<div class="popc"><div class="pe">${e}</div><b>${esc(t)}</b><p>${esc(sub)}</p></div>`;
+  el.onclick = () => el.remove(); document.body.appendChild(el); addCardBtn(el, ms); setTimeout(() => el.remove(), 9000);
 }
 let gSeen = null, gSeenFor = "";
 function checkUnlocks(m) { // new garden pet unlocked → confetti once (remembered on this device)
@@ -733,9 +744,12 @@ function calView(mine) {
   <div class="legend">less ${[0, 1, 2, 3, 4].map(l => `<i class="dy l${l}"></i>`).join("")} more</div></div>`;
 }
 // ---- photocard: a shareable image of your session, stats and garden (drawn by js/card.js) ----
-const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today", mode: "me", fid: "" };
+// the latest milestone (pet evolved / streak record / couple level) is remembered on this device so you can still make its card later
+const loadMs = () => { try { const m = JSON.parse(ls("lastMs") || "null"); return m && ["evolve", "streak", "level"].includes(m.type) ? m : null; } catch { return null; } };
+const saveMs = ms => ls("lastMs", JSON.stringify(ms));
+const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today", mode: "me", fid: "", period: "week", ms: loadMs() };
 const gfmt = t => t % 3600 === 0 ? `${t / 3600}h` : fmt(t);
-let cardUrl = "", cardBlob = null, cardSeq = 0;
+let cardUrl = "", cardBlob = null, cardCv = null, cardSeq = 0, lastGift = 0;
 const dayLong = t => new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 const hhmm = t => new Date(t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 const pxc = document.createElement("canvas"); pxc.width = pxc.height = 1; const pxx = pxc.getContext("2d", { willReadFrequently: true });
@@ -788,53 +802,136 @@ function cardDataTogether(shape, fid) { // both of you, right now: live session 
   return { kind: "together", shape, people: [person(a), person(b)], title: `${a.name} & ${b.name}`, date: `${dayLong(now)} · ${hhmm(now)}`,
     togetherToday: fmt(liveToday(a) + liveToday(b)), coupleText: `Level ${couple().lv + 1} 💞`, garden: gardenSnap() };
 }
+// ---- recap card: totals for the last 7 / 30 days ----
+const isManual = x => { if (x.manual) return true; const t = new Date(x.start.toMillis()); return t.getHours() === 12 && !t.getMinutes() && !t.getSeconds() && !t.getMilliseconds(); }; // "+ add time" sessions are stamped 12:00 on the dot, so their start time is meaningless
+const dayShort = t => new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+const dayNum = t => new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+const hourLbl = h => new Date(2000, 0, 1, h % 24).toLocaleTimeString(undefined, { hour: "numeric" });
+async function cardDataRecap(shape, period) {
+  const m = users.find(u => u.id === me.uid), d = m.daily || {}, now = Date.now(), n = period === "month" ? 30 : 7, tk = key(now), t0 = new Date(now - (n - 1) * DAY); t0.setHours(0, 0, 0, 0);
+  const days = [...Array(n)].map((_, i) => { const t = now - (n - 1 - i) * DAY, k = key(t); return { t, v: k === tk ? liveToday(m) : d[k] || 0 }; });
+  const total = days.reduce((a, x) => a + x.v, 0), studied = days.filter(x => x.v > 0).length; let prev = 0; for (let i = n; i < 2 * n; i++) prev += d[key(now - i * DAY)] || 0;
+  let list; try { list = await DB.getSessionsSince(me.uid, t0.getTime()); } catch { list = sessions.filter(x => x.start.toMillis() >= t0.getTime()); } // offline: fall back to the 40 we already have
+  const best = days.reduce((b, x) => x.v > b.v ? x : b, { v: 0, t: now }), long = list.reduce((b, x) => x.seconds > (b ? b.seconds : 0) ? x : b, null);
+  const hrs = new Array(24).fill(0); // seconds studied in each hour of the day (tracked sessions only, spread forward from their start)
+  list.forEach(x => { if (isManual(x)) return; let t = x.start.toMillis(), left = x.seconds * 1000; while (left > 0) { const nx = new Date(t); nx.setHours(nx.getHours() + 1, 0, 0, 0); const step = Math.min(left, nx.getTime() - t); hrs[new Date(t).getHours()] += step; t += step; left -= step; } });
+  let bw = 0, bh = 0; for (let h = 0; h < 24; h++) { const w = hrs[h] + hrs[(h + 1) % 24]; if (w > bw) { bw = w; bh = h; } } // best 2-hour window
+  const part = bh < 5 || bh >= 21 ? "night owl 🌙" : bh < 9 ? "early bird 🌅" : bh < 12 ? "morning ☀️" : bh < 17 ? "afternoon 🌤️" : "evening 🌆", name = m.name || "you";
+  const sub = !total ? "no study yet. Start today ✨" : prev > 0 ? `${total >= prev ? "▲" : "▼"} ${fmt(Math.abs(total - prev))} vs the ${n} days before` : "keep it going ✨";
+  return { kind: "recap", shape, name, avatar: m.emoji || "📚", title: `${name}'s ${period}`, date: `${dayNum(t0)} – ${dayNum(now)}`, label: `LAST ${n} DAYS`, total: fmt(total), sub, studied, n, weekTotal: fmt(total),
+    tiles: [{ l: "best day", v: best.v ? fmt(best.v) : "–", s: best.v ? dayShort(best.t) : "" },
+      { l: "longest session", v: long ? fmt(long.seconds) : "–", s: long ? dayShort(long.start.toMillis()) + (isManual(long) ? "" : " · " + hhmm(long.start.toMillis())) : "" },
+      { l: "busiest time", v: bw ? `${hourLbl(bh)}–${hourLbl(bh + 2)}` : "–", s: bw ? part : "track a session ⏱️" },
+      { l: "daily average", v: fmt(total / n), s: `${studied} of ${n} days studied` }],
+    bars: days.map((x, i) => ({ v: x.v, today: i === n - 1, t: n <= 7 && x.v ? fmt(x.v) : "", l: n <= 7 ? new Date(x.t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2) : i % 5 === 0 || i === n - 1 ? String(new Date(x.t).getDate()) : "" })), garden: gardenSnap() };
+}
+// ---- milestone card: ms = { type: "evolve" | "streak" | "level", ... } saved when it happened ----
+function cardDataMilestone(shape, ms) {
+  const m = users.find(u => u.id === me.uid), s = stats(m), name = m.name || "you", out = { kind: "milestone", shape, name, avatar: m.emoji || "📚", date: dayLong(ms.at || Date.now()), garden: gardenSnap() };
+  if (ms.type === "evolve") {
+    const t = ALLP[ms.pet] ? ms.pet : petOf(m), a = Math.min(ms.a, 3), b = Math.min(ms.b, 3);
+    return { ...out, from: ALLP[t].e[a], emo: ALLP[t].e[b], acc: accOf(t, b), title: `${name}'s ${petName(t)} evolved!`, sub: `${stageNames(t)[b]} ✨`, spark: ["✨", "⭐", "💖", "🌟"], chips: [["total studied", fmt(totalOf(m))], ["streak", `${s.streak} day${s.streak === 1 ? "" : "s"} 🔥`]] };
+  }
+  if (ms.type === "streak") return { ...out, emo: "🔥", title: `${ms.n}-day streak!`, sub: "a new personal record", spark: ["🔥", "✨", "⭐"], chips: [["total studied", fmt(totalOf(m))], ["best streak", `${Math.max(ms.n, s.streak)} days 🔥`]] };
+  const lv = Math.min(ms.lv, LV_T.length - 1);
+  return { ...out, emo: "💞", title: `Level ${lv + 1}!`, sub: LV_T[lv], spark: ["💞", "✨", "🌸", "⭐"], chips: [["together", fmt(couple().sec)], ["couple level", `${lv + 1} 💞`]] };
+}
 async function renderCard() {
   const seq = ++cardSeq, img = $("#cimg"), ld = $(".cload"); if (!img) return;
-  if (ld) ld.hidden = false;
+  cardBlob = null; cardCv = null; if (ld) ld.hidden = false; // until the new card is drawn, save / send say "still drawing"
   try { await Promise.race([Promise.all([document.fonts.load("700 48px Fredoka"), document.fonts.load("800 28px Nunito")]), new Promise(r => setTimeout(r, 1500))]); } catch {}
   if (seq !== cardSeq) return;
-  const data = cardOpt.mode === "together" ? cardDataTogether(cardOpt.shape, cardOpt.fid) : cardData(cardOpt.shape, cardOpt.sid), cv = document.createElement("canvas");
+  let data; const md = cardOpt.mode;
+  try { data = md === "together" ? cardDataTogether(cardOpt.shape, cardOpt.fid) : md === "recap" ? await cardDataRecap(cardOpt.shape, cardOpt.period) : md === "milestone" ? cardDataMilestone(cardOpt.shape, cardOpt.ms) : cardData(cardOpt.shape, cardOpt.sid); }
+  catch { if (seq === cardSeq) { toast("Couldn't draw that card 😢"); if (ld) ld.hidden = true; } return; }
+  if (seq !== cardSeq) return;
+  const cv = document.createElement("canvas");
   drawCard(cv, data, cardPal(data.garden.night, data.garden.wx));
   cv.toBlob(b => {
     if (seq !== cardSeq || !b) return;
     if (cardUrl) URL.revokeObjectURL(cardUrl);
-    cardBlob = b; cardUrl = URL.createObjectURL(b); img.src = cardUrl; if (ld) ld.hidden = true;
+    cardBlob = b; cardCv = cv; cardUrl = URL.createObjectURL(b); img.src = cardUrl; if (ld) ld.hidden = true;
   }, "image/png");
+}
+// a small jpeg (640px wide, a few hundred KB at most) of the current card, to store in the friend's inbox
+function giftImg() {
+  const W = 640, c = document.createElement("canvas"); c.width = W; c.height = Math.round(cardCv.height * W / cardCv.width);
+  c.getContext("2d").drawImage(cardCv, 0, 0, c.width, c.height);
+  let q = .8, u = c.toDataURL("image/jpeg", q); while (u.length > 380000 && q > .35) { q -= .1; u = c.toDataURL("image/jpeg", q); }
+  return u;
 }
 function cardSheet(mode) {
   const sess = sessions.slice(0, 12), friends = users.filter(u => u.id !== me.uid), canShare = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File([""], "a.png", { type: "image/png" })] })); } catch { return false; } })();
-  cardOpt.mode = mode === "together" && friends.length ? "together" : "me";
+  if (!cardOpt.ms) cardOpt.ms = loadMs();
+  cardOpt.mode = mode === "together" && friends.length ? "together" : mode === "milestone" && cardOpt.ms ? "milestone" : mode === "recap" ? "recap" : "me";
   if (!sess.some(x => x.id === cardOpt.sid)) cardOpt.sid = "today";
   if (!friends.some(u => u.id === cardOpt.fid)) cardOpt.fid = (friends.find(u => u.status === "studying") || friends[0] || {}).id || "";
-  const SH = { square: "▫️ square", portrait: "🖼️ 4:5", story: "📱 story" }, MD = { me: "👤 just me", together: "💞 together" };
+  const SH = { square: "▫️ square", portrait: "🖼️ 4:5", story: "📱 story" }, PD = { week: "last 7 days", month: "last 30 days" },
+    MD = { me: "👤 me", ...(friends.length ? { together: "💞 together" } : {}), recap: "🗓️ recap", ...(cardOpt.ms ? { milestone: "🏅 milestone" } : {}) };
   modal.innerHTML = `<div class="back"><div class="sheet cardsheet"><h3>photocard 📸</h3>
-  ${friends.length ? `<div class="seg" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>` : ""}
+  <div class="seg" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>
+  <div class="seg" id="cper">${Object.keys(PD).map(k => `<button data-per="${k}" class="${k === cardOpt.period ? "sel" : ""}">${PD[k]}</button>`).join("")}</div>
   <div class="seg">${Object.keys(SH).map(k => `<button data-shape="${k}" class="${k === cardOpt.shape ? "sel" : ""}">${SH[k]}</button>`).join("")}</div>
   <select id="csel" aria-label="which session"><option value="today">Today (all sessions)</option>${sess.map(x => `<option value="${esc(x.id)}" ${x.id === cardOpt.sid ? "selected" : ""}>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} · ${fmt(x.seconds)}</option>`).join("")}</select>
   <select id="cfr" aria-label="which friend">${friends.map(u => `<option value="${esc(u.id)}" ${u.id === cardOpt.fid ? "selected" : ""}>${esc(u.emoji)} ${esc(u.name)}</option>`).join("")}</select>
   <div class="cprev"><div class="cload">drawing your card…</div><img id="cimg" alt="photocard preview"></div>
-  <div class="row"><button class="btn ghost" id="cclose">close</button>${canShare ? `<button class="btn" id="cshare">share 💖</button>` : ""}<button class="btn ${canShare ? "ghost" : ""}" id="csave">save ⬇️</button></div></div></div>`;
-  const vis = () => { $("#csel").hidden = cardOpt.mode === "together"; $("#cfr").hidden = cardOpt.mode !== "together" || friends.length < 2; };
-  const done = () => { cardSeq++; if (cardUrl) { URL.revokeObjectURL(cardUrl); cardUrl = ""; } cardBlob = null; modal.innerHTML = ""; };
+  ${friends.length ? `<button class="btn" id="csend">💌 send</button>` : ""}
+  <div class="row"><button class="btn ghost" id="cclose">close</button>${canShare ? `<button class="btn ghost" id="cshare">share</button>` : ""}<button class="btn ghost" id="csave">save ⬇️</button></div></div></div>`;
+  const vis = () => { $("#csel").hidden = cardOpt.mode !== "me"; $("#cfr").hidden = friends.length < 2; $("#cper").hidden = cardOpt.mode !== "recap"; };
+  const sendLbl = () => { const b = $("#csend"), f = friends.find(u => u.id === cardOpt.fid); if (b) { b.textContent = `💌 send to ${f ? f.name : "friend"}`; b.disabled = !f; } };
+  const done = () => { cardSeq++; if (cardUrl) { URL.revokeObjectURL(cardUrl); cardUrl = ""; } cardBlob = null; cardCv = null; modal.innerHTML = ""; };
   $("#cclose").onclick = done;
   modal.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { cardOpt.mode = b.dataset.mode; modal.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("sel", x === b)); vis(); renderCard(); });
+  modal.querySelectorAll("[data-per]").forEach(b => b.onclick = () => { cardOpt.period = b.dataset.per; modal.querySelectorAll("[data-per]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
   modal.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => { cardOpt.shape = b.dataset.shape; ls("cardShape", cardOpt.shape); modal.querySelectorAll("[data-shape]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
   $("#csel").onchange = e => { cardOpt.sid = e.target.value; renderCard(); };
-  $("#cfr").onchange = e => { cardOpt.fid = e.target.value; renderCard(); };
-  const file = () => new File([cardBlob], `study${cardOpt.mode === "together" ? "-together" : ""}-${key(Date.now())}.png`, { type: "image/png" });
+  $("#cfr").onchange = e => { cardOpt.fid = e.target.value; sendLbl(); if (cardOpt.mode === "together") renderCard(); };
+  const file = () => new File([cardBlob], `study${cardOpt.mode === "me" ? "" : "-" + cardOpt.mode}-${key(Date.now())}.png`, { type: "image/png" });
   $("#csave").onclick = () => { if (!cardBlob) return toast("One sec, still drawing…"); const a = document.createElement("a"); a.href = cardUrl; a.download = file().name; document.body.appendChild(a); a.click(); a.remove(); toast("Saved 📸"); };
   const sh = $("#cshare"); if (sh) sh.onclick = async () => {
     if (!cardBlob) return toast("One sec, still drawing…");
     try { await navigator.share({ files: [file()], title: "MN Study Tracker" }); } catch (e) { if (e && e.name !== "AbortError") toast("Couldn't open sharing — try save instead"); }
   };
-  vis(); renderCard();
+  const sd = $("#csend"); if (sd) sd.onclick = async () => { // deliver the card straight into the friend's together tab
+    const f = friends.find(u => u.id === cardOpt.fid), mine = users.find(u => u.id === me.uid); if (!f || !mine) return;
+    if (!cardCv) return toast("One sec, still drawing…");
+    if (Date.now() - lastGift < 8000) return toast("Slow down, cutie 😄");
+    lastGift = Date.now();
+    try { await DB.sendGift(f.id, me.uid, mine.name, mine.emoji, cardOpt.mode, giftImg()); toast(`Sent to ${f.name} 💌`); } catch (e) { lastGift = 0; toast(errMsg(e)); }
+  };
+  vis(); sendLbl(); renderCard();
+}
+
+// ---- cards from friends: the inbox on the together tab ----
+const giftKnown = new Set(); // ids already announced on this device
+const safeImg = u => typeof u === "string" && /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(u) ? u : ""; // a friend's document is untrusted: only ever show a plain jpeg
+function onGifts(list) {
+  list.slice(8).forEach(g => DB.deleteGift(me?.uid, g.id).catch(() => {})); // keep only the newest 8
+  gifts = list.slice(0, 8).filter(g => safeImg(g.img));
+  const fresh = gifts.filter(g => !g.seen && !giftKnown.has(g.id)); gifts.forEach(g => giftKnown.add(g.id));
+  if (fresh.length) {
+    const who = fresh[0].name || "Your friend"; burst(["💌", "✨"], 20); queueVisit(fresh[0].from);
+    toast(fresh.length > 1 ? `${fresh.length} new cards from ${who} 💌` : `${who} sent you a card 💌`); notify(`${who} sent you a card 💌`, "Open the app to see it");
+  }
+  render();
+}
+const giftsView = () => !gifts.length ? "" : `<h2>cards for you 💌</h2><div class="gifts">${gifts.map(g => `<button class="gift ${g.seen ? "" : "new"}" data-act="gift" data-id="${esc(g.id)}"><img src="${safeImg(g.img)}" alt="card from ${esc(g.name)}" decoding="async"><span>${esc(g.emoji)} ${esc(g.name)}</span></button>`).join("")}</div>`;
+function giftSheet(id) {
+  const g = gifts.find(x => x.id === id); if (!g) return;
+  if (!g.seen) DB.markGift(me.uid, g.id).catch(() => {});
+  const when = g.at && g.at.toMillis ? dayLong(g.at.toMillis()) : "";
+  modal.innerHTML = `<div class="back"><div class="sheet cardsheet"><h3>${esc(g.emoji)} from ${esc(g.name)}</h3><p class="hint">${esc(when)}</p><div class="cprev"><img src="${safeImg(g.img)}" alt="card from ${esc(g.name)}"></div>
+  <div class="row"><button class="btn ghost" id="gx">close</button><button class="btn ghost" id="gd">remove 🗑️</button><button class="btn" id="gs">save ⬇️</button></div></div></div>`;
+  $("#gx").onclick = () => modal.innerHTML = "";
+  $("#gs").onclick = () => { const a = document.createElement("a"); a.href = safeImg(g.img); a.download = `card-from-${String(g.name || "friend").replace(/[^a-z0-9]+/gi, "-")}-${key(Date.now())}.jpg`; document.body.appendChild(a); a.click(); a.remove(); toast("Saved 📸"); };
+  $("#gd").onclick = async () => { if (!confirm("Remove this card?")) return; try { await DB.deleteGift(me.uid, g.id); modal.innerHTML = ""; } catch (e) { toast(errMsg(e)); } };
 }
 
 function statsView(mine) {
   const s = stats(mine), d = mine.daily || {}, now = Date.now();
   const days = [...Array(7)].map((_, i) => { const t = now - (6 - i) * DAY; return { l: new Date(t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2), v: d[key(t)] || 0 }; });
   const max = Math.max(...days.map(x => x.v), 1);
-  return `<h2>last 7 days <button class="chip" data-act="card">📸 photocard</button></h2><div class="bars">${days.map(x => `<div class="bar"><i style="height:${Math.max(4, x.v / max * 100)}%"></i><em>${x.v ? fmt(x.v) : ""}</em><span>${x.l}</span></div>`).join("")}</div>
+  return `<h2>last 7 days <button class="chip" data-act="card">📸 photocard</button><button class="chip" data-act="card" data-id="recap">🗓️ recap</button></h2><div class="bars">${days.map(x => `<div class="bar"><i style="height:${Math.max(4, x.v / max * 100)}%"></i><em>${x.v ? fmt(x.v) : ""}</em><span>${x.l}</span></div>`).join("")}</div>
   <div class="tiles"><div><b>${fmt(s.today)}</b>today</div><div><b>${fmt(s.week)}</b>this week</div><div><b>${s.streak}🔥</b>day streak</div><div><b>${fmt(s.total)}</b>all time</div></div>
   ${calView(mine)}${badgeView(mine)}<h2>sessions <button class="chip" data-act="add">+ add time</button></h2>
   ${sessions.map(x => `<div class="sess"><div><b>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</b>
@@ -873,7 +970,7 @@ function watch() { // runs every second for the logged-in user
   const g = goalOf(m), k = "goal-" + key(Date.now()), st = stats(m);
   if (g > 0 && liveToday(m) >= g && ls(k) !== "1") { ls(k, "1"); burst(); toast("Daily goal reached! 🎉"); }
   if (m.bestStreak === undefined) { if (st.streak !== lastBest) { lastBest = st.streak; DB.updateProfile(me.uid, { bestStreak: st.streak }); } }
-  else if (st.streak > m.bestStreak && st.streak !== lastBest) { lastBest = st.streak; DB.updateProfile(me.uid, { bestStreak: st.streak }); if (st.streak >= 2) { burst(); toast(`New streak record: ${st.streak} days! 🔥`); } }
+  else if (st.streak > m.bestStreak && st.streak !== lastBest) { lastBest = st.streak; DB.updateProfile(me.uid, { bestStreak: st.streak }); if (st.streak >= 2) { burst(); const ms = { type: "streak", n: st.streak, at: Date.now() }; saveMs(ms); milestonePop(ms); } }
   const got = BADGES.filter(b => b[4](badgeCtx(m))).map(b => b[0]);
   if (m.badges === undefined) { // first time: quietly record badges she already earned (no confetti spam)
     if (!badgeBusy.has("init")) { badgeBusy.add("init"); DB.updateProfile(me.uid, { badges: Object.fromEntries(got.map(id => [id, Date.now()])) }).catch(() => {}); }
@@ -884,7 +981,7 @@ function watch() { // runs every second for the logged-in user
   if (sNodes && m.status !== "studying") { stopSound(); render(); }
   checkUnlocks(m); checkEvolve(m); checkSeeds(m);
   const cl = couple().lv, seen = ls("lvl");
-  if (seen == null) ls("lvl", cl); else if (cl > +seen) { ls("lvl", cl); burst(); setTimeout(() => toast(`Level up! ${LV_T[cl]} 🎉`), 1800); }
+  if (seen == null) ls("lvl", cl); else if (cl > +seen) { ls("lvl", cl); burst(); const ms = { type: "level", lv: cl, at: Date.now() }; saveMs(ms); setTimeout(() => milestonePop(ms), 1800); }
 }
 setInterval(() => { tick(); watch(); if (G.el && G.el.isConnected) syncGarden(); }, 1000);
 setInterval(() => me && render(), 30000);
@@ -982,7 +1079,8 @@ app.onclick = async e => {
     else if (a === "gtreat") await treat(id, mine);
     else if (a === "gvis") await collectVisitor(mine);
     else if (a === "gfind") findPet();
-    else if (a === "card") cardSheet(id === "together" ? "together" : "me");
+    else if (a === "card") cardSheet(["together", "recap"].includes(id) ? id : "me");
+    else if (a === "gift") giftSheet(id);
     else if (a === "calnav") { calMonth = Math.min(0, calMonth + +id); render(); }
     else if (a === "day") { const v = +b.dataset.v; toast(`${new Date(id + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${v ? fmt(v) : "no study 💤"}`); }
     else if (a === "discard") { if (confirm("Cancel without saving any time?")) { stopSound(); await DB.cancelStudy(me.uid); } }
@@ -995,7 +1093,7 @@ app.onclick = async e => {
     } else if (a === "add") {
       sheet({ title: "add study time", note: "Studied without pressing the button? Add it here.", date: key(Date.now()),
         onSave: async (sec, d) => { if (!sec) throw Error("Enter some time first."); const [y, m, dd] = d.split("-").map(Number), st = new Date(y, m - 1, dd, 12).getTime();
-          await DB.addSession(me.uid, st, split(st, sec), sec, false); toast("Added! ✨"); } });
+          await DB.addSession(me.uid, st, split(st, sec), sec, false, true); toast("Added! ✨"); } });
     } else if (a === "edit") {
       const s = sessions.find(x => x.id === id), st = s.start.toMillis();
       sheet({ title: "shorten session ✏️", note: "You can only reduce this session. To add more time, use “+ add time”.", secs: s.seconds, max: s.seconds,
@@ -1006,12 +1104,12 @@ app.onclick = async e => {
 
 // ---------- boot ----------
 DB.watchAuth(u => {
-  unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = []; clearGarden(); seedBase = -1; visits = [];
+  unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = []; gifts = []; giftKnown.clear(); clearGarden(); seedBase = -1; visits = [];
   if (u) unsubs = [DB.watchUsers(x => { users = x; render(); }), DB.watchSessions(u.uid, x => { sessions = x; render(); }),
     DB.watchCheers(u.uid, list => {
       cheerCard(list); list.forEach(c => queueVisit(c.from)); burst(list.map(c => short(c.emoji) ? c.emoji : "💌"), 24);
       notify(`${list[0].name || "Your friend"} sent you a cheer!`, list.map(c => c.emoji).join("  "));
-    })];
+    }), DB.watchGifts(u.uid, onGifts)];
   render();
 });
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; render(); });
