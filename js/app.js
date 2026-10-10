@@ -68,6 +68,10 @@ const goalOf = u => u.goal ?? 14400, limitOf = u => u.limit ?? 10800,
   focusOf = u => (u.pomoFocus ?? 25) * 60000, restOf = u => (u.pomoRest ?? 5) * 60000;
 const liveToday = u => stats(u).today + (u.status === "studying" || u.status === "paused" ? elapsed(u) / 1000 : 0);
 const ls = (k, v) => { try { return v === undefined ? localStorage.getItem(k) : localStorage.setItem(k, v); } catch {} };
+// collapsible sections on the stats tab (remembered on this device) + shorter/normal home tab
+const foldSet = (() => { try { return new Set(JSON.parse(ls("fold") || "[]")); } catch { return new Set(); } })();
+const sec = (id, title, extra, body) => { const shut = foldSet.has(id); return `<h2 class="fold${shut ? " shut" : ""}"><button class="fb" data-act="fold" data-id="${id}" aria-expanded="${!shut}"><i>▾</i>${title}</button>${extra || ""}</h2>${shut ? "" : body}`; };
+let compact = ls("compact") === "1";
 let pomo = ls("pomo") === "1", lastCheer = 0, askedAt = 0, busy = false, brkSeen = 0, lastBest = 0;
 
 function burst(emojis, n = 70) { // confetti (colored bits) or floating emojis
@@ -99,7 +103,12 @@ function homeView(mine) {
        <button class="study stop" data-act="stop">stop<span>⏹️</span></button></div><div class="chips"><button class="chip" data-act="sound">${soundLabel()}</button></div><button class="link" data-act="discard">cancel without saving</button></div>`
     : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p><div class="chips"><button class="chip" data-act="pomo">🍅 pomodoro: ${pomo ? `on (${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5})` : "off"}</button><button class="chip" data-act="sound">${soundLabel()}</button></div></div>`;
   const others = users.filter(u => u.id !== me.uid).sort((a, b) => (b.status === "studying") - (a.status === "studying"));
-  return `${hero}${installCard()}${coupleCard()}<h2>you</h2>${card(mine, true)}<h2>${others.length ? `friends <button class="chip" data-act="card" data-id="together">📸 photocard</button>` : "no friends yet"}</h2>
+  const g = goalOf(mine), lt = liveToday(mine), pr = g ? Math.min(100, lt / g * 100) : 0;
+  const mineCard = compact && (on || br)
+    ? `<div class="card sum ${on ? "on" : ""} ${br ? "brk" : ""}"><span class="ring ${!g ? "off" : pr >= 100 ? "done" : ""}" style="--p:${pr};--sz:40px"><span class="av">${esc(mine.emoji)}</span></span><b>you</b><span class="sl">today <b>${fmt(lt)}</b>${g ? `<small> / ${fmt(g)}</small>` : ""}</span><span class="ss">${stats(mine).streak}🔥</span></div>`
+    : card(mine, true);
+  const tog = `<div class="seg" role="group" aria-label="home layout"><button class="${compact ? "" : "sel"}" data-act="compact" data-id="0">normal</button><button class="${compact ? "sel" : ""}" data-act="compact" data-id="1">shorter</button></div>`;
+  return `${tog}${hero}${installCard()}${coupleCard()}<h2>you</h2>${mineCard}<h2>${others.length ? `friends <button class="chip" data-act="card" data-id="together">📸 photocard</button>` : "no friends yet"}</h2>
   ${others.map(u => card(u, false)).join("") || `<p class="hint">Ask your friend to create an account — they'll show up here!</p>`}${giftsView()}`;
 }
 // ---- cozy sounds (generated with the Web Audio API, no files needed) ----
@@ -732,7 +741,7 @@ const badgeBusy = new Set();
 const badgeCtx = m => { const v = Object.values(m.daily || {}), st = stats(m); return { total: st.total, streak: Math.max(st.streak, m.bestStreak || 0), bestDay: Math.max(0, ...v), days: v.filter(x => x > 0).length, goalHit: goalOf(m) > 0 && liveToday(m) >= goalOf(m) }; };
 function badgeView(mine) {
   const got = mine.badges || {}, n = BADGES.filter(b => got[b[0]]).length;
-  return `<h2>badges <span class="hint" style="margin-left:auto">${n} / ${BADGES.length}</span></h2><div class="badges">${BADGES.map(b => `<div class="badge ${got[b[0]] ? "" : "lock"}"><span>${b[1]}</span><b>${b[2]}</b><small>${b[3]}</small></div>`).join("")}</div>`;
+  return sec("badges", "badges", `<span class="hint" style="margin-left:auto">${n} / ${BADGES.length}</span>`, `<div class="badges">${BADGES.map(b => `<div class="badge ${got[b[0]] ? "" : "lock"}"><span>${b[1]}</span><b>${b[2]}</b><small>${b[3]}</small></div>`).join("")}</div>`);
 }
 let calMonth = 0; // 0 = this month, -1 = last month, ...
 function calView(mine) {
@@ -745,10 +754,10 @@ function calView(mine) {
     tot += v; if (v > 0) days++;
     cells += `<button class="dy l${lv}${k === tk ? " today" : ""}${k > tk ? " fut" : ""}" data-act="day" data-id="${k}" data-v="${v}">${i}</button>`;
   }
-  return `<h2>calendar</h2><div class="cal"><div class="calh"><button data-act="calnav" data-id="-1">‹</button><span>${first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span><button data-act="calnav" data-id="1" ${calMonth >= 0 ? "disabled" : ""}>›</button></div>
+  return sec("cal", "calendar", "", `<div class="cal"><div class="calh"><button data-act="calnav" data-id="-1">‹</button><span>${first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span><button data-act="calnav" data-id="1" ${calMonth >= 0 ? "disabled" : ""}>›</button></div>
   <div class="cg">${["S", "M", "T", "W", "T", "F", "S"].map(x => `<em>${x}</em>`).join("")}${cells}</div>
   <p class="hint">${days} study days · ${fmt(tot)} this month</p>
-  <div class="legend">less ${[0, 1, 2, 3, 4].map(l => `<i class="dy l${l}"></i>`).join("")} more</div></div>`;
+  <div class="legend">less ${[0, 1, 2, 3, 4].map(l => `<i class="dy l${l}"></i>`).join("")} more</div></div>`);
 }
 // ---- photocard: a shareable image of your session, stats and garden (drawn by js/card.js) ----
 // the latest milestone (pet evolved / streak record / couple level) is remembered on this device so you can still make its card later
@@ -940,9 +949,9 @@ function statsView(mine) {
   const max = Math.max(...days.map(x => x.v), 1);
   return `<h2>last 7 days <button class="chip" data-act="card">📸 photocard</button><button class="chip" data-act="card" data-id="recap">🗓️ recap</button></h2><div class="bars">${days.map(x => `<div class="bar"><i style="height:${Math.max(4, x.v / max * 100)}%"></i><em>${x.v ? fmt(x.v) : ""}</em><span>${x.l}</span></div>`).join("")}</div>
   <div class="tiles"><div><b>${fmt(s.today)}</b>today</div><div><b>${fmt(s.week)}</b>this week</div><div><b>${s.streak}🔥</b>day streak</div><div><b>${fmt(s.total)}</b>all time</div></div>
-  ${calView(mine)}${badgeView(mine)}<h2>sessions <button class="chip" data-act="add">+ add time</button></h2>
-  ${sessions.map(x => `<div class="sess"><div><b>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</b>
-  <span>${fmt(x.seconds)}</span></div><button class="ic" data-act="edit" data-id="${x.id}">✏️</button><button class="ic" data-act="del" data-id="${x.id}">🗑️</button></div>`).join("") || `<p class="hint">No sessions yet — press study to begin!</p>`}`;
+  ${calView(mine)}${badgeView(mine)}${sec("sess", "sessions", `<button class="chip" data-act="add">+ add time</button>`,
+  sessions.map(x => `<div class="sess"><div><b>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</b>
+  <span>${fmt(x.seconds)}</span></div><button class="ic" data-act="edit" data-id="${x.id}">✏️</button><button class="ic" data-act="del" data-id="${x.id}">🗑️</button></div>`).join("") || `<p class="hint">No sessions yet — press study to begin!</p>`)}`;
 }
 function render() {
   if (!me) return authView();
@@ -1067,6 +1076,8 @@ app.onclick = async e => {
       if (a === "login") await DB.logIn(u, p);
       else { if (SIGNUP_CODE && $("#c").value.trim() !== SIGNUP_CODE) return toast("Wrong secret code."); await DB.signUp(u, p, EMOJI[Math.floor(Math.random() * EMOJI.length)]); }
     } else if (a === "tab") { tab = id; render(); }
+    else if (a === "fold") { if (foldSet.has(id)) foldSet.delete(id); else foldSet.add(id); ls("fold", JSON.stringify([...foldSet])); render(); }
+    else if (a === "compact") { compact = id === "1"; ls("compact", compact ? "1" : "0"); render(); }
     else if (a === "install") { installEvt.prompt(); installEvt = null; render(); }
     else if (a === "study") { playSound(sound); await DB.startStudy(me.uid, pomo, focusOf(mine)); toast("Good luck! 🍀"); }
     else if (a === "pause") { stopSound(); await DB.pauseStudy(me.uid, elapsed(mine)); }
