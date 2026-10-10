@@ -66,6 +66,15 @@ export const watchCheers = (uid, cb) => onSnapshot(collection(db, "users", uid, 
   list.forEach(x => deleteDoc(x.ref).catch(() => {}));
 }, () => {});
 
+// ---- shared to-do board: board/{id} = { text, lane 0|1|2, o (order in lane), color 0-4, by, name, emoji, at } ----
+const noteRef = id => doc(db, "board", id);
+export const watchBoard = cb => onSnapshot(query(collection(db, "board"), limit(300)), s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+export const addNote = (uid, name, emoji, text, lane, o, color) => addDoc(collection(db, "board"), { text, lane, o, color, by: uid, name, emoji, at: serverTimestamp() });
+export const moveNote = (id, lane, o) => updateDoc(noteRef(id), { lane, o });
+export const editNote = (id, text, color) => updateDoc(noteRef(id), { text, color });
+export const deleteNote = id => deleteDoc(noteRef(id));
+export async function clearNotes(ids) { const b = writeBatch(db); ids.forEach(id => b.delete(noteRef(id))); await b.commit(); }
+
 // ---- badges ----
 export const unlockBadge = (uid, id) => updateDoc(userRef(uid), { [`badges.${id}`]: Date.now() });
 

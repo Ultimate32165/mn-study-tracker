@@ -1,5 +1,6 @@
 import * as DB from "./db.js";
 import { drawCard } from "./card.js";
+import { boardMain, initBoard, boardBusy, boardSheet, boardKeep, boardRestore, nextOrder } from "./board.js";
 import { forestMain, forestAct, forestGrow, forestCost, forestSnap, forestOf } from "./forest.js";
 import { SIGNUP_CODE } from "./firebase-config.js";
 
@@ -27,7 +28,7 @@ function applyTheme(t) {
 }
 applyTheme(theme);
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => theme === "auto" && applyTheme("auto"));
-let me = null, users = [], sessions = [], gifts = [], tab = "home", unsubs = [], installEvt = null;
+let me = null, users = [], sessions = [], gifts = [], board = [], tab = "home", unsubs = [], installEvt = null;
 
 // ---------- helpers ----------
 const key = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -993,15 +994,18 @@ function render() {
   if (!me) return authView();
   const mine = users.find(u => u.id === me.uid);
   if (!mine) return app.innerHTML = `<div class="auth"><div class="logo">📚</div><p class="hint">loading…</p></div>`;
+  if (boardBusy()) return; // a box is in your hand: don't redraw under your finger
   if (tab === "garden" && G.el && G.el.isConnected) { // garden is showing: leave the live scene alone, refresh only what sits around it
     const av = app.querySelector("header .av"); if (av && av.textContent !== mine.emoji) av.textContent = mine.emoji;
     const gp = $("#gpanel"); if (gp) gp.innerHTML = gardenPanel();
     syncGarden(); return;
   }
+  const kept = tab === "board" ? boardKeep() : null;
   app.innerHTML = `<header><h1>MN study tracker</h1><div class="hr">${tab === "home" ? `<button class="mtog ${compact ? "on" : ""}" data-act="compact" data-id="${compact ? 0 : 1}" role="switch" aria-checked="${compact}" title="shorter home tab"><em>short</em><i></i></button>` : ""}<button class="av" data-act="profile">${esc(mine.emoji)}</button></div></header>
-  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine), isEvening() || /night|cocoa|berry|forest|deepsea|ink|galaxy/.test(document.documentElement.dataset.theme || "")) : statsView(mine)}</main>
-  <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button><button class="${tab === "garden" ? "act" : ""}" data-act="tab" data-id="garden">🌳<span>garden</span></button><button class="${tab === "forest" ? "act" : ""}" data-act="tab" data-id="forest">🌲<span>forest</span></button></nav>`;
+  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "board" ? boardMain(board) : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine), isEvening() || /night|cocoa|berry|forest|deepsea|ink|galaxy/.test(document.documentElement.dataset.theme || "")) : statsView(mine)}</main>
+  <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button><button class="${tab === "garden" ? "act" : ""}" data-act="tab" data-id="garden">🌳<span>garden</span></button><button class="${tab === "forest" ? "act" : ""}" data-act="tab" data-id="forest">🌲<span>forest</span></button><button class="${tab === "board" ? "act" : ""}" data-act="tab" data-id="board">📝<span>board</span></button></nav>`;
   if (tab === "garden") mountGarden();
+  if (kept) boardRestore(kept);
   tick();
 }
 const tick = () => {
@@ -1104,6 +1108,18 @@ function profileSheet(mine) {
   $("#ps").onclick = async () => { await DB.updateProfile(me.uid, { name: $("#pn").value.trim() || mine.name, emoji: em }); modal.innerHTML = ""; };
 }
 
+// ---- shared to-do board (js/board.js) ----
+async function addBoardNote(mine) {
+  const i = $("#bnew"), text = (i ? i.value : "").trim().slice(0, 140); if (!text || !mine) return i && i.focus();
+  i.value = "";
+  try { await DB.addNote(me.uid, mine.name, mine.emoji, text, 0, nextOrder(board, 0), Math.floor(Math.random() * 5)); } catch (e) { i.value = text; toast(errMsg(e)); }
+}
+initBoard(app, {
+  move: (id, lane, o, laneChanged) => { DB.moveNote(id, lane, o).catch(e => toast(errMsg(e))); if (laneChanged && lane === 2) { burst(["🎉", "✨"], 20); toast("Done! 🎉"); } },
+  tap: id => { const n = board.find(x => x.id === id); if (n) boardSheet(n, { modal, toast, err: errMsg, save: (t, c) => DB.editNote(id, t, c), del: () => DB.deleteNote(id) }); }
+});
+app.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "bnew") { e.preventDefault(); addBoardNote(users.find(u => u.id === (me && me.uid))); } });
+
 // ---------- actions ----------
 app.onclick = async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
@@ -1128,6 +1144,8 @@ app.onclick = async e => {
     else if (a === "gpet") gardenTap(id);
     else if (a === "gchoose") gardenSheet(mine);
     else if (a === "gshop") shopSheet(mine);
+    else if (a === "badd") addBoardNote(mine);
+    else if (a === "bclear") { const ids = board.filter(n => n.lane === 2).map(n => n.id); if (ids.length && confirm(`Clear ${ids.length} finished note${ids.length > 1 ? "s" : ""}?`)) await DB.clearNotes(ids); }
     else if (a === "fcell") forestAct(+id, { u: mine, total: totalOf(mine), left: seedsLeft(mine), modal, toast, err: errMsg, fmt, burst, save: t => DB.saveForest(me.uid, t) });
     else if (a === "gedit") enterEdit(mine);
     else if (a === "gdone") await exitEdit(true);
@@ -1162,8 +1180,8 @@ app.onclick = async e => {
 
 // ---------- boot ----------
 DB.watchAuth(u => {
-  unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = []; gifts = []; giftKnown.clear(); clearGarden(); seedBase = -1; visits = [];
-  if (u) unsubs = [DB.watchUsers(x => { users = x; render(); }), DB.watchSessions(u.uid, x => { sessions = x; render(); }),
+  unsubs.forEach(f => f()); unsubs = []; me = u; users = []; sessions = []; gifts = []; board = []; giftKnown.clear(); clearGarden(); seedBase = -1; visits = [];
+  if (u) unsubs = [DB.watchUsers(x => { users = x; render(); }), DB.watchBoard(x => { board = x; render(); }), DB.watchSessions(u.uid, x => { sessions = x; render(); }),
     DB.watchCheers(u.uid, list => {
       cheerCard(list); list.forEach(c => queueVisit(c.from)); burst(list.map(c => short(c.emoji) ? c.emoji : "💌"), 24);
       notify(`${list[0].name || "Your friend"} sent you a cheer!`, list.map(c => c.emoji).join("  "));

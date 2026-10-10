@@ -28,5 +28,17 @@ service cloud.firestore {
                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen']);
       }
     }
+
+    // shared to-do board: anyone signed in can read, add (as themselves), move, edit and delete notes
+    match /board/{nid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.by == request.auth.uid
+                    && request.resource.data.text is string && request.resource.data.text.size() <= 200
+                    && request.resource.data.lane in [0, 1, 2];
+      allow update: if request.auth != null
+                    && request.resource.data.text is string && request.resource.data.text.size() <= 200
+                    && request.resource.data.lane in [0, 1, 2];
+      allow delete: if request.auth != null;
+    }
   }
 }
