@@ -157,6 +157,57 @@ function ring(ctx, cx, cy, r, lw, pct, pal) {
   if (pct > 0) { const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r); g.addColorStop(0, pal.alt); g.addColorStop(1, pal.main); ctx.strokeStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp01(pct)); ctx.stroke(); }
 }
 
+// ---------------------------------------------------------------- "together" card: both of you, live
+function personTile(ctx, x, y, w, h, p, pal) {
+  const live = p.status === "studying", inner = Math.min(30, w * .065), hf = pal.hf, bf = pal.bf;
+  ctx.save(); if (live) { ctx.shadowColor = pal.live; ctx.shadowBlur = 34; } tile(ctx, x, y, w, h, pal); ctx.restore();
+  if (live) { rr(ctx, x, y, w, h, 34); ctx.strokeStyle = pal.live; ctx.lineWidth = 5; ctx.stroke(); }
+  const av = Math.min(h * .15, 58), petS = Math.min(h * .21, 88), cy = y + inner + av / 2;
+  ctx.beginPath(); ctx.arc(x + inner + av / 2, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.tint; ctx.fill(); emoji(ctx, p.avatar, x + inner + av / 2, cy + 2, av * .58);
+  text(ctx, p.name, x + inner + av + 14, cy, { size: Math.min(h * .1, 42), font: hf, weight: 700, color: pal.ink, base: "middle", max: w - inner * 2 - av - 14 - petS * 1.05 });
+  emoji(ctx, p.pet.emo, x + w - inner - petS / 2, y + inner + petS * .55, petS, { rot: p.status === "rest" && p.pet.st > 0 ? 0 : 0 });
+  if (p.pet.acc) emoji(ctx, p.pet.acc, x + w - inner - petS / 2, y + inner + petS * .05, petS * .42);
+  // status pill
+  const ph = Math.min(h * .09, 40), py = y + inner + av + 16; ctx.font = `800 ${ph * .6}px ${bf}`; const pw = ctx.measureText(p.statusText).width + ph * .95;
+  rr(ctx, x + inner, py, pw, ph, ph / 2); ctx.fillStyle = live ? pal.onBg : pal.tint; ctx.fill(); ctx.strokeStyle = live ? pal.onLine : pal.edge; ctx.lineWidth = 2.5; ctx.stroke();
+  text(ctx, p.statusText, x + inner + pw / 2, py + ph / 2 + 1, { size: ph * .6, font: bf, weight: 800, color: live ? pal.live : pal.sub, align: "center", base: "middle" });
+  // the big number: this session while studying / on a break, otherwise today's total
+  const bigS = Math.min(h * .2, 100), midY = y + h * .6;
+  text(ctx, p.label.toUpperCase(), x + inner, midY - bigS * .72, { size: Math.min(h * .065, 24), font: bf, weight: 800, color: pal.sub });
+  text(ctx, p.big, x + inner, midY + bigS * .22, { size: bigS, font: hf, weight: 700, color: pal.ink, max: w - inner * 2 });
+  // goal bar + footer line
+  const bh = Math.min(18, h * .05), by = y + h - inner - Math.min(h * .08, 32) - bh - 14, tw = w - inner * 2;
+  if (p.pct != null) {
+    rr(ctx, x + inner, by, tw, bh, bh / 2); ctx.fillStyle = pal.tint; ctx.fill();
+    if (p.pct > 0) { const g = ctx.createLinearGradient(x + inner, 0, x + inner + tw, 0); g.addColorStop(0, pal.alt); g.addColorStop(1, pal.main); rr(ctx, x + inner, by, Math.max(bh, tw * clamp01(p.pct)), bh, bh / 2); ctx.fillStyle = g; ctx.fill(); }
+  }
+  const fy = y + h - inner - Math.min(h * .08, 32) / 2, fs = Math.min(h * .062, 26);
+  text(ctx, `today ${p.today}${p.goalText ? " · " + p.goalText : ""}`, x + inner, fy, { size: fs, font: bf, weight: 800, color: pal.sub, base: "middle", max: tw * .72 });
+  text(ctx, `🔥 ${p.streak}`, x + w - inner, fy, { size: fs * 1.1, font: bf, weight: 800, color: pal.sub, align: "right", base: "middle" });
+}
+function drawTogether(ctx, d, pal, W, H) {
+  const pad = 54, gap = 22, stamp = 54, hf = pal.hf, bf = pal.bf, cw = W - pad * 2;
+  const gh = Math.round(H * (d.shape === "story" ? .34 : d.shape === "portrait" ? .38 : .32)), gy = H - pad - stamp - gh;
+  const avail = gy - gap - pad - 2 * gap, wt = [1, 4.8, 1.1], cap = [120, 620, 130], sum = 6.9;
+  const hs = wt.map((k, i) => Math.min(cap[i], Math.round(avail * k / sum))), gp = gap + Math.max(0, (avail + 2 * gap - hs.reduce((a, b) => a + b, 0) - 2 * gap) / 3);
+  let y = pad + (gp - gap) / 2; const Y = hs.map(h => { const v = y; y += h + gp; return v; });
+  { const h = hs[0], cy = Y[0] + h / 2, av = Math.min(h, 84);
+    d.people.forEach((p, i) => { const cx = pad + av / 2 + i * av * .62; ctx.beginPath(); ctx.arc(cx, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = pal.edge; ctx.stroke(); emoji(ctx, p.avatar, cx, cy + 2, av * .56); });
+    const dateW = Math.min(cw * .36, 340), tx = pad + av * 1.62 + 20;
+    text(ctx, d.date, W - pad, cy, { size: Math.min(h * .46, 28), font: bf, weight: 700, color: pal.sub, align: "right", base: "middle", max: dateW });
+    text(ctx, d.title, tx, cy, { size: Math.min(h * .72, 48), font: hf, weight: 700, color: pal.ink, base: "middle", max: W - pad - tx - dateW - 20 }); }
+  { const tw = (cw - gap) / 2; d.people.forEach((p, i) => personTile(ctx, pad + i * (tw + gap), Y[1], tw, hs[1], p, pal)); }
+  { const h = hs[2], cwid = (cw - gap) / 2;
+    [["together today", d.togetherToday], ["couple level", d.coupleText]].forEach(([lab, val], i) => {
+      const x = pad + i * (cwid + gap); tile(ctx, x, Y[2], cwid, h, pal); const fs = Math.min(h * .46, 54), ls = Math.min(h * .3, 28);
+      text(ctx, lab, x + 28, Y[2] + h / 2, { size: ls, font: bf, weight: 800, color: pal.sub, base: "middle" });
+      ctx.font = `800 ${ls}px ${bf}`; const lw = ctx.measureText(lab).width;
+      text(ctx, val, x + cwid - 28, Y[2] + h / 2, { size: fs, font: hf, weight: 700, color: pal.ink, align: "right", base: "middle", max: cwid - 56 - lw - 10 });
+    }); }
+  drawScene(ctx, pad, gy, cw, gh, d.garden, pal);
+  text(ctx, "🍓 MN Study Tracker", W / 2, H - pad - stamp / 2 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
+}
+
 export function drawCard(cv, d, pal) {
   const [W, H] = SIZES[d.shape] || SIZES.square; cv.width = W; cv.height = H;
   const ctx = cv.getContext("2d"), L = layout(d.shape, W, H), hf = pal.hf, bf = pal.bf, pad = L.pad, cw = W - pad * 2;
@@ -165,6 +216,7 @@ export function drawCard(cv, d, pal) {
   glow(ctx, W * .12, H * .08, W * .55, pal.glow1, .55); glow(ctx, W * .95, H * .55, W * .6, pal.glow2, .5);
   ctx.fillStyle = pal.main; ctx.globalAlpha = .07; for (let yy = 30; yy < H; yy += 70) for (let xx = (yy / 70 % 2) * 35 + 20; xx < W; xx += 70) { ctx.beginPath(); ctx.arc(xx, yy, 5, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1;
 
+  if (d.kind === "together") { drawTogether(ctx, d, pal, W, H); return; }
   // header: avatar + title (left), date (right)
   { const { y, h } = L.head, av = Math.min(h, 84), cy = y + h / 2;
     ctx.beginPath(); ctx.arc(pad + av / 2, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = pal.edge; ctx.stroke();

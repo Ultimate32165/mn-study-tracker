@@ -92,7 +92,7 @@ function homeView(mine) {
        <button class="study stop" data-act="stop">stop<span>⏹️</span></button></div><div class="chips"><button class="chip" data-act="sound">${soundLabel()}</button></div><button class="link" data-act="discard">cancel without saving</button></div>`
     : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p><div class="chips"><button class="chip" data-act="pomo">🍅 pomodoro: ${pomo ? `on (${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5})` : "off"}</button><button class="chip" data-act="sound">${soundLabel()}</button></div></div>`;
   const others = users.filter(u => u.id !== me.uid).sort((a, b) => (b.status === "studying") - (a.status === "studying"));
-  return `${hero}${installCard()}${coupleCard()}<h2>${others.length ? "friends" : "no friends yet"}</h2>
+  return `${hero}${installCard()}${coupleCard()}<h2>${others.length ? `friends <button class="chip" data-act="card" data-id="together">📸 photocard</button>` : "no friends yet"}</h2>
   ${others.map(u => card(u, false)).join("") || `<p class="hint">Ask your friend to create an account — they'll show up here!</p>`}<h2>you</h2>${card(mine, true)}`;
 }
 // ---- cozy sounds (generated with the Web Audio API, no files needed) ----
@@ -733,7 +733,8 @@ function calView(mine) {
   <div class="legend">less ${[0, 1, 2, 3, 4].map(l => `<i class="dy l${l}"></i>`).join("")} more</div></div>`;
 }
 // ---- photocard: a shareable image of your session, stats and garden (drawn by js/card.js) ----
-const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today" };
+const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today", mode: "me", fid: "" };
+const gfmt = t => t % 3600 === 0 ? `${t / 3600}h` : fmt(t);
 let cardUrl = "", cardBlob = null, cardSeq = 0;
 const dayLong = t => new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 const hhmm = t => new Date(t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -748,7 +749,7 @@ function cardPal(night, wx) { // read the CURRENT theme's colours (also the gard
     sk1: v("--sk1").s, sk2: v("--sk2").s, cl: v("--cl").s, grB: v("--gr-b").s, grF: v("--gr-f").s, wood: v("--wood").s, woodL: v("--wood-l").s, woodD: v("--wood-d").s,
     soil: c("color-mix(in srgb,#8a5732 80%,var(--bg1))").s, cloth: c("color-mix(in srgb,#fff 88%,var(--main))").s, pad: c("color-mix(in srgb,#5fcf74 80%,var(--bg1))").s,
     stone: c("color-mix(in srgb,#cfd3dc 75%,var(--bg1))").s, water: c("color-mix(in srgb,#8fd3ff 80%,var(--bg1))").s, water2: c("color-mix(in srgb,#4fb0e8 78%,var(--bg1))").s,
-    glow1: v("--glow1").rgb, glow2: v("--glow2").rgb, hf: (getComputedStyle(document.documentElement).getPropertyValue("--hf").trim() || "Fredoka, sans-serif"), bf: "Nunito, system-ui, sans-serif"
+    live: v("--live").s, onBg: v("--on-bg").s, onLine: v("--on-line").s, glow1: v("--glow1").rgb, glow2: v("--glow2").rgb, hf: (getComputedStyle(document.documentElement).getPropertyValue("--hf").trim() || "Fredoka, sans-serif"), bf: "Nunito, system-ui, sans-serif"
   };
   tmp.remove(); return pal;
 }
@@ -763,7 +764,7 @@ function gardenSnap() { // the saved garden as plain data (live pet positions wh
   return { night, wx, lv: couple().lv, items, pets };
 }
 function cardData(shape, sid) {
-  const m = users.find(u => u.id === me.uid), s = stats(m), d = m.daily || {}, now = Date.now(), goal = goalOf(m), sx = sessions.find(x => x.id === sid), gfmt = t => t % 3600 === 0 ? `${t / 3600}h` : fmt(t);
+  const m = users.find(u => u.id === me.uid), s = stats(m), d = m.daily || {}, now = Date.now(), goal = goalOf(m), sx = sessions.find(x => x.id === sid);
   let ses, date = dayLong(now);
   if (sx) {
     const t0 = sx.start.toMillis(), dayTot = d[key(t0)] || sx.seconds; date = dayLong(t0);
@@ -776,12 +777,23 @@ function cardData(shape, sid) {
   return { shape, name: m.name || "you", avatar: m.emoji || "📚", pet: ALLP[petOf(m)].e[stageOf(totalOf(m))], date, session: ses, todayLabel: "today", todayText: fmt(liveToday(m)),
     streakText: `${s.streak} day${s.streak === 1 ? "" : "s"} 🔥`, week, weekTotal: fmt(week.reduce((a, k) => a + k.v, 0)), garden: gardenSnap() };
 }
+function cardDataTogether(shape, fid) { // both of you, right now: live session time, status, today's progress, pets, garden
+  const a = users.find(u => u.id === me.uid), b = users.find(u => u.id === fid) || users.find(u => u.id !== me.uid), now = Date.now();
+  const person = u => {
+    const on = u.status === "studying", br = u.status === "paused", g = goalOf(u), lt = liveToday(u), st = stageOf(totalOf(u)), t = petOf(u);
+    return { name: u.name || "friend", avatar: u.emoji || "📚", status: on ? "studying" : br ? "break" : "rest", statusText: on ? "studying ✏️" : br ? "on a break ☕" : "resting 💤",
+      label: on || br ? "this session" : "today", big: fmt(on || br ? elapsed(u) / 1000 : lt), today: fmt(lt), pct: g ? lt / g : null, goalText: g ? `goal ${gfmt(g)}` : "", streak: stats(u).streak,
+      pet: { emo: ALLP[t].e[st], acc: accOf(t, st), st } };
+  };
+  return { kind: "together", shape, people: [person(a), person(b)], title: `${a.name} & ${b.name}`, date: `${dayLong(now)} · ${hhmm(now)}`,
+    togetherToday: fmt(liveToday(a) + liveToday(b)), coupleText: `Level ${couple().lv + 1} 💞`, garden: gardenSnap() };
+}
 async function renderCard() {
   const seq = ++cardSeq, img = $("#cimg"), ld = $(".cload"); if (!img) return;
   if (ld) ld.hidden = false;
   try { await Promise.race([Promise.all([document.fonts.load("700 48px Fredoka"), document.fonts.load("800 28px Nunito")]), new Promise(r => setTimeout(r, 1500))]); } catch {}
   if (seq !== cardSeq) return;
-  const data = cardData(cardOpt.shape, cardOpt.sid), cv = document.createElement("canvas");
+  const data = cardOpt.mode === "together" ? cardDataTogether(cardOpt.shape, cardOpt.fid) : cardData(cardOpt.shape, cardOpt.sid), cv = document.createElement("canvas");
   drawCard(cv, data, cardPal(data.garden.night, data.garden.wx));
   cv.toBlob(b => {
     if (seq !== cardSeq || !b) return;
@@ -789,26 +801,33 @@ async function renderCard() {
     cardBlob = b; cardUrl = URL.createObjectURL(b); img.src = cardUrl; if (ld) ld.hidden = true;
   }, "image/png");
 }
-function cardSheet() {
-  const sess = sessions.slice(0, 12), canShare = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File([""], "a.png", { type: "image/png" })] })); } catch { return false; } })();
+function cardSheet(mode) {
+  const sess = sessions.slice(0, 12), friends = users.filter(u => u.id !== me.uid), canShare = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File([""], "a.png", { type: "image/png" })] })); } catch { return false; } })();
+  cardOpt.mode = mode === "together" && friends.length ? "together" : "me";
   if (!sess.some(x => x.id === cardOpt.sid)) cardOpt.sid = "today";
-  const SH = { square: "▫️ square", portrait: "🖼️ 4:5", story: "📱 story" };
+  if (!friends.some(u => u.id === cardOpt.fid)) cardOpt.fid = (friends.find(u => u.status === "studying") || friends[0] || {}).id || "";
+  const SH = { square: "▫️ square", portrait: "🖼️ 4:5", story: "📱 story" }, MD = { me: "👤 just me", together: "💞 together" };
   modal.innerHTML = `<div class="back"><div class="sheet cardsheet"><h3>photocard 📸</h3>
+  ${friends.length ? `<div class="seg" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>` : ""}
   <div class="seg">${Object.keys(SH).map(k => `<button data-shape="${k}" class="${k === cardOpt.shape ? "sel" : ""}">${SH[k]}</button>`).join("")}</div>
   <select id="csel" aria-label="which session"><option value="today">Today (all sessions)</option>${sess.map(x => `<option value="${esc(x.id)}" ${x.id === cardOpt.sid ? "selected" : ""}>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} · ${fmt(x.seconds)}</option>`).join("")}</select>
+  <select id="cfr" aria-label="which friend">${friends.map(u => `<option value="${esc(u.id)}" ${u.id === cardOpt.fid ? "selected" : ""}>${esc(u.emoji)} ${esc(u.name)}</option>`).join("")}</select>
   <div class="cprev"><div class="cload">drawing your card…</div><img id="cimg" alt="photocard preview"></div>
   <div class="row"><button class="btn ghost" id="cclose">close</button>${canShare ? `<button class="btn" id="cshare">share 💖</button>` : ""}<button class="btn ${canShare ? "ghost" : ""}" id="csave">save ⬇️</button></div></div></div>`;
+  const vis = () => { $("#csel").hidden = cardOpt.mode === "together"; $("#cfr").hidden = cardOpt.mode !== "together" || friends.length < 2; };
   const done = () => { cardSeq++; if (cardUrl) { URL.revokeObjectURL(cardUrl); cardUrl = ""; } cardBlob = null; modal.innerHTML = ""; };
   $("#cclose").onclick = done;
+  modal.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { cardOpt.mode = b.dataset.mode; modal.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("sel", x === b)); vis(); renderCard(); });
   modal.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => { cardOpt.shape = b.dataset.shape; ls("cardShape", cardOpt.shape); modal.querySelectorAll("[data-shape]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
   $("#csel").onchange = e => { cardOpt.sid = e.target.value; renderCard(); };
-  const file = () => new File([cardBlob], `study-${key(Date.now())}.png`, { type: "image/png" });
+  $("#cfr").onchange = e => { cardOpt.fid = e.target.value; renderCard(); };
+  const file = () => new File([cardBlob], `study${cardOpt.mode === "together" ? "-together" : ""}-${key(Date.now())}.png`, { type: "image/png" });
   $("#csave").onclick = () => { if (!cardBlob) return toast("One sec, still drawing…"); const a = document.createElement("a"); a.href = cardUrl; a.download = file().name; document.body.appendChild(a); a.click(); a.remove(); toast("Saved 📸"); };
   const sh = $("#cshare"); if (sh) sh.onclick = async () => {
     if (!cardBlob) return toast("One sec, still drawing…");
     try { await navigator.share({ files: [file()], title: "MN Study Tracker" }); } catch (e) { if (e && e.name !== "AbortError") toast("Couldn't open sharing — try save instead"); }
   };
-  renderCard();
+  vis(); renderCard();
 }
 
 function statsView(mine) {
@@ -963,7 +982,7 @@ app.onclick = async e => {
     else if (a === "gtreat") await treat(id, mine);
     else if (a === "gvis") await collectVisitor(mine);
     else if (a === "gfind") findPet();
-    else if (a === "card") cardSheet();
+    else if (a === "card") cardSheet(id === "together" ? "together" : "me");
     else if (a === "calnav") { calMonth = Math.min(0, calMonth + +id); render(); }
     else if (a === "day") { const v = +b.dataset.v; toast(`${new Date(id + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${v ? fmt(v) : "no study 💤"}`); }
     else if (a === "discard") { if (confirm("Cancel without saving any time?")) { stopSound(); await DB.cancelStudy(me.uid); } }
