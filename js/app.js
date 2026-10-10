@@ -1,6 +1,6 @@
 import * as DB from "./db.js";
 import { drawCard } from "./card.js";
-import { forestMain, forestAct, forestGrow, forestCost, forestSnap } from "./forest.js";
+import { forestMain, forestAct, forestGrow, forestCost, forestSnap, forestOf } from "./forest.js";
 import { SIGNUP_CODE } from "./firebase-config.js";
 
 const $ = s => document.querySelector(s), app = $("#app"), modal = $("#modal");
@@ -160,7 +160,15 @@ const PETS = {
   bunny: { e: ["🥚", "🐰", "🐇", "🐇"], acc: ["", "", "🎀", "👑"] },
   cat: { e: ["🥚", "🐱", "🐈", "🦁"], acc: ["", "", "🎀", "👑"] },
   chick: { e: ["🥚", "🐣", "🐥", "🐔"], acc: ["", "", "", "👑"] },
-  plant: { e: ["🌰", "🌱", "🪴", "🌳"], acc: ["", "", "", "🌸"] }
+  plant: { e: ["🌰", "🌱", "🪴", "🌳"], acc: ["", "", "", "🌸"] },
+  hamster: { e: ["🥚", "🐹", "🐹", "🐹"], acc: ["", "", "🌻", "👑"] },
+  mouse: { e: ["🥚", "🐭", "🐭", "🐁"], acc: ["", "", "🧀", "👑"] },
+  pig: { e: ["🥚", "🐷", "🐷", "🐖"], acc: ["", "", "🎀", "👑"] },
+  penguin: { e: ["🥚", "🐧", "🐧", "🐧"], acc: ["", "", "🧣", "👑"] },
+  koala: { e: ["🥚", "🐨", "🐨", "🐨"], acc: ["", "", "🍃", "👑"] },
+  bear: { e: ["🥚", "🧸", "🐻", "🐻"], acc: ["", "", "🍯", "👑"] },
+  duck: { e: ["🥚", "🐥", "🦆", "🦆"], acc: ["", "", "🎀", "👑"] },
+  hedgehog: { e: ["🥚", "🦔", "🦔", "🦔"], acc: ["", "", "🍎", "👑"] }
 };
 const accOf = (t, st) => ((ALLP[t] || {}).acc || [])[st] || "";
 const petFace = (t, st) => ALLP[t].e[st] + (accOf(t, st) ? `<i class="acc">${accOf(t, st)}</i>` : "");
@@ -197,11 +205,21 @@ const EXTRA = {
   fox: { n: "fox", e: ["🥚", "🦊", "🦊", "🦊"], acc: ["", "", "🍂", "👑"], req: "study 25 hours in total", ok: u => totalOf(u) >= 90000 },
   frog: { n: "frog", e: ["🥚", "🐸", "🐸", "🐸"], acc: ["", "", "🍃", "👑"], req: "reach couple level 4 💞", ok: () => couple().lv >= 3 },
   turtle: { n: "turtle", e: ["🥚", "🐢", "🐢", "🐢"], acc: ["", "", "🌿", "👑"], req: "earn the 7-day streak badge ✨", ok: u => !!(u.badges && u.badges.s7) },
-  unicorn: { n: "unicorn", e: ["🥚", "🦄", "🦄", "🦄"], acc: ["", "", "🌈", "👑"], req: "earn the 100 hours badge 👑", ok: u => !!(u.badges && u.badges.h100) }
+  unicorn: { n: "unicorn", e: ["🥚", "🦄", "🦄", "🦄"], acc: ["", "", "🌈", "👑"], req: "earn the 100 hours badge 👑", ok: u => !!(u.badges && u.badges.h100) },
+  lamb: { n: "lamb", e: ["🥚", "🐑", "🐑", "🐏"], acc: ["", "", "🌼", "👑"], req: "study 2 hours in total", ok: u => totalOf(u) >= 7200 },
+  otter: { n: "otter", e: ["🥚", "🦦", "🦦", "🦦"], acc: ["", "", "🐚", "👑"], req: "earn the 10 hours badge 🌟", ok: u => !!(u.badges && u.badges.h10) },
+  owl: { n: "owl", e: ["🥚", "🦉", "🦉", "🦉"], acc: ["", "", "📖", "👑"], req: "earn the 4h in a day badge 💪", ok: u => !!(u.badges && u.badges.d4) },
+  raccoon: { n: "raccoon", e: ["🥚", "🦝", "🦝", "🦝"], acc: ["", "", "🍓", "👑"], req: "earn the 10 study days badge 📅", ok: u => !!(u.badges && u.badges.n10) },
+  deer: { n: "deer", e: ["🥚", "🦌", "🦌", "🦌"], acc: ["", "", "🍂", "👑"], req: "plant 5 trees in your forest 🌲", ok: u => forestOf(u).length >= 5 },
+  flamingo: { n: "flamingo", e: ["🥚", "🦩", "🦩", "🦩"], acc: ["", "", "🌺", "👑"], req: "reach couple level 6 💞", ok: () => couple().lv >= 5 },
+  giraffe: { n: "giraffe", e: ["🥚", "🦒", "🦒", "🦒"], acc: ["", "", "🌿", "👑"], req: "earn the 14-day streak badge 💫", ok: u => !!(u.badges && u.badges.s14) },
+  dragon: { n: "dragon", e: ["🥚", "🐉", "🐉", "🐉"], acc: ["", "", "🔥", "👑"], req: "earn the 250 hours badge 💎", ok: u => !!(u.badges && u.badges.h250) }
 };
 const ALLP = { ...PETS, ...EXTRA };
+const MAX_FRIENDS = 5; // garden friends you can bring along (the garden itself shows 12 animals at most)
 const petName = t => EXTRA[t] ? EXTRA[t].n : t;
-const MOVE = { bunny: [1.3, 9], cat: [1.1, 5], chick: [1.2, 6], plant: [.3, 3], dog: [1.25, 7], panda: [.65, 4], fox: [1.2, 6], frog: [.9, 11], turtle: [.4, 2], unicorn: [1.1, 6] }; // [speed, hop height px]
+const MOVE = { bunny: [1.3, 9], cat: [1.1, 5], chick: [1.2, 6], plant: [.3, 3], dog: [1.25, 7], panda: [.65, 4], fox: [1.2, 6], frog: [.9, 11], turtle: [.4, 2], unicorn: [1.1, 6], hamster: [1.3, 8], mouse: [1.4, 8], pig: [.9, 5], penguin: [.8, 6], koala: [.5, 3], bear: [.8, 4], duck: [1, 6], hedgehog: [.7, 4],
+  lamb: [1, 7], otter: [1.1, 7], owl: [.7, 5], raccoon: [1, 5], deer: [1.3, 8], flamingo: [.8, 5], giraffe: [.7, 3], dragon: [1, 6] }; // [speed, hop height px]
 const FACE_RIGHT = new Set(["🐢"]); // emoji that look RIGHT by default (all the others look left). If one walks backwards on your phone, add/remove its emoji here (e.g. "🐈", "🐕", "🦮").
 // The garden is a big WORLD (WW x WH px) seen through a small window (the same 5:6 box as before) that you pan around by dragging.
 // Pet / item positions are fractions of the world. The window size only decides how much you see at once.
@@ -307,11 +325,11 @@ function buildDeco(lv) { // more flowers, butterflies, trees and a rainbow as th
   G.fly.innerHTML = fl;
   G.el.classList.toggle("rainbow", lv >= 6);
 }
-function gardenList() { // everyone's main pet, then the extra friends they picked (max 3 each), capped at 12 in total
+function gardenList() { // everyone's main pet, then the extra friends they picked (max 5 each), capped at 12 in total
   const base = [], extra = [];
   users.slice().sort((a, b) => a.id < b.id ? -1 : 1).forEach(u => {
     base.push({ key: `${u.id}:${petOf(u)}`, u, type: petOf(u) });
-    [...new Set(Array.isArray(u.garden) ? u.garden : [])].filter(id => EXTRA[id] && EXTRA[id].ok(u)).slice(0, 3).forEach(id => extra.push({ key: `${u.id}:${id}`, u, type: id }));
+    [...new Set(Array.isArray(u.garden) ? u.garden : [])].filter(id => EXTRA[id] && EXTRA[id].ok(u)).slice(0, MAX_FRIENDS).forEach(id => extra.push({ key: `${u.id}:${id}`, u, type: id }));
   });
   return [...base, ...extra].slice(0, 12);
 }
@@ -668,15 +686,15 @@ function gardenTap(key) {
   clearTimeout(G.cardT); G.cardT = setTimeout(() => { G.card.hidden = true; }, own ? 6500 : 4200);
 }
 function gardenSheet(mine) { // "choose my garden pets" modal: locked pets are greyed out with their unlock requirement
-  const sel = new Set((Array.isArray(mine.garden) ? mine.garden : []).filter(id => EXTRA[id] && EXTRA[id].ok(mine)).slice(0, 3));
-  modal.innerHTML = `<div class="back"><div class="sheet"><h3>garden friends 🌳</h3><p class="hint">${ALLP[petOf(mine)].e[2]} always lives in the garden. Pick up to 3 friends to join it!<br><b id="gn"></b></p>
+  const sel = new Set((Array.isArray(mine.garden) ? mine.garden : []).filter(id => EXTRA[id] && EXTRA[id].ok(mine)).slice(0, MAX_FRIENDS));
+  modal.innerHTML = `<div class="back"><div class="sheet"><h3>garden friends 🌳</h3><p class="hint">${ALLP[petOf(mine)].e[2]} always lives in the garden. Pick up to ${MAX_FRIENDS} friends to join it!<br><b id="gn"></b></p>
   <div class="gch">${Object.keys(EXTRA).map(id => { const x = EXTRA[id], ok = x.ok(mine); return `<button class="${ok ? "" : "lock"}" data-g="${id}"><span>${x.e[2]}</span><b>${x.n}</b><small>${ok ? "unlocked ✓" : "🔒 " + x.req}</small></button>`; }).join("")}</div>
   <div class="row"><button class="btn ghost" id="sx">cancel</button><button class="btn" id="gs">save 💖</button></div></div></div>`;
-  const paint = () => { $("#gn").textContent = `${sel.size} / 3 chosen`; modal.querySelectorAll("[data-g]").forEach(b => b.classList.toggle("sel", sel.has(b.dataset.g))); };
+  const paint = () => { $("#gn").textContent = `${sel.size} / ${MAX_FRIENDS} chosen`; modal.querySelectorAll("[data-g]").forEach(b => b.classList.toggle("sel", sel.has(b.dataset.g))); };
   modal.querySelectorAll("[data-g]").forEach(b => b.onclick = () => {
     const id = b.dataset.g, x = EXTRA[id];
     if (!x.ok(mine)) return toast("🔒 " + x.req);
-    if (sel.has(id)) sel.delete(id); else if (sel.size >= 3) return toast("Max 3 friends 🐾"); else sel.add(id);
+    if (sel.has(id)) sel.delete(id); else if (sel.size >= MAX_FRIENDS) return toast(`Max ${MAX_FRIENDS} friends 🐾`); else sel.add(id);
     paint();
   });
   $("#sx").onclick = () => modal.innerHTML = "";

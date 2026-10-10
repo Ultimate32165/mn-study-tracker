@@ -27,7 +27,7 @@ export const cancelStudy = uid => updateDoc(userRef(uid), { status: "offline", s
 export const pauseStudy = (uid, accumMs) => updateDoc(userRef(uid), { status: "paused", accum: accumMs, runStart: null, breakAt: null });
 export const resumeStudy = uid => updateDoc(userRef(uid), { status: "studying", runStart: Date.now(), breakAt: null });
 export const updateProfile = (uid, d) => updateDoc(userRef(uid), d);
-export const saveGarden = (uid, ids) => updateDoc(userRef(uid), { garden: ids }); // up to 3 extra pets that live in the shared garden
+export const saveGarden = (uid, ids) => updateDoc(userRef(uid), { garden: ids }); // up to 5 extra pets that live in the shared garden
 export const giveTreat = uid => updateDoc(userRef(uid), { treats: increment(1) });   // a treat for your pet costs 1 seed (seeds = study time + bonus - treats - decorations)
 export const addBonus = (uid, n) => updateDoc(userRef(uid), { bonus: increment(n) }); // seeds from garden visitors
 export const saveForest = (uid, trees) => updateDoc(userRef(uid), { forest: trees }); // study forest: [{ s: species, c: tile 0-35, t: total study seconds when planted }]
