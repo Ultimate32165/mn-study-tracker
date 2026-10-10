@@ -450,16 +450,16 @@ h2 .chip+.chip{margin-left:6px}
 #csend:disabled{opacity:.5}
 
 /* collapsible sections */
-h2.fold .fb{display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
-h2.fold .fb i{font-style:normal;display:inline-block;transition:transform .2s;font-size:.9em;color:var(--soft)}
-h2.fold.shut .fb i{transform:rotate(-90deg)}
+h2.fold .fbtn{display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+h2.fold .fbtn i{font-style:normal;display:inline-block;transition:transform .2s;font-size:.9em;color:var(--soft)}
+h2.fold.shut .fbtn i{transform:rotate(-90deg)}
 /* small header toggle for the shorter home tab */
 .hr{display:flex;align-items:center;gap:12px}
-.sw{display:flex;align-items:center;gap:5px;background:none;border:0;padding:8px 2px;color:var(--soft);font-family:var(--hf);font-size:.62rem;font-weight:600}
-.sw em{font-style:normal}
-.sw i{width:25px;height:14px;border-radius:99px;background:color-mix(in srgb,var(--soft) 35%,transparent);position:relative;transition:background .2s}
-.sw i::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0003;transition:left .2s}
-.sw.on i{background:var(--main)}.sw.on i::after{left:13px}
+.mtog{display:flex;align-items:center;gap:5px;background:none;border:0;padding:8px 2px;color:var(--soft);font-family:var(--hf);font-size:.62rem;font-weight:600}
+.mtog em{font-style:normal}
+.mtog i{width:25px;height:14px;border-radius:99px;background:color-mix(in srgb,var(--soft) 35%,transparent);position:relative;transition:background .2s}
+.mtog i::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0003;transition:left .2s}
+.mtog.on i{background:var(--main)}.mtog.on i::after{left:13px}
 /* shorter home tab: you + friend as square tiles */
 .sq{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
 .tile{aspect-ratio:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 8px;text-align:center;background:var(--card);backdrop-filter:blur(var(--blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);border:2px solid var(--edge);border-radius:var(--r);box-shadow:var(--sh)}
@@ -489,7 +489,7 @@ h2.fold.shut .fb i{transform:rotate(-90deg)}
 #gpanel .gbtns .btn{margin:0;padding:10px 8px;font-size:.9rem}
 #gpanel .hint{font-size:.78rem;margin:8px 0 4px}
 
-/* reduce-motion setting: stops every endless looping animation (one-shot ones like confetti and sheets still play) */
+/* reduce-motion setting: calms the app's own looping animations (blobs, study button, hero sparkle, pet bobbing). The garden scene (weather, swing, fireflies...) is left alone. */
 [data-motion=off] body::before,
 [data-motion=off] body::after,
 [data-motion=off] .hero::before,
@@ -501,17 +501,4 @@ h2.fold.shut .fb i{transform:rotate(-90deg)}
 [data-motion=off] .petrow.sleepy .pet,
 [data-motion=off] .petrow.sleepy::after,
 [data-motion=off] .pe,
-[data-motion=off] .gcl,
-[data-motion=off] .gpond::after,
-[data-motion=off] .gfly i,
-[data-motion=off] .gff i,
-[data-motion=off] .gbub.study.on,
-[data-motion=off] .gbub.sleep.on,
-[data-motion=off] .evo .ar,
-[data-motion=off] #garden.night .lant .gl,
-[data-motion=off] .swing .sw,
-[data-motion=off] .wx-rain .gpond::before,
-[data-motion=off] .gvis::after,
-[data-motion=off] #garden.night .fairy b,
-[data-motion=off] .fount .d{animation:none!important}
-[data-motion=off] .gwx,[data-motion=off] .gfly,[data-motion=off] .gff,[data-motion=off] .fount .d,[data-motion=off] .wx-rain .gpond::before{display:none}
+[data-motion=off] .evo .ar{animation:none!important}

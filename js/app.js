@@ -70,7 +70,7 @@ const liveToday = u => stats(u).today + (u.status === "studying" || u.status ===
 const ls = (k, v) => { try { return v === undefined ? localStorage.getItem(k) : localStorage.setItem(k, v); } catch {} };
 // collapsible sections on the stats tab (remembered on this device) + shorter/normal home tab
 const foldSet = (() => { try { return new Set(JSON.parse(ls("fold") || "[]")); } catch { return new Set(); } })();
-const sec = (id, title, extra, body) => { const shut = foldSet.has(id); return `<h2 class="fold${shut ? " shut" : ""}"><button class="fb" data-act="fold" data-id="${id}" aria-expanded="${!shut}"><i>▾</i>${title}</button>${extra || ""}</h2>${shut ? "" : body}`; };
+const sec = (id, title, extra, body) => { const shut = foldSet.has(id); return `<h2 class="fold${shut ? " shut" : ""}"><button class="fbtn" data-act="fold" data-id="${id}" aria-expanded="${!shut}"><i>▾</i>${title}</button>${extra || ""}</h2>${shut ? "" : body}`; };
 let compact = ls("compact") === "1";
 let calm = ls("motion") === "off"; // "reduce motion": turns off the endless bobbing / drifting / twinkling
 const applyMotion = () => { document.documentElement.dataset.motion = calm ? "off" : "on"; };
@@ -968,7 +968,7 @@ function render() {
     const gp = $("#gpanel"); if (gp) gp.innerHTML = gardenPanel();
     syncGarden(); return;
   }
-  app.innerHTML = `<header><h1>MN study tracker</h1><div class="hr">${tab === "home" ? `<button class="sw ${compact ? "on" : ""}" data-act="compact" data-id="${compact ? 0 : 1}" role="switch" aria-checked="${compact}" title="shorter home tab"><em>short</em><i></i></button>` : ""}<button class="av" data-act="profile">${esc(mine.emoji)}</button></div></header>
+  app.innerHTML = `<header><h1>MN study tracker</h1><div class="hr">${tab === "home" ? `<button class="mtog ${compact ? "on" : ""}" data-act="compact" data-id="${compact ? 0 : 1}" role="switch" aria-checked="${compact}" title="shorter home tab"><em>short</em><i></i></button>` : ""}<button class="av" data-act="profile">${esc(mine.emoji)}</button></div></header>
   <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : statsView(mine)}</main>
   <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button><button class="${tab === "garden" ? "act" : ""}" data-act="tab" data-id="garden">🌳<span>garden</span></button></nav>`;
   if (tab === "garden") mountGarden();
