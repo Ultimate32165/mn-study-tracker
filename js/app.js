@@ -1,5 +1,6 @@
 import * as DB from "./db.js";
 import { drawCard } from "./card.js";
+import { forestMain, forestAct, forestGrow, forestCost } from "./forest.js";
 import { SIGNUP_CODE } from "./firebase-config.js";
 
 const $ = s => document.querySelector(s), app = $("#app"), modal = $("#modal");
@@ -455,7 +456,7 @@ const seedsEarned = u => Math.floor(totalOf(u) / SEED_SEC) + (u.bonus || 0) - (u
 const upgradeD = d => d.v === 2 ? d : { ...d, v: 2, x: (d.x * 340 + 225) / WW, y: (d.y * 408 + 198) / WH };
 const decorOf = u => (Array.isArray(u.decor) ? u.decor : []).filter(d => d && ITEMS[d.i] && typeof d.k === "string" && Number.isFinite(d.x) && Number.isFinite(d.y)).slice(0, MAX_DECOR).map(upgradeD);
 const decorNow = u => G.edit && G.work && u.id === me?.uid ? G.work : decorOf(u); // while decorating, your own list is the unsaved working copy
-const seedsLeft = u => Math.max(0, seedsEarned(u) - decorNow(u).reduce((a, d) => a + ITEMS[d.i].price, 0)); // spent seeds are simply the price of everything placed
+const seedsLeft = u => Math.max(0, seedsEarned(u) - decorNow(u).reduce((a, d) => a + ITEMS[d.i].price, 0) - forestCost(u)); // spent seeds (decorations + trees) are simply the price of everything placed
 const clampX = x => Math.min(.96, Math.max(.04, x)), clampY = y => Math.min(.95, Math.max(.38, y));
 const okSpot = (id, x, y) => ITEMS[id].water ? inPond(x, y) : !inPond(x, y - .02); // lily pads only on the pond, everything else on the grass
 let seedBase = -1, visits = [];
@@ -977,8 +978,8 @@ function render() {
     syncGarden(); return;
   }
   app.innerHTML = `<header><h1>MN study tracker</h1><div class="hr">${tab === "home" ? `<button class="mtog ${compact ? "on" : ""}" data-act="compact" data-id="${compact ? 0 : 1}" role="switch" aria-checked="${compact}" title="shorter home tab"><em>short</em><i></i></button>` : ""}<button class="av" data-act="profile">${esc(mine.emoji)}</button></div></header>
-  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : statsView(mine)}</main>
-  <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button><button class="${tab === "garden" ? "act" : ""}" data-act="tab" data-id="garden">🌳<span>garden</span></button></nav>`;
+  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine)) : statsView(mine)}</main>
+  <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button><button class="${tab === "garden" ? "act" : ""}" data-act="tab" data-id="garden">🌳<span>garden</span></button><button class="${tab === "forest" ? "act" : ""}" data-act="tab" data-id="forest">🌲<span>forest</span></button></nav>`;
   if (tab === "garden") mountGarden();
   tick();
 }
@@ -1009,7 +1010,7 @@ function watch() { // runs every second for the logged-in user
     const b = BADGES.find(x => x[0] === id); burst(); setTimeout(() => toast(`Badge unlocked: ${b[1]} ${b[2]}!`), 1800);
   });
   if (sNodes && m.status !== "studying") { stopSound(); render(); }
-  checkUnlocks(m); checkEvolve(m); checkSeeds(m);
+  checkUnlocks(m); checkEvolve(m); checkSeeds(m); forestGrow(m, totalOf(m), toast);
   const cl = couple().lv, seen = ls("lvl");
   if (seen == null) ls("lvl", cl); else if (cl > +seen) { ls("lvl", cl); burst(); const ms = { type: "level", lv: cl, at: Date.now() }; saveMs(ms); setTimeout(() => milestonePop(ms), 1800); }
 }
@@ -1106,6 +1107,7 @@ app.onclick = async e => {
     else if (a === "gpet") gardenTap(id);
     else if (a === "gchoose") gardenSheet(mine);
     else if (a === "gshop") shopSheet(mine);
+    else if (a === "fcell") forestAct(+id, { u: mine, total: totalOf(mine), left: seedsLeft(mine), modal, toast, err: errMsg, fmt, save: t => DB.saveForest(me.uid, t) });
     else if (a === "gedit") enterEdit(mine);
     else if (a === "gdone") await exitEdit(true);
     else if (a === "gcancel") await exitEdit(false);

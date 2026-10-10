@@ -502,3 +502,15 @@ h2.fold.shut .fbtn i{transform:rotate(-90deg)}
 [data-motion=off] .petrow.sleepy::after,
 [data-motion=off] .pe,
 [data-motion=off] .evo .ar{animation:none!important}
+
+/* ---- forest tab (isometric blocks, all colours come from the theme) ---- */
+.forest{margin-top:8px;border-radius:var(--r);border:2px solid var(--edge);background:linear-gradient(180deg,var(--glow1),var(--bg1) 85%);box-shadow:var(--sh-s);overflow:hidden}
+.forest svg{display:block;width:100%;height:auto}
+.fl{fill:var(--c)}.ft{fill:color-mix(in srgb,var(--c) 66%,#fff)}.fr{fill:color-mix(in srgb,var(--c) 76%,#000)}
+.fcell{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fcell.e:hover .ft,.fcell.e:active .ft{fill:color-mix(in srgb,var(--c) 40%,#fff)}
+.fpanel .seedbar{margin-top:12px}
+.fsp{height:72px;display:flex;justify-content:center}.fsp svg{height:100%;width:auto}
+.fprev{display:flex;justify-content:center}.fprev svg{height:150px;width:auto}
+.fbar{height:12px;border-radius:99px;background:var(--tint);border:2px solid var(--edge);overflow:hidden;margin:10px 0}
+.fbar i{display:block;height:100%;background:linear-gradient(90deg,var(--main-l),var(--main));border-radius:99px}
