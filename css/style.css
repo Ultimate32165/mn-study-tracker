@@ -412,43 +412,39 @@ font-family:var(--hf);color:var(--ink);background:var(--sheet);border:2px solid 
 
 /* ===== photocard sheet ===== */
 .cardsheet{max-width:440px}
-.seg{display:flex;gap:8px;margin:10px 0 4px}
-.seg button{flex:1;padding:10px 6px;border-radius:16px;border:2px solid var(--edge);background:var(--card);color:var(--ink);font-family:var(--hf);font-size:.88rem;box-shadow:var(--sh-s)}
-.seg button.sel{border-color:var(--main);background:var(--tint);color:var(--main-d)}
-.seg button:active{transform:scale(.96)}
-select#csel{width:100%;padding:12px 16px;margin-top:10px;border-radius:18px;border:2px solid var(--edge);background:var(--card);color:var(--ink);font:inherit;color-scheme:light dark}
-.cprev{position:relative;margin-top:12px;min-height:120px;display:grid;place-items:center}
-.cprev img{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:18px;box-shadow:var(--sh-s)}
-.cprev img:not([src]){display:none}
-.cload{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--hf);color:var(--soft);background:var(--tint);border-radius:18px}
-.cload[hidden]{display:none}
-select#cfr{width:100%;padding:12px 16px;margin-top:10px;border-radius:18px;border:2px solid var(--edge);background:var(--card);color:var(--ink);font:inherit;color-scheme:light dark}
 
-/* ===== cards for you (inbox), recap + milestone cards ===== */
-h2 .chip+.chip{margin-left:6px}
-.gifts{display:flex;gap:10px;overflow-x:auto;padding:6px 4px 12px;scrollbar-width:none}
-.gifts::-webkit-scrollbar{display:none}
-.gift{position:relative;flex:none;width:112px;background:var(--card);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur));border:2px solid var(--edge);border-radius:20px;padding:6px 6px 8px;box-shadow:var(--sh-s);color:var(--ink);text-align:center}
-.gift img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;object-position:top;border-radius:14px;background:var(--tint)}
-.gift span{display:block;margin-top:5px;font-family:var(--hf);font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gift.new{border-color:var(--main)}
-.gift.new::after{content:"";position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:var(--main);border:3px solid var(--card)}
-.gift:active{transform:scale(.96)}
-.popc .chip{display:block;margin:14px auto 0}
-.seg[hidden]{display:none}
-.cardsheet .seg button{font-size:.78rem;padding:10px 2px}
-#csend{margin-top:12px}
-#csend:disabled{opacity:.5}
-
-/* collapsible sections + shorter home tab */
-h2.fold .fb{display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
-h2.fold .fb i{font-style:normal;display:inline-block;transition:transform .2s;font-size:.9em;color:var(--soft)}
-h2.fold.shut .fb i{transform:rotate(-90deg)}
-.seg{display:flex;justify-content:flex-end;gap:0;margin:2px 4px 10px}
-.seg button{padding:6px 14px;font-family:var(--hf);font-weight:600;font-size:.8rem;color:var(--soft);background:var(--card);border:2px solid var(--edge);backdrop-filter:blur(var(--blur))}
-.seg button:first-child{border-radius:999px 0 0 999px;border-right-width:1px}.seg button:last-child{border-radius:0 999px 999px 0;border-left-width:1px}
-.seg button.sel{color:#fff;background:linear-gradient(145deg,var(--main-l),var(--main));border-color:transparent}
-.card.sum{display:flex;align-items:center;gap:10px;padding:9px 14px}
-.card.sum .ring .av{font-size:1.05rem}
-.card.sum .sl{flex:1;color:var(--soft);font-size:.85rem}.card.sum .sl b{color:var(--ink);font-family:var(--hf);font-size:1rem}.card.sum .sl small{color:var(--soft)}
-.card.sum .ss{font-family:var(--hf);font-weight:600}
+/* small header toggle for the shorter home tab */
+.hr{display:flex;align-items:center;gap:12px}
+.sw{display:flex;align-items:center;gap:5px;background:none;border:0;padding:8px 2px;color:var(--soft);font-family:var(--hf);font-size:.62rem;font-weight:600}
+.sw em{font-style:normal}
+.sw i{width:25px;height:14px;border-radius:99px;background:color-mix(in srgb,var(--soft) 35%,transparent);position:relative;transition:background .2s}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0003;transition:left .2s}
+.sw.on i{background:var(--main)}.sw.on i::after{left:13px}
+/* shorter home tab: you + friend as square tiles */
+.sq{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.tile{aspect-ratio:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 8px;text-align:center;background:var(--card);backdrop-filter:blur(var(--blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);border:2px solid var(--edge);border-radius:var(--r);box-shadow:var(--sh)}
+.tile.on{box-shadow:var(--sh-on);background:var(--on-bg)}
+.tile .tn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.95rem}
+.tile .clock{font-size:1.45rem;line-height:1.1}.tile .clock.idle{color:var(--ink)}
+.tile.brk .clock,.tile.brk .pill{color:var(--alt)}.tile.brk .pill{font-weight:700}
+.tile small{color:var(--soft);font-size:.7rem;font-weight:600}
+.tcheer{display:flex;gap:6px;margin-top:2px}.tcheer button{background:var(--tint);border-radius:999px;padding:3px 10px;font-size:1.05rem}.tcheer button:active{transform:scale(1.3) rotate(-8deg)}
+/* compact settings sheet */
+.sheet.prof{padding:16px 16px calc(18px + env(safe-area-inset-bottom))}
+.sheet.prof h3{font-size:1.15rem}
+.sheet.prof input{padding:10px 14px;margin-top:6px}
+.sheet.prof .emojis{gap:6px;margin:6px 0}
+.sheet.prof .av{width:36px;height:36px;font-size:1.2rem}
+.sheet.prof .opts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0 2px}
+.sheet.prof .opts .btn.ghost{margin:0;padding:9px 8px;font-size:.8rem;border-radius:16px;line-height:1.25}
+.sheet.prof .hint{font-size:.75rem;margin:6px 0 0}
+.sheet.prof .btn{padding:11px}.sheet.prof .row{margin-top:8px}.sheet.prof .row .btn{margin-top:0}
+.sheet.prof .link{margin-top:8px}
+/* compact garden panel */
+#gpanel .gtop{display:flex;align-items:center;gap:8px;margin-top:10px}
+#gpanel .gtop .seedbar{margin:0;flex:1;padding:6px 12px}
+#gpanel .gtop .chip{flex:none;padding:6px 12px;font-size:.78rem}
+#gpanel .gbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+#gpanel .gbtns.one{grid-template-columns:1fr}
+#gpanel .gbtns .btn{margin:0;padding:10px 8px;font-size:.9rem}
+#gpanel .hint{font-size:.78rem;margin:8px 0 4px}

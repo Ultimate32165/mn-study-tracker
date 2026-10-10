@@ -103,12 +103,17 @@ function homeView(mine) {
        <button class="study stop" data-act="stop">stop<span>⏹️</span></button></div><div class="chips"><button class="chip" data-act="sound">${soundLabel()}</button></div><button class="link" data-act="discard">cancel without saving</button></div>`
     : `<div class="hero"><button class="study" data-act="study">study<span>📖</span></button><p class="hint">tap when you start ✨</p><div class="chips"><button class="chip" data-act="pomo">🍅 pomodoro: ${pomo ? `on (${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5})` : "off"}</button><button class="chip" data-act="sound">${soundLabel()}</button></div></div>`;
   const others = users.filter(u => u.id !== me.uid).sort((a, b) => (b.status === "studying") - (a.status === "studying"));
-  const g = goalOf(mine), lt = liveToday(mine), pr = g ? Math.min(100, lt / g * 100) : 0;
-  const mineCard = compact && (on || br)
-    ? `<div class="card sum ${on ? "on" : ""} ${br ? "brk" : ""}"><span class="ring ${!g ? "off" : pr >= 100 ? "done" : ""}" style="--p:${pr};--sz:40px"><span class="av">${esc(mine.emoji)}</span></span><b>you</b><span class="sl">today <b>${fmt(lt)}</b>${g ? `<small> / ${fmt(g)}</small>` : ""}</span><span class="ss">${stats(mine).streak}🔥</span></div>`
-    : card(mine, true);
-  const tog = `<div class="seg" role="group" aria-label="home layout"><button class="${compact ? "" : "sel"}" data-act="compact" data-id="0">normal</button><button class="${compact ? "sel" : ""}" data-act="compact" data-id="1">shorter</button></div>`;
-  return `${tog}${hero}${installCard()}${coupleCard()}<h2>you</h2>${mineCard}<h2>${others.length ? `friends <button class="chip" data-act="card" data-id="together">📸 photocard</button>` : "no friends yet"}</h2>
+  const tile = (u, isMe) => {
+    const s = stats(u), on = u.status === "studying", br = u.status === "paused", g = goalOf(u), lt = liveToday(u), p = g ? Math.min(100, lt / g * 100) : 0;
+    return `<div class="tile ${on ? "on" : ""} ${br ? "brk" : ""}"><span class="ring ${!g ? "off" : p >= 100 ? "done" : ""}" style="--p:${p};--sz:52px"><span class="av">${esc(u.emoji)}</span></span>
+    <b class="tn">${esc(u.name)}${isMe ? " (you)" : ""}</b><span class="pill ${on ? "live" : ""}">${on ? "studying ✏️" : br ? "on a break ☕" : "resting 💤"}</span>
+    ${on || br ? `<div class="clock" ${live(u)}>00:00:00</div>` : `<div class="clock idle">${fmt(lt)}</div>`}
+    <small>${on || br ? `today ${fmt(lt)}` : "today"}${g ? ` / ${fmt(g)}` : ""}</small><small>${s.streak}🔥 · ${fmt(s.week)} this week</small>
+    ${!isMe && on ? `<div class="tcheer"><button data-act="cheer" data-id="${u.id}" data-e="💖">💖</button><button data-act="cheer" data-id="${u.id}" data-e="🔥">🔥</button><button data-act="stickers" data-id="${u.id}">💌</button></div>` : ""}</div>`;
+  };
+  if (compact) return `${hero}${installCard()}${coupleCard()}<h2>${others.length ? `together <button class="chip" data-act="card" data-id="together">📸 photocard</button>` : "you"}</h2>
+  <div class="sq">${[tile(mine, true), ...others.map(u => tile(u, false))].join("")}</div>${others.length ? "" : `<p class="hint">Ask your friend to create an account — they'll show up here!</p>`}${giftsView()}`;
+  return `${hero}${installCard()}${coupleCard()}<h2>you</h2>${card(mine, true)}<h2>${others.length ? `friends <button class="chip" data-act="card" data-id="together">📸 photocard</button>` : "no friends yet"}</h2>
   ${others.map(u => card(u, false)).join("") || `<p class="hint">Ask your friend to create an account — they'll show up here!</p>`}${giftsView()}`;
 }
 // ---- cozy sounds (generated with the Web Audio API, no files needed) ----
@@ -459,15 +464,13 @@ function gardenPanel() {
   const w = G.wxMode === "auto" ? G.wxAuto : G.wxMode, wl = G.wxMode === "auto" ? `random ${WXL[w][0]}` : `${WXL[w][0]} ${WXL[w][1]}`;
   if (G.edit) {
     const sel = (G.work || []).find(d => d.k === G.sel);
-    return `<div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds left</div><p class="hint">${sel ? "drag it where you like ✋ (near the edge scrolls) · tap it again to unselect" : "drag your things to move them · drag the ground to look around"}</p>
-    ${sel ? `<button class="btn ghost" data-act="gdel">🗑️ remove ${ITEMS[sel.i].n} (+${ITEMS[sel.i].price} 🌱)</button>` : ""}<button class="btn ghost" data-act="gshop">🛍️ shop</button>
-    <div class="row"><button class="btn ghost" data-act="gcancel">cancel</button><button class="btn" data-act="gdone">done 💖</button></div>`;
+    return `<div class="gtop"><div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds left</div></div><p class="hint">${sel ? "drag it where you like ✋ · tap it again to unselect" : "drag your things to move them · drag the ground to look around"}</p>
+    <div class="gbtns ${sel ? "" : "one"}"><button class="btn ghost" data-act="gshop">🛍️ shop</button>${sel ? `<button class="btn ghost" data-act="gdel">🗑️ remove ${ITEMS[sel.i].n} (+${ITEMS[sel.i].price} 🌱)</button>` : ""}</div>
+    <div class="gbtns"><button class="btn ghost" data-act="gcancel">cancel</button><button class="btn" data-act="gdone">done 💖</button></div>`;
   }
-  return `<div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds</div>
-  <div class="row"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button></div>
-  <button class="btn ghost" data-act="gchoose">🐾 choose my garden pets</button>
-  <button class="btn ghost" data-act="card">📸 make a photocard</button>
-  <div class="wxrow"><button class="chip" data-act="gwx">🌦️ weather: ${wl}</button></div><p class="hint">drag the garden to look around ✋ · tap a pet to say hi 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
+  return `<div class="gtop"><div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds</div><button class="chip" data-act="gwx">🌦️ ${wl}</button></div>
+  <div class="gbtns"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button><button class="btn ghost" data-act="gchoose">🐾 garden pets</button><button class="btn ghost" data-act="card">📸 photocard</button></div>
+  <p class="hint">drag the garden to look around ✋ · tap a pet to say hi 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
 }
 function enterEdit(m) {
   G.edit = true; G.work = decorOf(m).map(d => ({ ...d })); G.sel = null;
@@ -962,7 +965,7 @@ function render() {
     const gp = $("#gpanel"); if (gp) gp.innerHTML = gardenPanel();
     syncGarden(); return;
   }
-  app.innerHTML = `<header><h1>MN study tracker</h1><button class="av" data-act="profile">${esc(mine.emoji)}</button></header>
+  app.innerHTML = `<header><h1>MN study tracker</h1><div class="hr">${tab === "home" ? `<button class="sw ${compact ? "on" : ""}" data-act="compact" data-id="${compact ? 0 : 1}" role="switch" aria-checked="${compact}" title="shorter home tab"><em>short</em><i></i></button>` : ""}<button class="av" data-act="profile">${esc(mine.emoji)}</button></div></header>
   <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : statsView(mine)}</main>
   <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button><button class="${tab === "garden" ? "act" : ""}" data-act="tab" data-id="garden">🌳<span>garden</span></button></nav>`;
   if (tab === "garden") mountGarden();
@@ -1034,13 +1037,14 @@ function sheet({ title, note = "", secs = 0, max, date, onSave }) { // max = cap
   };
 }
 function profileSheet(mine) {
-  modal.innerHTML = `<div class="back"><div class="sheet"><h3>your profile</h3><input id="pn" value="${esc(mine.name)}" maxlength="20">
+  modal.innerHTML = `<div class="back"><div class="sheet prof"><h3>your profile</h3><input id="pn" value="${esc(mine.name)}" maxlength="20">
   <div class="emojis">${EMOJI.map(e => `<button class="av ${e === mine.emoji ? "sel" : ""}" data-e="${e}">${e}</button>`).join("")}</div>
-  <button class="btn ghost" id="gl">🎯 daily goal: ${goalOf(mine) ? fmt(goalOf(mine)) : "off"}</button>
-  <button class="btn ghost" id="lm">⏰ still-studying check: ${limitOf(mine) ? "after " + fmt(limitOf(mine)) : "off"}</button>
+  <div class="opts"><button class="btn ghost" id="gl">🎯 daily goal: ${goalOf(mine) ? fmt(goalOf(mine)) : "off"}</button>
+  <button class="btn ghost" id="lm">⏰ still-studying: ${limitOf(mine) ? "after " + fmt(limitOf(mine)) : "off"}</button>
   <button class="btn ghost" id="pt">${PETS[petOf(mine)].e[2]} pet: ${petOf(mine)}</button>
-  <button class="btn ghost" id="pm">🍅 pomodoro: ${mine.pomoFocus ?? 25} min focus / ${mine.pomoRest ?? 5} min break</button>
-  <button class="btn ghost" id="nt">🔔 turn on notifications</button><p class="hint">cute themes</p><div class="emojis">${themeBtns(["auto", ...CUTE])}</div><p class="hint">dark themes 🌙</p><div class="emojis">${themeBtns(DARK)}</div><p class="hint">seasons 🍃 (first four light, last four dark)</p><div class="emojis">${themeBtns(SEASON)}</div><p class="hint">glass themes ✨</p><div class="emojis">${themeBtns(GLASS)}</div>
+  <button class="btn ghost" id="pm">🍅 pomodoro: ${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5} min</button>
+  <button class="btn ghost" id="nt">🔔 notifications</button></div>
+  <p class="hint">cute themes</p><div class="emojis">${themeBtns(["auto", ...CUTE])}</div><p class="hint">dark themes 🌙</p><div class="emojis">${themeBtns(DARK)}</div><p class="hint">seasons 🍃 · light, then dark</p><div class="emojis">${themeBtns(SEASON)}</div><p class="hint">glass themes ✨</p><div class="emojis">${themeBtns(GLASS)}</div>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
   $("#gl").onclick = () => sheet({ title: "daily goal 🎯", note: "How long do you want to study each day? 00:00 turns it off.", secs: goalOf(mine), onSave: sec => DB.updateProfile(me.uid, { goal: sec }) });
