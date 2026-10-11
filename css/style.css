@@ -547,3 +547,67 @@ h2.fold.shut .fbtn i{transform:rotate(-90deg)}
 .swat{display:flex;gap:12px;justify-content:center;margin:12px 0}
 .swat button{width:34px;height:34px;border-radius:50%;background:var(--c);border:3px solid var(--card);box-shadow:var(--sh-s)}
 .swat .sel{outline:3px solid var(--ink)}
+/* ---- board: styles, stickers, cute faces, more colours ---- */
+.bhead{display:flex;align-items:center;justify-content:space-between;gap:10px}.bhead .chip{flex:none}
+.bpick{display:flex;gap:8px;overflow-x:auto;padding:8px 3px 5px;scrollbar-width:none}.bpick::-webkit-scrollbar{display:none}
+.bpick button{flex:none;width:28px;height:28px;border-radius:50%;background:var(--c,var(--tint));border:3px solid var(--card);box-shadow:var(--sh-s);font-size:.95rem;line-height:1;display:grid;place-items:center;padding:0;color:var(--ink)}
+.bpick.stk button{background:var(--card);width:32px;height:32px;font-size:1.1rem}
+.bpick .sel{outline:3px solid var(--ink)}
+.swat.wrap{flex-wrap:wrap;gap:8px}.swat.wrap button{width:30px;height:30px}
+.stks{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0}
+.stks button{width:36px;height:36px;border-radius:12px;border:2px solid var(--edge);background:var(--card);font-size:1.15rem;padding:0;color:var(--ink)}.stks .sel{border-color:var(--main);outline:2px solid var(--main)}
+.bsty{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.bsty button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;border-radius:16px;background:var(--card);border:2px solid var(--edge);color:var(--ink);font:inherit;font-size:.78rem}
+.bsty button span{font-size:1.5rem}.bsty .sel{border-color:var(--main);background:color-mix(in srgb,var(--main) 14%,var(--card))}
+.bpat{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.bpat button{padding:6px 12px;border-radius:99px;border:2px solid var(--edge);background:var(--card);color:var(--ink);font:inherit;font-size:.8rem}.bpat .sel{border-color:var(--main);background:color-mix(in srgb,var(--main) 18%,var(--card))}
+.tgl{display:flex;gap:8px;align-items:center;margin:12px 0 4px;font-size:.9rem}
+
+/* cute notes: washi tape, little faces, stickers */
+.bd{--f0:"• ᴗ •";--f1:"> ᴗ <";--f2:"^ ᴗ ^"}
+.bd .note{border-radius:18px;padding:13px 14px 8px;min-width:84px}
+.bd .note::before{content:"";position:absolute;left:50%;top:-8px;width:40px;height:14px;margin-left:-20px;transform:rotate(-4deg);background:repeating-linear-gradient(45deg,#fff8 0 4px,#fff3 4px 8px),color-mix(in srgb,var(--c) 75%,#fff);border-radius:3px;opacity:.9;box-shadow:0 1px 2px #0002}
+.bd .note::after{display:block;text-align:right;font-size:.68rem;opacity:.55;margin-top:3px;letter-spacing:.06em;font-weight:700}
+.bd .note[data-l="0"]::after{content:var(--f0)}.bd .note[data-l="1"]::after{content:var(--f1)}.bd .note[data-l="2"]::after{content:var(--f2)}
+.bd.nofaces .note::after,.bd .note.ph::before,.bd .note.ph::after{display:none}
+.bd .stk{position:absolute;left:-8px;bottom:-9px;font-size:1.3rem;line-height:1;transform:rotate(-12deg);filter:drop-shadow(0 2px 2px #0003)}
+.bd .lane.over{filter:brightness(1.08)}
+
+/* 🤠 western: wooden planks, nailed-up parchment notices */
+.s-western{--f0:"★";--f1:"★★";--f2:"★★★"}
+.s-western .lane{position:relative;background:repeating-linear-gradient(180deg,#b07a43 0 26px,#8f5e2f 26px 28px);border:5px solid #5a3818;border-radius:10px;box-shadow:inset 0 0 0 2px #0002,0 4px 0 #3b2410}
+.s-western .lane::before,.s-western .lane::after{content:"";position:absolute;top:6px;width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ddd,#555);box-shadow:0 1px 1px #0008}
+.s-western .lane::before{left:6px}.s-western .lane::after{right:6px}
+.s-western .lane.over{border-color:#f0c35a}
+.s-western .lane h4{padding:0 12px;font-family:"Rye",var(--hf),serif;color:#fbe9b7;text-shadow:0 2px 0 #3b2410;letter-spacing:.04em;text-transform:uppercase;font-size:.88rem}
+.s-western .lane h4 em{background:#5a3818;color:#fbe9b7}
+.s-western .lbox:empty::before{color:#fbe9b7;opacity:.8}
+.s-western .note{background:color-mix(in srgb,var(--c) 24%,#f4e4bb);border:0;border-left:7px solid var(--c);border-radius:3px;color:#4a2f14;font-family:"Special Elite","Courier New",monospace;font-size:.88rem;box-shadow:2px 4px 0 #0004;outline:1px dashed #8b5a2b88;outline-offset:-5px;padding:17px 14px 8px}
+.s-western .note::before{top:4px;width:11px;height:11px;margin-left:-5px;transform:none;border-radius:50%;background:radial-gradient(circle at 35% 30%,#eee,#6b6b6b 70%);box-shadow:0 1px 2px #0007;opacity:1}
+
+/* 📌 cork board: pins */
+.s-cork .lane{background:radial-gradient(#0003 1px,transparent 1.6px) 0 0/11px 11px,radial-gradient(#fff3 1px,transparent 1.6px) 5px 6px/11px 11px,#c99a62;border:6px solid #8a5a2b;border-radius:14px;box-shadow:inset 0 2px 6px #0004,0 4px 0 #5a3818}
+.s-cork .lane.over{border-color:#d9a24a}
+.s-cork .lane h4{color:#4a2f14}.s-cork .lane h4 em{background:#f5e5c8;color:#6b4a28}.s-cork .lbox:empty::before{color:#6b4a28}
+.s-cork .note{background:color-mix(in srgb,var(--c) 18%,#fffdf6);border:1px solid color-mix(in srgb,var(--c) 40%,#e8dcc4);border-radius:4px;color:#3d3326;box-shadow:1px 3px 5px #0004;padding:15px 14px 8px}
+.s-cork .note::before{top:-6px;width:15px;height:15px;margin-left:-7px;transform:none;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff9,transparent 40%),var(--c);box-shadow:0 3px 3px #0005,inset 0 -2px 2px #0003;opacity:1}
+
+/* 🖍️ chalkboard: magnets and chalk */
+.s-chalk .lane{background:#2d3d38;border:5px solid #b98d5a;border-radius:10px;box-shadow:inset 0 0 22px #0006,0 4px 0 #6d4a26}
+.s-chalk .lane.over{border-color:#f3d28c}
+.s-chalk .lane h4{color:#f2f2e8;text-shadow:0 0 1px #fff8}.s-chalk .lane h4 em{background:#ffffff22;color:#e8e8dc}.s-chalk .lbox:empty::before{color:#e8e8dc;opacity:.55}
+.s-chalk .note{background:color-mix(in srgb,var(--c) 80%,#fff);border:2px dashed #fffc;border-radius:12px;color:#24302c;font-weight:700;box-shadow:0 3px 0 #0005}
+.s-chalk .note::before{top:-7px;width:13px;height:13px;margin-left:-6px;transform:none;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#9a9a9a);box-shadow:0 2px 2px #0006;opacity:1}
+
+/* 📓 notebook: lined paper, binder holes, washi tape */
+.s-notebook .lane{padding-left:50px;background:linear-gradient(90deg,transparent 38px,#ff8a8a99 38px 40px,transparent 40px),radial-gradient(circle at 15px 50%,#d6dbe0 6px,transparent 7px) 0 0/30px 64px repeat-y,repeating-linear-gradient(180deg,#fffdf5 0 27px,#a9cdee 27px 28px);border:2px solid #d9d2c0;border-radius:6px 18px 18px 6px;box-shadow:0 3px 0 #cfc7b2}
+.s-notebook .lane.over{border-color:var(--main)}
+.s-notebook .lane h4{color:#4a4458}.s-notebook .lane h4 em{background:#eef3f8;color:#6b6578}.s-notebook .lbox:empty::before{color:#8a8498}
+.s-notebook .note{background:color-mix(in srgb,var(--c) 38%,#fff);border:1px solid color-mix(in srgb,var(--c) 60%,#fff);border-radius:4px 14px 4px 14px;color:#4a4458;box-shadow:1px 2px 0 #0002}
+
+/* ✨ my own: pick a colour and a pattern */
+.s-own .lane{background-color:color-mix(in srgb,var(--bgc) 38%,var(--card));border:2px dashed color-mix(in srgb,var(--bgc) 70%,var(--card))}
+.s-own.p-dots .lane{background-image:radial-gradient(color-mix(in srgb,var(--bgc) 60%,#fff) 2px,transparent 2.6px);background-size:16px 16px}
+.s-own.p-grid .lane{background-image:linear-gradient(color-mix(in srgb,var(--bgc) 55%,#fff) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--bgc) 55%,#fff) 1px,transparent 1px);background-size:20px 20px}
+.s-own.p-lines .lane{background-image:repeating-linear-gradient(180deg,transparent 0 23px,color-mix(in srgb,var(--bgc) 65%,#fff) 23px 24px)}
+.s-own.p-stripes .lane{background-image:repeating-linear-gradient(45deg,color-mix(in srgb,var(--bgc) 30%,transparent) 0 10px,transparent 10px 20px)}

@@ -1,6 +1,6 @@
 import * as DB from "./db.js";
 import { drawCard } from "./card.js";
-import { boardMain, initBoard, boardBusy, boardSheet, boardKeep, boardRestore, nextOrder } from "./board.js";
+import { boardMain, initBoard, boardBusy, boardSheet, boardStyleSheet, boardDraft, boardKeep, boardRestore, nextOrder } from "./board.js";
 import { forestMain, forestAct, forestGrow, forestCost, forestSnap, forestOf } from "./forest.js";
 import { SIGNUP_CODE } from "./firebase-config.js";
 
@@ -1111,12 +1111,12 @@ function profileSheet(mine) {
 // ---- shared to-do board (js/board.js) ----
 async function addBoardNote(mine) {
   const i = $("#bnew"), text = (i ? i.value : "").trim().slice(0, 140); if (!text || !mine) return i && i.focus();
-  i.value = "";
-  try { await DB.addNote(me.uid, mine.name, mine.emoji, text, 0, nextOrder(board, 0), Math.floor(Math.random() * 5)); } catch (e) { i.value = text; toast(errMsg(e)); }
+  i.value = ""; const dr = boardDraft();
+  try { await DB.addNote(me.uid, mine.name, mine.emoji, text, 0, nextOrder(board, 0), dr.color, dr.icon); } catch (e) { i.value = text; toast(errMsg(e)); }
 }
 initBoard(app, {
   move: (id, lane, o, laneChanged) => { DB.moveNote(id, lane, o).catch(e => toast(errMsg(e))); if (laneChanged && lane === 2) { burst(["🎉", "✨"], 20); toast("Done! 🎉"); } },
-  tap: id => { const n = board.find(x => x.id === id); if (n) boardSheet(n, { modal, toast, err: errMsg, save: (t, c) => DB.editNote(id, t, c), del: () => DB.deleteNote(id) }); }
+  tap: id => { const n = board.find(x => x.id === id); if (n) boardSheet(n, { modal, toast, err: errMsg, save: (t, c, ic) => DB.editNote(id, t, c, ic), del: () => DB.deleteNote(id) }); }
 });
 app.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "bnew") { e.preventDefault(); addBoardNote(users.find(u => u.id === (me && me.uid))); } });
 
@@ -1144,6 +1144,7 @@ app.onclick = async e => {
     else if (a === "gpet") gardenTap(id);
     else if (a === "gchoose") gardenSheet(mine);
     else if (a === "gshop") shopSheet(mine);
+    else if (a === "bstyle") boardStyleSheet({ modal, rerender: render });
     else if (a === "badd") addBoardNote(mine);
     else if (a === "bclear") { const ids = board.filter(n => n.lane === 2).map(n => n.id); if (ids.length && confirm(`Clear ${ids.length} finished note${ids.length > 1 ? "s" : ""}?`)) await DB.clearNotes(ids); }
     else if (a === "fcell") forestAct(+id, { u: mine, total: totalOf(mine), left: seedsLeft(mine), modal, toast, err: errMsg, fmt, burst, save: t => DB.saveForest(me.uid, t) });
