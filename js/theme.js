@@ -52,8 +52,11 @@ let calm = ls("motion") === "off"; // "reduce motion": turns off the endless bob
 const applyMotion = () => { document.documentElement.dataset.motion = calm ? "off" : "on"; };
 applyMotion();
 const setTheme = t => { theme = t; applyTheme(t); };
-const setLook = s => { // "bg:dots", "hue:215", ... or "reset"
-  if (s === "reset") look = { ...DEF }; else { const [k, v] = s.split(":"); look[k] = k === "hue" || k === "acc" ? +v : v; }
+const setLook = s => { // "bg:dots", "hue:215", ... , "random" or "reset"
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  if (s === "reset") look = { ...DEF };
+  else if (s === "random") look = { bg: pick(LOOK.bg)[0], round: pick(LOOK.round)[0], shadow: pick(LOOK.shadow)[0], hue: pick(HUES), acc: Math.floor(Math.random() * ACCENTS.length) };
+  else { const [k, v] = s.split(":"); look[k] = k === "hue" || k === "acc" ? +v : v; }
   try { localStorage.setItem("look", JSON.stringify(look)); } catch {}
   applyTheme(theme);
 };

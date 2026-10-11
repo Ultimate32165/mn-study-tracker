@@ -53,7 +53,7 @@ function profileSheet(mine) {
   <div class="crow"><b>accent colour</b><div class="cacc">${dotBtns("acc")}</div></div>
   <div class="crow"><b>corners</b><div class="seg wrap">${lookBtns("round")}</div></div>
   <div class="crow"><b>shadows</b><div class="seg wrap">${lookBtns("shadow")}</div></div>
-  <div class="crow"><button class="btn ghost" data-look="reset">↺ back to the theme's own look</button></div></details>
+  <div class="crow"><button class="btn ghost" data-look="random">🎲 surprise me</button><button class="btn ghost" data-look="reset">↺ back to the theme's own look</button></div></details>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
   $("#gl").onclick = () => sheet({ title: "daily goal 🎯", note: "How long do you want to study each day? 00:00 turns it off.", secs: goalOf(mine), onSave: sec => DB.updateProfile(me.uid, { goal: sec }) });
