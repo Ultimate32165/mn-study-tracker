@@ -57,6 +57,18 @@ body::before{width:300px;height:300px;left:-90px;top:-60px;background:var(--b1)}
 body::after{width:340px;height:340px;right:-110px;bottom:8%;background:var(--b2);animation-delay:-6s}
 #app::before{content:"";position:fixed;z-index:-1;width:220px;height:220px;left:45%;top:38%;border-radius:50%;background:var(--b3);filter:blur(60px);opacity:.5;pointer-events:none}
 @keyframes drift{to{transform:translate(40px,30px) scale(1.12)}}
+/* extra look (profile sheet > customize theme): theme.js sets data-bg / data-round / data-shadow and some colour variables on <html> */
+html[data-bg=flat] body{background:var(--bg1)}
+html[data-bg=flat] body::before,html[data-bg=flat] body::after,html[data-bg=flat] #app::before{display:none}
+html[data-bg=glow] body{background:radial-gradient(circle at 12% 8%,var(--glow1),transparent 55%),radial-gradient(circle at 92% 88%,var(--glow2),transparent 55%),linear-gradient(160deg,var(--bg1),var(--bg2));background-attachment:fixed}
+html[data-bg=dots] body{background-image:radial-gradient(color-mix(in srgb,var(--main) 30%,transparent) 2px,transparent 2.5px),linear-gradient(160deg,var(--bg1),var(--bg2));background-size:22px 22px,auto}
+html[data-bg=grid] body{background-image:linear-gradient(color-mix(in srgb,var(--main) 16%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--main) 16%,transparent) 1px,transparent 1px),linear-gradient(160deg,var(--bg1),var(--bg2));background-size:26px 26px,26px 26px,auto}
+html[data-bg=stripes] body{background-image:repeating-linear-gradient(45deg,color-mix(in srgb,var(--main) 11%,transparent) 0 14px,transparent 14px 28px),linear-gradient(160deg,var(--bg1),var(--bg2))}
+html[data-bg=checks] body{background-image:conic-gradient(color-mix(in srgb,var(--main) 11%,transparent) 25%,transparent 0 50%,color-mix(in srgb,var(--main) 11%,transparent) 0 75%,transparent 0),linear-gradient(160deg,var(--bg1),var(--bg2));background-size:44px 44px,auto}
+html[data-round=sharp]{--r:12px}
+html[data-round=pill]{--r:40px}
+html[data-shadow=soft]{--sh:0 10px 26px color-mix(in srgb,var(--ink) 14%,transparent);--sh-s:0 5px 14px color-mix(in srgb,var(--ink) 12%,transparent);--sh-on:0 10px 26px color-mix(in srgb,var(--live) 30%,transparent)}
+html[data-shadow=flat]{--sh:0 0 0 transparent;--sh-s:0 0 0 transparent;--sh-on:0 0 0 transparent}
 h1,h2,h3,.clock,.study,.btn,.pill,.chip,.mini b,.tiles b,nav span{font-family:var(--hf)}
 header{display:flex;justify-content:space-between;align-items:center;padding:calc(14px + env(safe-area-inset-top)) 18px 6px}
 header h1{margin:0;font-size:1.55rem;color:var(--main);letter-spacing:.2px}
@@ -500,6 +512,8 @@ h2.fold.shut .fbtn i{transform:rotate(-90deg)}
 .sheet.prof .hint{font-size:.75rem;margin:6px 0 0}
 .sheet.prof .btn{padding:11px}.sheet.prof .row{margin-top:8px}.sheet.prof .row .btn{margin-top:0}
 .sheet.prof .link{margin-top:8px}
+.sheet.prof .seg{flex-wrap:wrap;gap:6px}.sheet.prof .seg button{flex:1 1 auto;padding:7px 10px;font-size:.8rem;white-space:nowrap}
+.sheet.prof .cacc{flex-wrap:wrap;gap:8px}
 /* compact garden panel */
 #gpanel .gtop{display:flex;align-items:center;gap:8px;margin-top:10px}
 #gpanel .gtop .seedbar{margin:0;flex:1;padding:6px 12px}

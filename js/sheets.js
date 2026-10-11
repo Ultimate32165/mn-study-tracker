@@ -2,7 +2,7 @@
 import * as DB from "./db.js";
 import { PETS, petOf } from "./pets.js";
 import { elapsed, goalOf, limitOf, me } from "./state.js";
-import { CUTE, DARK, GLASS, SEASON, calm, setTheme, themeBtns, toggleCalm } from "./theme.js";
+import { CUTE, DARK, GLASS, SEASON, calm, dotBtns, isLook, lookBtns, setLook, setTheme, themeBtns, toggleCalm } from "./theme.js";
 import { $, EMOJI, errMsg, esc, fmt, key, modal, split, toast } from "./util.js";
 
 function askStill(m) {
@@ -47,6 +47,13 @@ function profileSheet(mine) {
   <button class="btn ghost" id="nt">🔔 notifications</button>
   <button class="btn ghost" id="rm">🍃 reduce motion: ${calm ? "on" : "off"}</button></div>
   <p class="hint">cute themes</p><div class="emojis">${themeBtns(["auto", ...CUTE])}</div><p class="hint">dark themes 🌙</p><div class="emojis">${themeBtns(DARK)}</div><p class="hint">seasons 🍃 · light, then dark</p><div class="emojis">${themeBtns(SEASON)}</div><p class="hint">glass themes ✨</p><div class="emojis">${themeBtns(GLASS)}</div>
+  <details class="cmore"><summary>🎨 customize theme</summary>
+  <div class="crow"><b>background</b><div class="seg wrap">${lookBtns("bg")}</div></div>
+  <div class="crow"><b>background tint</b><div class="cacc">${dotBtns("hue")}</div></div>
+  <div class="crow"><b>accent colour</b><div class="cacc">${dotBtns("acc")}</div></div>
+  <div class="crow"><b>corners</b><div class="seg wrap">${lookBtns("round")}</div></div>
+  <div class="crow"><b>shadows</b><div class="seg wrap">${lookBtns("shadow")}</div></div>
+  <div class="crow"><button class="btn ghost" data-look="reset">↺ back to the theme's own look</button></div></details>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
   $("#gl").onclick = () => sheet({ title: "daily goal 🎯", note: "How long do you want to study each day? 00:00 turns it off.", secs: goalOf(mine), onSave: sec => DB.updateProfile(me.uid, { goal: sec }) });
@@ -66,6 +73,7 @@ function profileSheet(mine) {
   $("#rm").onclick = () => { toggleCalm(); $("#rm").textContent = `🍃 reduce motion: ${calm ? "on" : "off"}`; toast(calm ? "Motion reduced 🍃" : "Motion back on ✨"); };
   $("#nt").onclick = async () => { try { toast((await Notification.requestPermission()) === "granted" ? "Notifications on! 🔔" : "Notifications blocked."); } catch { toast("Install the app to your home screen first."); } };
   modal.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { setTheme(b.dataset.t); modal.querySelectorAll("[data-t]").forEach(x => x.classList.toggle("sel", x === b)); });
+  modal.querySelectorAll("[data-look]").forEach(b => b.onclick = () => { setLook(b.dataset.look); modal.querySelectorAll("[data-look]").forEach(x => x.classList.toggle("sel", isLook(x.dataset.look))); });
   modal.querySelectorAll("[data-e]").forEach(b => b.onclick = () => { em = b.dataset.e; modal.querySelectorAll("[data-e]").forEach(x => x.classList.toggle("sel", x === b)); });
   $("#sx").onclick = () => modal.innerHTML = "";
   $("#lo").onclick = () => { modal.innerHTML = ""; DB.logOut(); };
