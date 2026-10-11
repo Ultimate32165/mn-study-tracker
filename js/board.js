@@ -13,6 +13,7 @@ const STYLES = { // looks for the whole board (saved on this device only); the n
 const PATS = ["plain", "dots", "grid", "lines", "stripes"], KEY = "boardStyle";
 const getStyle = () => { try { const v = JSON.parse(localStorage.getItem(KEY)); if (v && STYLES[v.s]) return { s: v.s, bg: COLORS[v.bg] ? v.bg : 0, pat: PATS.includes(v.pat) ? v.pat : "dots", faces: v.faces !== false }; } catch {} return { s: "cutie", bg: 0, pat: "dots", faces: true }; };
 const setStyle = p => { try { localStorage.setItem(KEY, JSON.stringify({ ...getStyle(), ...p })); } catch {} };
+let palOpen = false; // phone: is the colour & sticker card unfolded? (on a wide screen it is a side bar, always open)
 let draft = { color: -1, icon: "" }; // colour / sticker for the next new note (-1 = surprise me)
 export const boardDraft = () => ({ color: draft.color >= 0 ? draft.color : Math.floor(Math.random() * COLORS.length), icon: draft.icon });
 const col = c => c[0] === "-" ? `var(${c})` : c;
@@ -22,14 +23,17 @@ const valid = n => n && typeof n.text === "string" && [0, 1, 2].includes(n.lane)
 const inLane = (notes, l) => notes.filter(n => valid(n) && n.lane === l).sort((a, b) => (a.o || 0) - (b.o || 0) || ((a.at && a.at.seconds) || 0) - ((b.at && b.at.seconds) || 0));
 export const nextOrder = (notes, l) => inLane(notes, l).reduce((m, n) => Math.max(m, n.o || 0), 0) + 1;
 
+const preview = () => `<b${draft.color >= 0 ? ` style="--c:${col(COLORS[draft.color])}"` : ""}>${draft.color < 0 ? "🎲" : ""}</b>${draft.icon ? `<b>${draft.icon}</b>` : ""}`;
 const note = n => `<div class="note${n.lane === 2 ? " done" : ""}" data-id="${esc(n.id)}" data-o="${n.o || 0}" data-l="${n.lane}" style="--c:${col(COLORS[n.color] || COLORS[0])};--r:${tilt(n.id)}deg"><span>${esc(n.text)}</span>${STICKERS.includes(n.icon) && n.icon ? `<b class="nstk">${n.icon}</b>` : ""}${n.emoji ? `<i class="by">${esc(n.emoji)}</i>` : ""}</div>`;
 
 export function boardMain(notes) {
   const st = getStyle(), S = STYLES[st.s];
   return `<div class="bhead"><h2>our board</h2><button class="chip" data-act="bstyle">🎨 style</button></div>
   <div class="bnew"><input id="bnew" maxlength="140" placeholder="what do we need to do? ✏️" autocomplete="off" enterkeyhint="send"><button class="chip" data-act="badd">add</button></div>
-  <div class="bpick" id="bcol"><button class="rnd${draft.color < 0 ? " sel" : ""}" data-bc="-1" aria-label="surprise colour">🎲</button>${COLORS.map((c, i) => `<button data-bc="${i}" class="${draft.color === i ? "sel" : ""}" style="--c:${col(c)}" aria-label="colour ${i + 1}"></button>`).join("")}</div>
-  <div class="bpick bstkrow" id="bstk">${STICKERS.map(e => `<button data-bi="${e}" class="${draft.icon === e ? "sel" : ""}" aria-label="sticker ${e || "none"}">${e || "∅"}</button>`).join("")}</div>
+  <aside class="bside${palOpen ? " open" : ""}" id="bside"><button class="bside-t" data-bt>🎨 colours &amp; stickers <span class="now" id="bnow">${preview()}</span><i>▾</i></button>
+    <div class="bside-b"><h5>colour</h5><div class="bgrid" id="bcol"><button class="rnd${draft.color < 0 ? " sel" : ""}" data-bc="-1" aria-label="surprise colour" title="surprise me">🎲</button>${COLORS.map((c, i) => `<button data-bc="${i}" class="${draft.color === i ? "sel" : ""}" style="--c:${col(c)}" aria-label="colour ${i + 1}"></button>`).join("")}</div>
+    <h5>sticker</h5><div class="bgrid bsg" id="bstk">${STICKERS.map(e => `<button data-bi="${e}" class="${draft.icon === e ? "sel" : ""}" aria-label="sticker ${e || "none"}">${e || "∅"}</button>`).join("")}</div>
+    <p class="bhint">for your next note</p></div></aside>
   <p class="hint">drag a box to move it · tap to edit · on a phone, press and hold first ✋</p>
   <div class="bd s-${st.s} p-${st.pat}${st.faces ? "" : " nofaces"}" style="--bgc:${col(COLORS[st.bg])}">
   ${S.lanes.map(([name, e], l) => { const list = inLane(notes, l);
@@ -96,8 +100,10 @@ export function initBoard(root, h) {
   root.addEventListener("contextmenu", e => { if (e.target.closest(".note")) e.preventDefault(); });
   root.addEventListener("click", e => { // colour / sticker for the next new note
     const c = e.target.closest("[data-bc]"), t = e.target.closest("[data-bi]");
+    if (e.target.closest("[data-bt]")) { palOpen = !palOpen; document.querySelector("#bside")?.classList.toggle("open", palOpen); }
     if (c) { draft.color = +c.dataset.bc; document.querySelectorAll("#bcol button").forEach(b => b.classList.toggle("sel", b === c)); }
     if (t) { draft.icon = t.dataset.bi; document.querySelectorAll("#bstk button").forEach(b => b.classList.toggle("sel", b === t)); }
+    if (c || t) { const w = document.querySelector("#bnow"); if (w) w.innerHTML = preview(); }
   });
 }
 
