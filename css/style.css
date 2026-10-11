@@ -506,7 +506,7 @@ h2.fold.shut .fbtn i{transform:rotate(-90deg)}
 /* ---- forest tab (isometric blocks, all colours come from the theme) ---- */
 .forest{margin-top:8px;border-radius:var(--r);border:2px solid var(--edge);background:linear-gradient(180deg,var(--glow1),var(--bg1) 85%);box-shadow:var(--sh-s);overflow:hidden}
 .forest svg{display:block;width:100%;height:auto}
-.fl{fill:var(--c)}.ft{fill:color-mix(in srgb,var(--c) 66%,#fff)}.fr{fill:color-mix(in srgb,var(--c) 76%,#000)}
+.fl{fill:var(--c)}.ft{fill:color-mix(in srgb,var(--c) 66%,#fff);stroke:color-mix(in srgb,var(--c) 45%,#fff);stroke-width:.6;stroke-linejoin:round}.fr{fill:color-mix(in srgb,var(--c) 76%,#000)}
 .fcell{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .fcell.e:hover .ft,.fcell.e:active .ft{fill:color-mix(in srgb,var(--c) 40%,#fff)}
 .fpanel .seedbar{margin-top:12px}

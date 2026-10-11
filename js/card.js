@@ -96,17 +96,39 @@ function drawForest(ctx, x, y, w, h, g, pal) { // g.forest = [{ s: species, c: t
   if (night) { for (let i = 0; i < 40; i++) { ctx.globalAlpha = .35 + R() * .6; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x + R() * w, y + R() * h * .55, (.8 + R() * 1.4) * Math.max(.8, s * 1.4), 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1; }
   glow(ctx, x + w * .84, y + h * .17, Math.min(w, h) * .13, night ? "255,246,214" : "255,233,168", night ? .55 : .7);
   ctx.fillStyle = night ? "#fff6d6" : "#fff0b8"; ctx.beginPath(); ctx.arc(x + w * .84, y + h * .17, Math.min(w, h) * .034, 0, Math.PI * 2); ctx.fill();
-  const poly = (pts, col) => { ctx.beginPath(); pts.forEach(([px, py], i) => ctx[i ? "lineTo" : "moveTo"](ox + px * s, oy + py * s)); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke(); }; // same-colour stroke hides seams
-  const box = (cx, by, bw, bh, col) => { const a = bw / 2, d = bw / 4, t = by - bh;
-    poly([[cx - a, by], [cx, by + d], [cx, t + d], [cx - a, t]], col);
-    poly([[cx + a, by], [cx, by + d], [cx, t + d], [cx + a, t]], mixc(col, BLK, .24));
-    poly([[cx, t - d], [cx + a, t], [cx, t + d], [cx - a, t]], mixc(col, WHT, .34)); };
+  const CT = { leaf: ["dot", 9], petal: ["dot", 10], spark: ["dot", 12], spine: ["dot", 8], dots: ["big", 14], needle: ["slash", 8], bark: ["vbar", 6], birch: ["birch", 8], ring: ["hbar", 6], seg: ["hbar", 14], grass: ["tuft", 10] };
+  const tex = (X, Y, k) => { // soft surface texture inside one face (same ideas as the patterns in the forest tab)
+    const [kind, st] = CT[k] || [], sp = st * s; if (!kind) return;
+    const x0 = Math.min(...X), x1 = Math.max(...X), y0 = Math.min(...Y), y1 = Math.max(...Y);
+    ctx.save(); ctx.beginPath(); X.forEach((px, i) => ctx[i ? "lineTo" : "moveTo"](px, Y[i])); ctx.closePath(); ctx.clip();
+    const W_ = a => `rgba(255,255,255,${a})`, B_ = a => `rgba(0,0,0,${a})`;
+    if (kind === "birch") { ctx.fillStyle = W_(.12); ctx.fillRect(x0, y0, x1 - x0, y1 - y0); }
+    let row = 0;
+    for (let yy = y0; yy < y1 + sp; yy += sp, row++) {
+      if (kind === "hbar") { ctx.fillStyle = B_(.25); ctx.fillRect(x0, yy, x1 - x0, Math.max(1, 1.4 * s)); continue; }
+      for (let xx = x0 + (row % 2) * sp / 2; xx < x1 + sp; xx += sp) {
+        if (kind === "dot") { ctx.fillStyle = W_(.34); ctx.beginPath(); ctx.arc(xx, yy, sp * .17, 0, 6.3); ctx.fill(); ctx.fillStyle = B_(.12); ctx.beginPath(); ctx.arc(xx + sp * .45, yy + sp * .4, sp * .13, 0, 6.3); ctx.fill(); }
+        else if (kind === "big") { ctx.fillStyle = W_(.7); ctx.beginPath(); ctx.arc(xx, yy, sp * .19, 0, 6.3); ctx.fill(); }
+        else if (kind === "slash") { ctx.strokeStyle = W_(.32); ctx.lineWidth = Math.max(1, 1.2 * s); ctx.beginPath(); ctx.moveTo(xx, yy + sp * .7); ctx.lineTo(xx + sp * .3, yy); ctx.stroke(); }
+        else if (kind === "vbar") { ctx.fillStyle = B_(.22); ctx.fillRect(xx, yy, Math.max(1, 1.2 * s), sp * .8); }
+        else if (kind === "birch") { ctx.fillStyle = "rgba(43,43,43,.5)"; ctx.fillRect(xx, yy + sp * .25, sp * .55, Math.max(1, 1.3 * s)); }
+        else if (kind === "tuft") { ctx.strokeStyle = B_(.13); ctx.lineWidth = Math.max(1, s); ctx.beginPath(); ctx.moveTo(xx, yy + sp * .5); ctx.lineTo(xx + sp * .08, yy); ctx.stroke(); }
+      }
+    }
+    ctx.restore();
+  };
+  const poly = (pts, col, tx) => { const X = pts.map(p => ox + p[0] * s), Y = pts.map(p => oy + p[1] * s); ctx.beginPath(); X.forEach((px, i) => ctx[i ? "lineTo" : "moveTo"](px, Y[i])); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke(); if (tx) tex(X, Y, tx); }; // same-colour stroke hides seams
+  const box = (cx, by, bw, bh, col, tx, faces = "LRT") => { const a = bw / 2, d = bw / 4, t = by - bh;
+    poly([[cx - a, by], [cx, by + d], [cx, t + d], [cx - a, t]], col, faces.includes("L") ? tx : "");
+    poly([[cx + a, by], [cx, by + d], [cx, t + d], [cx + a, t]], mixc(col, BLK, .24), faces.includes("R") ? tx : "");
+    poly([[cx, t - d], [cx + a, t], [cx, t + d], [cx - a, t]], mixc(col, WHT, .34), faces.includes("T") ? tx : ""); };
+  const cc = v => v[0] === "-" ? pal[v.slice(2)] : hexc(v);
   const wood = mixc(mixc(pal.sub, pal.main, .3), BLK, .1), m = new Map((g.forest || []).map(t => [t.c, t]));
   for (let d = 0; d < 2 * GRID - 1; d++) for (let r = 0; r < GRID; r++) { // back to front
     const c = d - r; if (c < 0 || c >= GRID) continue;
     const i = r * GRID + c, [cx, ys] = cellPos(i), t = m.get(i);
-    box(cx, ys + 10, 64, 10, mixc(pal.bg2, pal.live, (r + c) % 2 ? .30 : .38));
-    if (t && SPECIES[t.s]) { let yy = ys; for (const [bw, bh, k] of treeParts(t.s, t.st)) { box(cx, yy, bw, bh, k === "wood" ? wood : pal[SPECIES[t.s].c.slice(2)]); yy -= bh; } }
+    box(cx, ys + 10, 64, 10, mixc(pal.bg2, pal.live, (r + c) % 2 ? .30 : .38), "grass", "T");
+    if (t && SPECIES[t.s]) { const S = SPECIES[t.s]; for (const p of treeParts(t.s, t.st)) box(cx + p.x, ys - p.z + p.y, p.w, p.h, p.k === "wood" ? (S.wc ? cc(S.wc) : wood) : cc(p.k === "d" ? S.c2 || S.c : S.c), p.t); }
   }
   if (night) for (let i = 0; i < 14; i++) glow(ctx, x + R() * w, y + h * (.3 + R() * .6), (5 + R() * 5) * Math.max(1, s * 1.4), "255,235,140", .75);
   ctx.restore();
