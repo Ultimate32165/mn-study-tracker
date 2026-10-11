@@ -1,8 +1,9 @@
 import { treeParts, cellPos, SPECIES, GRID } from "./forest.js";
 import { COLORS } from "./board.js";
 // Photocard: draws a shareable "cozy dashboard" image on a canvas.
-// Pure drawing code: numbers and colours in, pixels out. No DOM, no Firebase (app.js collects the data and the theme colours).
-// The garden is redrawn from the same data as the live scene, shrunk to fit. Keep WW/WH/POND in sync with js/app.js and the garden CSS.
+// Pure drawing code: numbers and colours in, pixels out. No DOM, no Firebase (carddata.js collects the data and the theme colours).
+// STYLES (see the "card styles" section near the bottom) change the whole look: background, tiles, frame, decorations, accent colour.
+// The garden is redrawn from the same data as the live scene, shrunk to fit. Keep WW/WH/POND in sync with js/garden-state.js and the garden CSS.
 export const SIZES = { square: [1080, 1080], portrait: [1080, 1350], story: [1080, 1920] };
 const WW = 980, WH = 680, POND = { x: 300, y: 500, rx: 80, ry: 44 };
 const SIZE_BY_STAGE = [28, 32, 40, 50];
@@ -198,6 +199,28 @@ function layout(shape, W, H, wt = [1, 2.8, 1.1, 3.2], cap = [120, 340, 130, 290]
   out.garden = { y: gy, h: gh }; out.stampY = H - pad - stamp / 2 + 8; return out;
 }
 function tile(ctx, x, y, w, h, pal) {
+  const t = ST.tile;
+  if (t === "pop") { // sticker: hard coloured shadow + bold ink outline
+    rr(ctx, x + 9, y + 11, w, h, 28); ctx.fillStyle = pal.main; ctx.fill();
+    rr(ctx, x, y, w, h, 28); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = pal.ink; ctx.stroke(); return;
+  }
+  if (t === "glass") { // frosted glass
+    const dk = lum(pal.bg1) < .4;
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.14)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10; rr(ctx, x, y, w, h, 34); ctx.fillStyle = dk ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.58)"; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.shadowColor = "transparent"; // (a glow set by the caller, e.g. the "studying" tile, must not shine through the glass)
+    const g = ctx.createLinearGradient(x, y, x, y + h); g.addColorStop(0, dk ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.55)"); g.addColorStop(.55, "rgba(255,255,255,0)"); rr(ctx, x, y, w, h, 34); ctx.fillStyle = g; ctx.fill();
+    rr(ctx, x, y, w, h, 34); ctx.lineWidth = 3; ctx.strokeStyle = dk ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.95)"; ctx.stroke(); ctx.restore(); return;
+  }
+  if (t === "neon") { // glowing outline on a dark card
+    ctx.save(); ctx.shadowColor = pal.main; ctx.shadowBlur = 22; rr(ctx, x, y, w, h, 34); ctx.fillStyle = "rgba(34,26,78,.86)"; ctx.fill(); ctx.restore();
+    rr(ctx, x, y, w, h, 34); ctx.lineWidth = 3.5; ctx.strokeStyle = pal.main; ctx.stroke(); return;
+  }
+  if (t === "paper") { // scrapbook: a paper scrap with a piece of tape
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.16)"; ctx.shadowBlur = 14; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 7; rr(ctx, x, y, w, h, 10); ctx.fillStyle = pal.card; ctx.fill(); ctx.restore();
+    rr(ctx, x, y, w, h, 10); ctx.lineWidth = 2.5; ctx.strokeStyle = pal.edge; ctx.stroke();
+    if (w > 240) { ctx.save(); ctx.translate(x + w / 2, y + 2); ctx.rotate(((Math.round(x * 7 + y * 3) % 9) - 4) * Math.PI / 180); ctx.globalAlpha = .8; ctx.fillStyle = mixc(pal.alt, Wt, .45); ctx.fillRect(-46, -14, 92, 28); ctx.restore(); }
+    return;
+  }
   ctx.save(); ctx.shadowColor = "rgba(0,0,0,.10)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8; rr(ctx, x, y, w, h, 34); ctx.fillStyle = pal.card; ctx.fill(); ctx.restore();
   rr(ctx, x, y, w, h, 34); ctx.strokeStyle = pal.edge; ctx.lineWidth = 3; ctx.stroke();
 }
@@ -438,13 +461,139 @@ function drawBoard(ctx, d, pal, W, H) {
   text(ctx, "🍓 MN Study Tracker", W / 2, H - pad - 27 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
 }
 
-export function drawCard(cv, d, pal) {
+// ---------------------------------------------------------------- card styles (the look of the WHOLE card, on top of the theme colours)
+// bg = background pattern, tile = look of the white tiles, deco = overlay decorations, frame = the card is placed inside a frame (the content is re-laid-out to fit), dark = forces a dark palette.
+export const STYLES = {
+  classic: { label: "🍓 classic" },
+  sticker: { label: "🎨 sticker", bg: "pop", tile: "pop", deco: "stars" },
+  glass: { label: "🫧 glass", bg: "aurora", tile: "glass" },
+  midnight: { label: "🌌 midnight", bg: "night", tile: "neon", dark: true, deco: "stars" },
+  scrapbook: { label: "📎 scrapbook", bg: "grid", tile: "paper", deco: "tape" },
+  gilded: { label: "👑 gilded", bg: "linen", deco: "double" },
+  polaroid: { label: "📷 polaroid", frame: "polaroid" },
+  film: { label: "🎞️ film", frame: "film" },
+  ticket: { label: "🎫 ticket", frame: "ticket" },
+  stamp: { label: "✉️ stamp", frame: "stamp" }
+};
+export const ACCENTS = { theme: null, pink: ["#ff6fa5", "#ffb0cf"], lilac: ["#8f6bf2", "#c7b5ff"], sky: ["#2f9cf0", "#9bd3ff"], mint: ["#22b98a", "#98ecc9"], sun: ["#ff9638", "#ffd18a"] }; // [main, light]; "theme" keeps the app theme's own colours
+let ST = STYLES.classic; // the style being drawn right now (tile() reads it)
+const MONO = '"Special Elite","Courier New",monospace';
+const lum = c => { const [r, g, b] = c.match(/[\d.]+/g).map(Number); return (.299 * r + .587 * g + .114 * b) / 255; };
+const hash = s => [...String(s)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+
+function skin(pal, sty, acc) { // the palette actually used: theme colours, forced dark for "midnight", then the accent colour on top
+  const p = { ...pal };
+  if (sty.dark) Object.assign(p, { bg1: "rgba(20,18,52,1)", bg2: "rgba(38,28,82,1)", card: "rgba(255,255,255,0.10)", ink: "rgba(255,255,255,1)", sub: "rgba(214,208,255,0.8)", tint: "rgba(255,255,255,0.14)", edge: "rgba(255,255,255,0.3)", glow1: "130,100,255", glow2: "255,110,190" });
+  const a = ACCENTS[acc];
+  if (a) { const m = hexc(a[0]), l = hexc(a[1]); p.main = m; p.alt = l; p.glow1 = l.match(/[\d.]+/g).slice(0, 3).join(","); p.tint = sty.dark ? l.replace(/[\d.]+\)$/, ".28)") : mixc(p.card, l, .32); }
+  return p;
+}
+function paintBg(ctx, pal, W, H) {
+  const bg = ST.bg, g = ctx.createLinearGradient(0, 0, W * .6, H), R = seeded(41); g.addColorStop(0, pal.bg1); g.addColorStop(1, pal.bg2); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (bg === "pop") { // bold confetti
+    const cols = [pal.main, pal.alt, pal.live, pal.edge]; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (let i = 0; i < 46; i++) {
+      const r = 14 + R() * 30, k = i % 4; ctx.save(); ctx.translate(R() * W, R() * H); ctx.rotate(R() * 6); ctx.globalAlpha = .4; ctx.fillStyle = ctx.strokeStyle = cols[k]; ctx.lineWidth = 7;
+      if (k === 0) { ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.3); ctx.fill(); }
+      else if (k === 1) { rr(ctx, -r, -r, r * 2, r * 2, 8); ctx.fill(); }
+      else if (k === 2) { ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.3); ctx.stroke(); }
+      else { ctx.beginPath(); for (let j = 0; j < 6; j++) ctx.lineTo(-r + j * r / 2.5, (j % 2 ? -1 : 1) * r * .35); ctx.stroke(); }
+      ctx.restore();
+    }
+  } else if (bg === "aurora") { // soft colour blobs + soap bubbles
+    [[.15, .1, .7, pal.glow1, .75], [.9, .3, .65, pal.glow2, .7], [.2, .62, .6, "120,220,255", .55], [.85, .88, .7, "255,205,140", .55], [.5, .45, .45, "255,160,215", .4]].forEach(([fx, fy, fr, rgb, a]) => glow(ctx, W * fx, H * fy, W * fr, rgb, a));
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+    for (let i = 0; i < 14; i++) { const px = R() * W, py = R() * H, r = 24 + R() * 70; ctx.globalAlpha = .5; ctx.beginPath(); ctx.arc(px, py, r, 0, 6.3); ctx.stroke(); ctx.globalAlpha = .75; ctx.beginPath(); ctx.arc(px, py, r * .72, Math.PI * 1.1, Math.PI * 1.45); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  } else if (bg === "night") { // starry sky
+    glow(ctx, W * .15, H * .1, W * .6, pal.glow1, .5); glow(ctx, W * .95, H * .6, W * .65, pal.glow2, .35); glow(ctx, W * .86, H * .1, 170, "255,244,214", .5);
+    ctx.fillStyle = "#fff"; for (let i = 0; i < 140; i++) { ctx.globalAlpha = .25 + R() * .7; ctx.beginPath(); ctx.arc(R() * W, R() * H, .8 + R() * 2, 0, 6.3); ctx.fill(); } ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(255,244,214,.9)";
+    for (let i = 0; i < 10; i++) { const px = R() * W, py = R() * H, r = 8 + R() * 10; ctx.beginPath(); ctx.moveTo(px, py - r); ctx.quadraticCurveTo(px, py, px + r, py); ctx.quadraticCurveTo(px, py, px, py + r); ctx.quadraticCurveTo(px, py, px - r, py); ctx.quadraticCurveTo(px, py, px, py - r); ctx.fill(); }
+  } else if (bg === "grid") { // graph paper
+    ctx.fillStyle = pal.bg2; ctx.fillRect(0, 0, W, H); glow(ctx, W * .12, H * .08, W * .5, pal.glow1, .4);
+    ctx.strokeStyle = pal.main; ctx.globalAlpha = .13; ctx.lineWidth = 2; ctx.beginPath();
+    for (let k = 0; k < W; k += 44) { ctx.moveTo(k, 0); ctx.lineTo(k, H); } for (let k = 0; k < H; k += 44) { ctx.moveTo(0, k); ctx.lineTo(W, k); } ctx.stroke(); ctx.globalAlpha = 1;
+  } else if (bg === "linen") { // fine woven texture
+    glow(ctx, W * .12, H * .08, W * .55, pal.glow1, .55); glow(ctx, W * .95, H * .55, W * .6, pal.glow2, .5);
+    ctx.strokeStyle = pal.main; ctx.globalAlpha = .06; ctx.lineWidth = 2; ctx.beginPath();
+    for (let k = -H; k < W; k += 9) { ctx.moveTo(k, 0); ctx.lineTo(k + H, H); ctx.moveTo(k + H, 0); ctx.lineTo(k, H); } ctx.stroke(); ctx.globalAlpha = 1;
+  } else { // classic: theme gradient + soft blobs + polka dots
+    glow(ctx, W * .12, H * .08, W * .55, pal.glow1, .55); glow(ctx, W * .95, H * .55, W * .6, pal.glow2, .5);
+    ctx.fillStyle = pal.main; ctx.globalAlpha = .07; for (let yy = 30; yy < H; yy += 70) for (let xx = (yy / 70 % 2) * 35 + 20; xx < W; xx += 70) { ctx.beginPath(); ctx.arc(xx, yy, 5, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1;
+  }
+}
+function paintDeco(ctx, kind, W, H, pal) { // small decorations in the card margins (the content never reaches them)
+  if (kind === "stars") { emoji(ctx, "✨", W - 34, 34, 40); emoji(ctx, "⭐", 32, H - 30, 34, { rot: -.3 }); emoji(ctx, "✨", W - 30, H * .52, 30, { alpha: .9 }); }
+  else if (kind === "tape") [[24, 24, -.62], [W - 24, 24, .62], [24, H - 24, .62], [W - 24, H - 24, -.62]].forEach(([x, y, r]) => {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(r); ctx.globalAlpha = .8; ctx.fillStyle = mixc(pal.alt, Wt, .35); ctx.fillRect(-52, -16, 104, 32);
+    ctx.beginPath(); ctx.rect(-52, -16, 104, 32); ctx.clip(); ctx.globalAlpha = .5; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); for (let k = -60; k < 60; k += 14) { ctx.moveTo(k, 16); ctx.lineTo(k + 20, -16); } ctx.stroke(); ctx.restore();
+  });
+  else if (kind === "double") {
+    ctx.lineJoin = "round"; rr(ctx, 16, 16, W - 32, H - 32, 36); ctx.lineWidth = 6; ctx.strokeStyle = pal.main; ctx.stroke(); rr(ctx, 30, 30, W - 60, H - 60, 26); ctx.lineWidth = 2.5; ctx.strokeStyle = pal.alt; ctx.stroke();
+    [[30, 30], [W - 30, 30], [30, H - 30], [W - 30, H - 30]].forEach(([x, y]) => { ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4); ctx.fillStyle = pal.main; ctx.fillRect(-9, -9, 18, 18); ctx.fillStyle = pal.card; ctx.fillRect(-4, -4, 8, 8); ctx.restore(); });
+  }
+}
+const capOf = d => d.title || (d.kind === "board" ? "our to-do board" : `${d.name}'s study day`);
+function paintFrame(ctx, kind, d, pal, W, H, inside) { // inside(x, y, w, h, radius) draws the normal card into that box
+  const shadow = (b, dy) => { ctx.shadowColor = "rgba(0,0,0,.3)"; ctx.shadowBlur = b; ctx.shadowOffsetY = dy; };
+  if (kind === "polaroid") {
+    const m = 30, ph = 38, bot = d.shape === "square" ? 130 : 165, ix = m + ph, iw = W - ix * 2, ih = H - m - ph - m - bot;
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, mixc(pal.main, Wt, .45)); g.addColorStop(1, mixc(pal.alt, Wt, .35)); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(255,255,255,.35)"; for (let yy = 30; yy < H; yy += 70) for (let xx = (yy / 70 % 2) * 35 + 20; xx < W; xx += 70) { ctx.beginPath(); ctx.arc(xx, yy, 4, 0, 6.3); ctx.fill(); }
+    ctx.save(); shadow(40, 14); rr(ctx, m, m, W - m * 2, H - m * 2, 16); ctx.fillStyle = "#fffdf8"; ctx.fill(); ctx.restore();
+    inside(ix, m + ph, iw, ih, 10); rr(ctx, ix, m + ph, iw, ih, 10); ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.08)"; ctx.stroke();
+    const cy = H - m - bot / 2;
+    text(ctx, capOf(d), W / 2, cy - 12, { size: 46, font: pal.hf, weight: 700, color: "#5b4a52", align: "center", base: "middle", max: W - 200 });
+    text(ctx, d.date || "", W / 2, cy + 34, { size: 28, font: pal.bf, weight: 700, color: "#a39098", align: "center", base: "middle", max: W - 200 });
+    [[W * .18, m + 6, -.35], [W * .82, m + 6, .35]].forEach(([x, y, r]) => { ctx.save(); ctx.translate(x, y); ctx.rotate(r); ctx.globalAlpha = .72; ctx.fillStyle = mixc(pal.alt, Wt, .3); ctx.fillRect(-85, -23, 170, 46); ctx.restore(); });
+  } else if (kind === "film") {
+    ctx.fillStyle = "#161412"; ctx.fillRect(0, 0, W, H);
+    for (let yy = 22; yy < H - 30; yy += 64) for (const hx of [30, W - 60]) { rr(ctx, hx, yy, 30, 40, 9); ctx.fillStyle = "#f3efe6"; ctx.fill(); }
+    inside(100, 76, W - 200, H - 152, 10); rr(ctx, 100, 76, W - 200, H - 152, 10); ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,.25)"; ctx.stroke();
+    const o = { size: 26, font: MONO, weight: 400, color: "#f2a43a", base: "middle" };
+    text(ctx, "MN FILM 400", 100, 38, o); text(ctx, "► 12A", W - 100, 38, { ...o, align: "right" });
+    text(ctx, d.date || "", 100, H - 38, { ...o, max: W * .6 }); text(ctx, "12A ►", W - 100, H - 38, { ...o, align: "right" });
+  } else if (kind === "ticket") {
+    const bd = mixc(pal.main, K, .28), x = 26, y = 26, w = W - 52, h = H - 52, top = 118, bot = 96, y1 = y + top, y2 = y + h - bot;
+    ctx.fillStyle = bd; ctx.fillRect(0, 0, W, H);
+    ctx.save(); shadow(30, 10); rr(ctx, x, y, w, h, 30); ctx.fillStyle = "#fffaf0"; ctx.fill(); ctx.restore();
+    text(ctx, "ADMIT ONE", x + 40, y + top / 2 + 2, { size: 50, font: MONO, weight: 400, color: "#4a2f14", base: "middle" });
+    text(ctx, "No. " + (100000 + hash(d.date) % 900000), x + w - 40, y + top / 2 + 2, { size: 34, font: MONO, weight: 400, color: "#9a7b55", align: "right", base: "middle" });
+    ctx.save(); ctx.setLineDash([14, 12]); ctx.strokeStyle = "#cdb892"; ctx.lineWidth = 3; [y1, y2].forEach(yy => { ctx.beginPath(); ctx.moveTo(x + 44, yy); ctx.lineTo(x + w - 44, yy); ctx.stroke(); }); ctx.restore();
+    [y1, y2].forEach(yy => { ell(ctx, x, yy, 26, 26, bd); ell(ctx, x + w, yy, 26, 26, bd); });
+    inside(x + 34, y1 + 24, w - 68, y2 - y1 - 48, 12);
+    const R = seeded(hash(d.date) + 3); let bx = x + 44; ctx.fillStyle = "#4a2f14";
+    while (bx < x + w * .58) { const bw = 2 + Math.floor(R() * 7); ctx.fillRect(bx, y2 + 22, bw, bot - 44); bx += bw + 2 + Math.floor(R() * 6); }
+    text(ctx, "MN STUDY TRACKER", x + w - 40, y2 + bot / 2, { size: 28, font: MONO, weight: 400, color: "#9a7b55", align: "right", base: "middle", max: w * .33 });
+  } else if (kind === "stamp") {
+    const bd = mixc(pal.main, Wt, .6), x = 34, y = 34, w = W - 68, h = H - 68, m = 46, bot = 110;
+    ctx.fillStyle = bd; ctx.fillRect(0, 0, W, H);
+    ctx.save(); shadow(26, 8); ctx.fillStyle = "#fffdf6"; ctx.fillRect(x, y, w, h); ctx.restore();
+    const nx = Math.round(w / 36), ny = Math.round(h / 36); // scalloped edge: bites out of the paper
+    for (let i = 0; i <= nx; i++) { ell(ctx, x + i * w / nx, y, 11, 11, bd); ell(ctx, x + i * w / nx, y + h, 11, 11, bd); }
+    for (let j = 0; j <= ny; j++) { ell(ctx, x, y + j * h / ny, 11, 11, bd); ell(ctx, x + w, y + j * h / ny, 11, 11, bd); }
+    inside(x + m, y + m, w - m * 2, h - m - bot, 6); rr(ctx, x + m, y + m, w - m * 2, h - m - bot, 6); ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.10)"; ctx.stroke();
+    const cy = y + h - bot / 2;
+    text(ctx, capOf(d), x + m, cy - 12, { size: 40, font: pal.hf, weight: 700, color: "#6a4a58", base: "middle", max: w * .5 });
+    text(ctx, "first class ✦ MN study", x + m, cy + 30, { size: 26, font: pal.bf, weight: 800, color: "#b09aa6", base: "middle", max: w * .5 });
+    const pr = Math.min(52, bot * .46), pcx = x + w - 96, pcy = cy; // postmark
+    ctx.save(); ctx.globalAlpha = .5; ctx.strokeStyle = "#3a3048"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(pcx, pcy, pr, 0, 6.3); ctx.stroke();
+    for (let i = -1; i <= 1; i++) { ctx.beginPath(); for (let k = 0; k <= 200; k += 6) { const px = pcx - pr - 8 - k, py = pcy + i * 18 + Math.sin(k / 9) * 6; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); }
+    ctx.restore();
+    text(ctx, new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" }), pcx, pcy, { size: 26, font: pal.bf, weight: 800, color: "#3a3048", align: "center", base: "middle", alpha: .6, max: pr * 1.7 });
+  }
+}
+
+export function drawCard(cv, d, pal0) {
   const [W, H] = SIZES[d.shape] || SIZES.square; cv.width = W; cv.height = H;
-  const ctx = cv.getContext("2d"), L = layout(d.shape, W, H), hf = pal.hf, bf = pal.bf, pad = L.pad, cw = W - pad * 2;
-  // background: theme gradient + soft blobs + polka dots
-  const bg = ctx.createLinearGradient(0, 0, W * .6, H); bg.addColorStop(0, pal.bg1); bg.addColorStop(1, pal.bg2); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  glow(ctx, W * .12, H * .08, W * .55, pal.glow1, .55); glow(ctx, W * .95, H * .55, W * .6, pal.glow2, .5);
-  ctx.fillStyle = pal.main; ctx.globalAlpha = .07; for (let yy = 30; yy < H; yy += 70) for (let xx = (yy / 70 % 2) * 35 + 20; xx < W; xx += 70) { ctx.beginPath(); ctx.arc(xx, yy, 5, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1;
+  const sty = STYLES[d.style] || STYLES.classic, ctx = cv.getContext("2d"), pal = skin(pal0, sty, d.accent); ST = sty;
+  if (!sty.frame) { paintCard(ctx, d, pal, W, H); if (sty.deco) paintDeco(ctx, sty.deco, W, H, pal); return; }
+  paintFrame(ctx, sty.frame, d, pal, W, H, (x, y, w, h, r) => { ctx.save(); rr(ctx, x, y, w, h, r); ctx.clip(); ctx.translate(x, y); paintCard(ctx, d, pal, w, h); ctx.restore(); }); // the card is laid out for the smaller box, so nothing is squashed
+}
+function paintCard(ctx, d, pal, W, H) { // one card, drawn into a W×H area at the current origin
+  const L = layout(d.shape, W, H), hf = pal.hf, bf = pal.bf, pad = L.pad, cw = W - pad * 2;
+  paintBg(ctx, pal, W, H);
 
   if (d.kind === "together") { drawTogether(ctx, d, pal, W, H); return; }
   if (d.kind === "recap") { drawRecap(ctx, d, pal, W, H); return; }

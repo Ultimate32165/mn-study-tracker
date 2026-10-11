@@ -1,5 +1,5 @@
 // Photocard UI: the options sheet (cardSheet), drawing the preview (renderCard), save / share / send; remembers the latest milestone.
-import { drawCard } from "./card.js";
+import { ACCENTS, STYLES, drawCard } from "./card.js";
 import * as DB from "./db.js";
 import { forestSnap } from "./forest.js";
 import { cardData, cardDataBoard, cardDataMilestone, cardDataRecap, cardDataTogether, cardPal } from "./carddata.js";
@@ -7,15 +7,16 @@ import { me, sessions, totalOf, users } from "./state.js";
 import { $, errMsg, esc, fmt, key, ls, modal, toast } from "./util.js";
 
 // ---- photocard: a shareable image of your session, stats and garden (drawn by js/card.js) ----
+// the look (style + accent colour) is chosen in the sheet, remembered on this device, and drawn by card.js (STYLES / ACCENTS live there)
 // the latest milestone (pet evolved / streak record / couple level) is remembered on this device so you can still make its card later
 const loadMs = () => { try { const m = JSON.parse(ls("lastMs") || "null"); return m && ["evolve", "streak", "level"].includes(m.type) ? m : null; } catch { return null; } };
 const saveMs = ms => ls("lastMs", JSON.stringify(ms));
-const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today", mode: "me", fid: "", period: "week", ms: loadMs(), scene: ls("cardScene") === "forest" ? "forest" : "garden" };
+const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today", mode: "me", fid: "", period: "week", ms: loadMs(), scene: ls("cardScene") === "forest" ? "forest" : "garden", style: ls("cardStyle") in STYLES ? ls("cardStyle") : "classic", accent: ls("cardAcc") in ACCENTS ? ls("cardAcc") : "theme" };
 let cardUrl = "", cardBlob = null, cardCv = null, cardSeq = 0, lastGift = 0;
 async function renderCard() {
   const seq = ++cardSeq, img = $("#cimg"), ld = $(".cload"); if (!img) return;
   cardBlob = null; cardCv = null; if (ld) ld.hidden = false; // until the new card is drawn, save / send say "still drawing"
-  try { await Promise.race([Promise.all([document.fonts.load("700 48px Fredoka"), document.fonts.load("800 28px Nunito"), ...(cardOpt.mode === "board" ? [document.fonts.load("30px Rye"), document.fonts.load("30px 'Special Elite'")] : [])]), new Promise(r => setTimeout(r, 1500))]); } catch {}
+  try { await Promise.race([Promise.all([document.fonts.load("700 48px Fredoka"), document.fonts.load("800 28px Nunito"), ...(cardOpt.mode === "board" ? [document.fonts.load("30px Rye"), document.fonts.load("30px 'Special Elite'")] : ["film", "ticket"].includes(cardOpt.style) ? [document.fonts.load("30px 'Special Elite'")] : [])]), new Promise(r => setTimeout(r, 1500))]); } catch {}
   if (seq !== cardSeq) return;
   let data; const md = cardOpt.mode;
   try { data = md === "together" ? cardDataTogether(cardOpt.shape, cardOpt.fid) : md === "recap" ? await cardDataRecap(cardOpt.shape, cardOpt.period) : md === "milestone" ? cardDataMilestone(cardOpt.shape, cardOpt.ms) : md === "board" ? cardDataBoard(cardOpt.shape) : cardData(cardOpt.shape, cardOpt.sid); }
@@ -23,6 +24,7 @@ async function renderCard() {
   if (seq !== cardSeq) return;
   const cv = document.createElement("canvas");
   if (cardOpt.scene === "forest") { const fm = users.find(u => u.id === me.uid); if (fm) data.garden = { ...data.garden, forest: forestSnap(fm, totalOf(fm)) }; } // forest instead of garden
+  data.style = cardOpt.style; data.accent = cardOpt.accent; // look chosen in the sheet
   drawCard(cv, data, cardPal(data.garden.night, data.garden.wx));
   cv.toBlob(b => {
     if (seq !== cardSeq || !b) return;
@@ -49,6 +51,8 @@ function cardSheet(mode) {
   <div class="seg" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>
   <div class="seg" id="cper">${Object.keys(PD).map(k => `<button data-per="${k}" class="${k === cardOpt.period ? "sel" : ""}">${PD[k]}</button>`).join("")}</div>
   <div class="seg">${Object.keys(SH).map(k => `<button data-shape="${k}" class="${k === cardOpt.shape ? "sel" : ""}">${SH[k]}</button>`).join("")}</div>
+  <div class="seg sty" id="cstyle" aria-label="card style">${Object.keys(STYLES).map(k => `<button data-style="${k}" class="${k === cardOpt.style ? "sel" : ""}">${STYLES[k].label}</button>`).join("")}</div>
+  <div class="cacc" id="cacc" aria-label="accent colour">${Object.keys(ACCENTS).map(k => `<button data-acc="${k}" class="adot ${k === "theme" ? "athm" : ""} ${k === cardOpt.accent ? "sel" : ""}" ${ACCENTS[k] ? `style="background:${ACCENTS[k][0]}"` : ""} aria-label="${k}">${k === "theme" ? "🎨" : ""}</button>`).join("")}<button class="adot ashuf" id="cshuf" aria-label="surprise me">🎲</button></div>
   <div class="seg" id="cscene">${[["garden", "🌳 garden"], ["forest", "🌲 forest"]].map(([k, l]) => `<button data-scene="${k}" class="${k === cardOpt.scene ? "sel" : ""}">${l}</button>`).join("")}</div>
   <select id="csel" aria-label="which session"><option value="today">Today (all sessions)</option>${sess.map(x => `<option value="${esc(x.id)}" ${x.id === cardOpt.sid ? "selected" : ""}>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} · ${fmt(x.seconds)}</option>`).join("")}</select>
   <select id="cfr" aria-label="which friend">${friends.map(u => `<option value="${esc(u.id)}" ${u.id === cardOpt.fid ? "selected" : ""}>${esc(u.emoji)} ${esc(u.name)}</option>`).join("")}</select>
@@ -63,6 +67,10 @@ function cardSheet(mode) {
   modal.querySelectorAll("[data-per]").forEach(b => b.onclick = () => { cardOpt.period = b.dataset.per; modal.querySelectorAll("[data-per]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
   modal.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => { cardOpt.shape = b.dataset.shape; ls("cardShape", cardOpt.shape); modal.querySelectorAll("[data-shape]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
   modal.querySelectorAll("[data-scene]").forEach(b => b.onclick = () => { cardOpt.scene = b.dataset.scene; ls("cardScene", cardOpt.scene); modal.querySelectorAll("[data-scene]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
+  const lookUi = () => { modal.querySelectorAll("[data-style]").forEach(x => x.classList.toggle("sel", x.dataset.style === cardOpt.style)); modal.querySelectorAll("[data-acc]").forEach(x => x.classList.toggle("sel", x.dataset.acc === cardOpt.accent)); const s = modal.querySelector("[data-style].sel"); if (s) { const c = s.parentElement; c.scrollLeft = s.offsetLeft - c.clientWidth / 2 + s.offsetWidth / 2; } }; // keep the chosen style chip in view
+  modal.querySelectorAll("[data-style]").forEach(b => b.onclick = () => { cardOpt.style = b.dataset.style; ls("cardStyle", cardOpt.style); lookUi(); renderCard(); });
+  modal.querySelectorAll("[data-acc]").forEach(b => b.onclick = () => { cardOpt.accent = b.dataset.acc; ls("cardAcc", cardOpt.accent); lookUi(); renderCard(); });
+  $("#cshuf").onclick = () => { const pick = (a, not) => { const o = a.filter(k => k !== not); return o[Math.floor(Math.random() * o.length)]; }; cardOpt.style = pick(Object.keys(STYLES), cardOpt.style); cardOpt.accent = pick(Object.keys(ACCENTS), cardOpt.accent); ls("cardStyle", cardOpt.style); ls("cardAcc", cardOpt.accent); lookUi(); renderCard(); }; // 🎲 random style + colour
   $("#csel").onchange = e => { cardOpt.sid = e.target.value; renderCard(); };
   $("#cfr").onchange = e => { cardOpt.fid = e.target.value; sendLbl(); if (cardOpt.mode === "together") renderCard(); };
   const file = () => new File([cardBlob], `study${cardOpt.mode === "me" ? "" : "-" + cardOpt.mode}-${key(Date.now())}.png`, { type: "image/png" });
@@ -78,7 +86,7 @@ function cardSheet(mode) {
     lastGift = Date.now();
     try { await DB.sendGift(f.id, me.uid, mine.name, mine.emoji, cardOpt.mode, giftImg()); toast(`Sent to ${f.name} 💌`); } catch (e) { lastGift = 0; toast(errMsg(e)); }
   };
-  vis(); sendLbl(); renderCard();
+  vis(); sendLbl(); lookUi(); renderCard();
 }
 
 export { cardOpt, cardSheet, saveMs };
