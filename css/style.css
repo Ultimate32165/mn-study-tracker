@@ -447,11 +447,20 @@ h2 .chip+.chip{margin-left:6px}
 .seg[hidden]{display:none}
 .cardsheet .seg button{font-size:.78rem;padding:10px 2px}
 #csend{margin-top:12px}
-/* photocard look: style chips (scroll sideways) + accent colour dots */
-.cardsheet .seg.sty{overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px;margin-bottom:0}
-.cardsheet .seg.sty::-webkit-scrollbar{display:none}
-.cardsheet .seg.sty button{flex:none;padding:10px 12px;white-space:nowrap}
-.cacc{display:flex;gap:10px;align-items:center;justify-content:center;margin:6px 0 2px}
+/* photocard look: style chips (wrap, so no sideways scrolling is needed), accent colour dots, "more options" */
+.cardsheet .seg.wrap{flex-wrap:wrap;gap:6px}
+.cardsheet .seg.wrap button{flex:1 1 auto;padding:8px 10px;white-space:nowrap}
+.cardsheet #cstyle{margin-bottom:0}
+.cacc{display:flex;gap:10px;align-items:center;justify-content:center;margin:8px 0 2px}
+.cmore{margin:8px 0 2px;text-align:left}
+.cmore summary{cursor:pointer;list-style:none;text-align:center;padding:9px 12px;border-radius:16px;border:2px dashed var(--edge);color:var(--soft);font-family:var(--hf);font-size:.85rem}
+.cmore summary::-webkit-details-marker{display:none}
+.cmore[open] summary{border-style:solid;color:var(--main-d)}
+.crow{margin-top:8px}
+.crow>b{display:block;font-family:var(--hf);font-size:.72rem;font-weight:600;color:var(--soft);margin:0 0 2px 4px;text-transform:uppercase;letter-spacing:.04em}
+.cmore .seg{margin:0}
+#cmsg{width:100%;box-sizing:border-box;padding:10px 14px;border-radius:16px;border:2px solid var(--edge);background:var(--card);color:var(--ink);font:inherit}
+.cmore .btn.ghost{width:100%}
 .adot{width:34px;height:34px;padding:0;border-radius:50%;border:3px solid var(--card);box-shadow:0 0 0 2px var(--edge),var(--sh-s);display:grid;place-items:center;font-size:.95rem;line-height:1;color:var(--ink)}
 .adot.athm{background:conic-gradient(var(--main),var(--alt),var(--main))}
 .adot.ashuf{background:var(--tint)}

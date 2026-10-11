@@ -201,28 +201,28 @@ function layout(shape, W, H, wt = [1, 2.8, 1.1, 3.2], cap = [120, 340, 130, 290]
 function tile(ctx, x, y, w, h, pal) {
   const t = ST.tile;
   if (t === "pop") { // sticker: hard coloured shadow + bold ink outline
-    rr(ctx, x + 9, y + 11, w, h, 28); ctx.fillStyle = pal.main; ctx.fill();
-    rr(ctx, x, y, w, h, 28); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = pal.ink; ctx.stroke(); return;
+    rr(ctx, x + 9, y + 11, w, h, rad(28)); ctx.fillStyle = pal.main; ctx.fill();
+    rr(ctx, x, y, w, h, rad(28)); ctx.fillStyle = lum(pal.bg1) < .4 ? "rgba(38,28,82,1)" : pal.card; ctx.fill(); ctx.lineWidth = 5; // (solid on dark, so the hard shadow can not shine through) ctx.strokeStyle = pal.ink; ctx.stroke(); return;
   }
   if (t === "glass") { // frosted glass
     const dk = lum(pal.bg1) < .4;
-    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.14)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10; rr(ctx, x, y, w, h, 34); ctx.fillStyle = dk ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.58)"; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.14)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10; rr(ctx, x, y, w, h, rad(34)); ctx.fillStyle = dk ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.58)"; ctx.fill(); ctx.restore();
     ctx.save(); ctx.shadowColor = "transparent"; // (a glow set by the caller, e.g. the "studying" tile, must not shine through the glass)
-    const g = ctx.createLinearGradient(x, y, x, y + h); g.addColorStop(0, dk ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.55)"); g.addColorStop(.55, "rgba(255,255,255,0)"); rr(ctx, x, y, w, h, 34); ctx.fillStyle = g; ctx.fill();
-    rr(ctx, x, y, w, h, 34); ctx.lineWidth = 3; ctx.strokeStyle = dk ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.95)"; ctx.stroke(); ctx.restore(); return;
+    const g = ctx.createLinearGradient(x, y, x, y + h); g.addColorStop(0, dk ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.55)"); g.addColorStop(.55, "rgba(255,255,255,0)"); rr(ctx, x, y, w, h, rad(34)); ctx.fillStyle = g; ctx.fill();
+    rr(ctx, x, y, w, h, rad(34)); ctx.lineWidth = 3; ctx.strokeStyle = dk ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.95)"; ctx.stroke(); ctx.restore(); return;
   }
   if (t === "neon") { // glowing outline on a dark card
-    ctx.save(); ctx.shadowColor = pal.main; ctx.shadowBlur = 22; rr(ctx, x, y, w, h, 34); ctx.fillStyle = "rgba(34,26,78,.86)"; ctx.fill(); ctx.restore();
-    rr(ctx, x, y, w, h, 34); ctx.lineWidth = 3.5; ctx.strokeStyle = pal.main; ctx.stroke(); return;
+    ctx.save(); ctx.shadowColor = pal.main; ctx.shadowBlur = 22; rr(ctx, x, y, w, h, rad(34)); ctx.fillStyle = "rgba(34,26,78,.86)"; ctx.fill(); ctx.restore();
+    rr(ctx, x, y, w, h, rad(34)); ctx.lineWidth = 3.5; ctx.strokeStyle = pal.main; ctx.stroke(); return;
   }
   if (t === "paper") { // scrapbook: a paper scrap with a piece of tape
-    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.16)"; ctx.shadowBlur = 14; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 7; rr(ctx, x, y, w, h, 10); ctx.fillStyle = pal.card; ctx.fill(); ctx.restore();
-    rr(ctx, x, y, w, h, 10); ctx.lineWidth = 2.5; ctx.strokeStyle = pal.edge; ctx.stroke();
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.16)"; ctx.shadowBlur = 14; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 7; rr(ctx, x, y, w, h, rad(10)); ctx.fillStyle = pal.card; ctx.fill(); ctx.restore();
+    rr(ctx, x, y, w, h, rad(10)); ctx.lineWidth = 2.5; ctx.strokeStyle = pal.edge; ctx.stroke();
     if (w > 240) { ctx.save(); ctx.translate(x + w / 2, y + 2); ctx.rotate(((Math.round(x * 7 + y * 3) % 9) - 4) * Math.PI / 180); ctx.globalAlpha = .8; ctx.fillStyle = mixc(pal.alt, Wt, .45); ctx.fillRect(-46, -14, 92, 28); ctx.restore(); }
     return;
   }
-  ctx.save(); ctx.shadowColor = "rgba(0,0,0,.10)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8; rr(ctx, x, y, w, h, 34); ctx.fillStyle = pal.card; ctx.fill(); ctx.restore();
-  rr(ctx, x, y, w, h, 34); ctx.strokeStyle = pal.edge; ctx.lineWidth = 3; ctx.stroke();
+  ctx.save(); ctx.shadowColor = "rgba(0,0,0,.10)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8; rr(ctx, x, y, w, h, rad(34)); ctx.fillStyle = pal.card; ctx.fill(); ctx.restore();
+  rr(ctx, x, y, w, h, rad(34)); ctx.strokeStyle = pal.edge; ctx.lineWidth = 3; ctx.stroke();
 }
 function ring(ctx, cx, cy, r, lw, pct, pal) {
   ctx.lineCap = "round"; ctx.lineWidth = lw; ctx.strokeStyle = pal.tint; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
@@ -277,7 +277,7 @@ function drawTogether(ctx, d, pal, W, H) {
       text(ctx, val, x + cwid - 28, Y[2] + h / 2, { size: fs, font: hf, weight: 700, color: pal.ink, align: "right", base: "middle", max: cwid - 56 - lw - 10 });
     }); }
   drawScene(ctx, pad, gy, cw, gh, d.garden, pal);
-  text(ctx, "🍓 MN Study Tracker", W / 2, H - pad - stamp / 2 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
+  text(ctx, stampTxt(), W / 2, H - pad - stamp / 2 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9, max: 900 });
 }
 
 // ---------------------------------------------------------------- shared pieces for the recap + milestone cards
@@ -325,7 +325,7 @@ function drawRecap(ctx, d, pal, W, H) {
     d.tiles.forEach((t, i) => drawStat(ctx, pad + (i % 2) * (tw + g2), y + Math.floor(i / 2) * (th + g2), tw, th, pal, t)); }
   drawBars(ctx, pad, L.chart.y, cw, L.chart.h, pal, d);
   drawScene(ctx, pad, L.garden.y, cw, L.garden.h, d.garden, pal);
-  text(ctx, "🍓 MN Study Tracker", W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
+  text(ctx, stampTxt(), W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9, max: 900 });
 }
 
 // ---------------------------------------------------------------- milestone card: pet evolved / streak record / couple level
@@ -356,7 +356,7 @@ function drawMilestone(ctx, d, pal, W, H) {
       text(ctx, val, x + cwid - 28, y + h / 2, { size: fs, font: hf, weight: 700, color: pal.ink, align: "right", base: "middle", max: cwid - 56 - lw - 10 });
     }); }
   drawScene(ctx, pad, L.garden.y, cw, L.garden.h, d.garden, pal);
-  text(ctx, "🍓 MN Study Tracker", W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
+  text(ctx, stampTxt(), W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9, max: 900 });
 }
 
 // ---------------------------------------------------------------- board card: the shared to-do list, drawn in the board's own style (js/board.js)
@@ -458,7 +458,7 @@ function drawBoard(ctx, d, pal, W, H) {
     fl[i].items.forEach(it => drawNote(ctx, st, it, ox, oy, s, B, pal, skin, i, fnt, fw));
     y += hh + gap;
   });
-  text(ctx, "🍓 MN Study Tracker", W / 2, H - pad - 27 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
+  text(ctx, stampTxt(), W / 2, H - pad - 27 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9, max: 900 });
 }
 
 // ---------------------------------------------------------------- card styles (the look of the WHOLE card, on top of the theme colours)
@@ -480,19 +480,30 @@ let ST = STYLES.classic; // the style being drawn right now (tile() reads it)
 const MONO = '"Special Elite","Courier New",monospace';
 const lum = c => { const [r, g, b] = c.match(/[\d.]+/g).map(Number); return (.299 * r + .587 * g + .114 * b) / 255; };
 const hash = s => [...String(s)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+// more things the person can change (photocard.js builds the buttons from these tables; d.look = { style, accent, font, round, pat, stick, filt, dark, msg })
+export const FONTS = { theme: { label: "🎀 theme", fam: null }, round: { label: "Fredoka", fam: "Fredoka" }, bubbly: { label: "Baloo", fam: '"Baloo 2"' }, clean: { label: "Nunito", fam: "Nunito" }, western: { label: "🤠 Rye", fam: "Rye" }, type: { label: "⌨️ typewriter", fam: '"Special Elite"' } }; // big text / numbers (fonts come from index.html)
+export const CORNERS = { soft: "🔵 soft", sharp: "◻️ sharp", round: "⚪ extra round" };
+export const PATTERNS = { auto: "✨ style's own", none: "none", dots: "dots", hearts: "hearts", stars: "stars", stripes: "stripes", checks: "checks", waves: "waves" };
+const STK = { sparkle: ["✨", "⭐", "✨"], hearts: ["💖", "🌸", "💖"], space: ["🚀", "🪐", "⭐"], treats: ["🍓", "🧋", "🍰"], paws: ["🐾", "🦴", "🐾"] }; // emoji for the 3 corners
+export const STICKERS = { auto: "✨ style's own", none: "none", sparkle: "✨ sparkle", hearts: "💖 hearts", space: "🚀 space", treats: "🍓 treats", paws: "🐾 paws" };
+export const FILTERS = { none: "none", warm: "🌅 warm", cool: "❄️ cool", vintage: "📼 vintage", mono: "⚫ mono", vivid: "🌈 vivid", dreamy: "☁️ dreamy" };
+let LK = {}; // the look being drawn right now (d.look)
+const rad = r0 => ({ sharp: 10, round: 54 })[LK.round] || r0; // tile corner radius
+const stampTxt = () => LK.msg || "🍓 MN Study Tracker";
 
 function skin(pal, sty, acc) { // the palette actually used: theme colours, forced dark for "midnight", then the accent colour on top
   const p = { ...pal };
-  if (sty.dark) Object.assign(p, { bg1: "rgba(20,18,52,1)", bg2: "rgba(38,28,82,1)", card: "rgba(255,255,255,0.10)", ink: "rgba(255,255,255,1)", sub: "rgba(214,208,255,0.8)", tint: "rgba(255,255,255,0.14)", edge: "rgba(255,255,255,0.3)", glow1: "130,100,255", glow2: "255,110,190" });
+  if (sty.dark || LK.dark) Object.assign(p, { bg1: "rgba(20,18,52,1)", bg2: "rgba(38,28,82,1)", card: "rgba(255,255,255,0.10)", ink: "rgba(255,255,255,1)", sub: "rgba(214,208,255,0.8)", tint: "rgba(255,255,255,0.14)", edge: "rgba(255,255,255,0.3)", glow1: "130,100,255", glow2: "255,110,190" });
+  const f = FONTS[LK.font]; if (f && f.fam) p.hf = f.fam + ", " + pal.hf;
   const a = ACCENTS[acc];
-  if (a) { const m = hexc(a[0]), l = hexc(a[1]); p.main = m; p.alt = l; p.glow1 = l.match(/[\d.]+/g).slice(0, 3).join(","); p.tint = sty.dark ? l.replace(/[\d.]+\)$/, ".28)") : mixc(p.card, l, .32); }
+  if (a) { const m = hexc(a[0]), l = hexc(a[1]); p.main = m; p.alt = l; p.glow1 = l.match(/[\d.]+/g).slice(0, 3).join(","); p.tint = (sty.dark || LK.dark) ? l.replace(/[\d.]+\)$/, ".28)") : mixc(p.card, l, .32); }
   return p;
 }
 function paintBg(ctx, pal, W, H) {
-  const bg = ST.bg, g = ctx.createLinearGradient(0, 0, W * .6, H), R = seeded(41); g.addColorStop(0, pal.bg1); g.addColorStop(1, pal.bg2); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const bg = ST.bg, g = ctx.createLinearGradient(0, 0, W * .6, H), R = seeded(41), own = !LK.pat || LK.pat === "auto"; g.addColorStop(0, pal.bg1); g.addColorStop(1, pal.bg2); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   if (bg === "pop") { // bold confetti
     const cols = [pal.main, pal.alt, pal.live, pal.edge]; ctx.lineCap = "round"; ctx.lineJoin = "round";
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; own && i < 46; i++) {
       const r = 14 + R() * 30, k = i % 4; ctx.save(); ctx.translate(R() * W, R() * H); ctx.rotate(R() * 6); ctx.globalAlpha = .4; ctx.fillStyle = ctx.strokeStyle = cols[k]; ctx.lineWidth = 7;
       if (k === 0) { ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.3); ctx.fill(); }
       else if (k === 1) { rr(ctx, -r, -r, r * 2, r * 2, 8); ctx.fill(); }
@@ -503,28 +514,56 @@ function paintBg(ctx, pal, W, H) {
   } else if (bg === "aurora") { // soft colour blobs + soap bubbles
     [[.15, .1, .7, pal.glow1, .75], [.9, .3, .65, pal.glow2, .7], [.2, .62, .6, "120,220,255", .55], [.85, .88, .7, "255,205,140", .55], [.5, .45, .45, "255,160,215", .4]].forEach(([fx, fy, fr, rgb, a]) => glow(ctx, W * fx, H * fy, W * fr, rgb, a));
     ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
-    for (let i = 0; i < 14; i++) { const px = R() * W, py = R() * H, r = 24 + R() * 70; ctx.globalAlpha = .5; ctx.beginPath(); ctx.arc(px, py, r, 0, 6.3); ctx.stroke(); ctx.globalAlpha = .75; ctx.beginPath(); ctx.arc(px, py, r * .72, Math.PI * 1.1, Math.PI * 1.45); ctx.stroke(); }
+    for (let i = 0; own && i < 14; i++) { const px = R() * W, py = R() * H, r = 24 + R() * 70; ctx.globalAlpha = .5; ctx.beginPath(); ctx.arc(px, py, r, 0, 6.3); ctx.stroke(); ctx.globalAlpha = .75; ctx.beginPath(); ctx.arc(px, py, r * .72, Math.PI * 1.1, Math.PI * 1.45); ctx.stroke(); }
     ctx.globalAlpha = 1;
   } else if (bg === "night") { // starry sky
     glow(ctx, W * .15, H * .1, W * .6, pal.glow1, .5); glow(ctx, W * .95, H * .6, W * .65, pal.glow2, .35); glow(ctx, W * .86, H * .1, 170, "255,244,214", .5);
-    ctx.fillStyle = "#fff"; for (let i = 0; i < 140; i++) { ctx.globalAlpha = .25 + R() * .7; ctx.beginPath(); ctx.arc(R() * W, R() * H, .8 + R() * 2, 0, 6.3); ctx.fill(); } ctx.globalAlpha = 1;
-    ctx.fillStyle = "rgba(255,244,214,.9)";
-    for (let i = 0; i < 10; i++) { const px = R() * W, py = R() * H, r = 8 + R() * 10; ctx.beginPath(); ctx.moveTo(px, py - r); ctx.quadraticCurveTo(px, py, px + r, py); ctx.quadraticCurveTo(px, py, px, py + r); ctx.quadraticCurveTo(px, py, px - r, py); ctx.quadraticCurveTo(px, py, px, py - r); ctx.fill(); }
+    if (own) {
+      ctx.fillStyle = "#fff"; for (let i = 0; i < 140; i++) { ctx.globalAlpha = .25 + R() * .7; ctx.beginPath(); ctx.arc(R() * W, R() * H, .8 + R() * 2, 0, 6.3); ctx.fill(); } ctx.globalAlpha = 1;
+      ctx.fillStyle = "rgba(255,244,214,.9)";
+      for (let i = 0; i < 10; i++) { const px = R() * W, py = R() * H, r = 8 + R() * 10; ctx.beginPath(); ctx.moveTo(px, py - r); ctx.quadraticCurveTo(px, py, px + r, py); ctx.quadraticCurveTo(px, py, px, py + r); ctx.quadraticCurveTo(px, py, px - r, py); ctx.quadraticCurveTo(px, py, px, py - r); ctx.fill(); }
+    }
   } else if (bg === "grid") { // graph paper
     ctx.fillStyle = pal.bg2; ctx.fillRect(0, 0, W, H); glow(ctx, W * .12, H * .08, W * .5, pal.glow1, .4);
-    ctx.strokeStyle = pal.main; ctx.globalAlpha = .13; ctx.lineWidth = 2; ctx.beginPath();
-    for (let k = 0; k < W; k += 44) { ctx.moveTo(k, 0); ctx.lineTo(k, H); } for (let k = 0; k < H; k += 44) { ctx.moveTo(0, k); ctx.lineTo(W, k); } ctx.stroke(); ctx.globalAlpha = 1;
+    if (own) { ctx.strokeStyle = pal.main; ctx.globalAlpha = .13; ctx.lineWidth = 2; ctx.beginPath();
+      for (let k = 0; k < W; k += 44) { ctx.moveTo(k, 0); ctx.lineTo(k, H); } for (let k = 0; k < H; k += 44) { ctx.moveTo(0, k); ctx.lineTo(W, k); } ctx.stroke(); ctx.globalAlpha = 1; }
   } else if (bg === "linen") { // fine woven texture
     glow(ctx, W * .12, H * .08, W * .55, pal.glow1, .55); glow(ctx, W * .95, H * .55, W * .6, pal.glow2, .5);
-    ctx.strokeStyle = pal.main; ctx.globalAlpha = .06; ctx.lineWidth = 2; ctx.beginPath();
-    for (let k = -H; k < W; k += 9) { ctx.moveTo(k, 0); ctx.lineTo(k + H, H); ctx.moveTo(k + H, 0); ctx.lineTo(k, H); } ctx.stroke(); ctx.globalAlpha = 1;
+    if (own) { ctx.strokeStyle = pal.main; ctx.globalAlpha = .06; ctx.lineWidth = 2; ctx.beginPath();
+      for (let k = -H; k < W; k += 9) { ctx.moveTo(k, 0); ctx.lineTo(k + H, H); ctx.moveTo(k + H, 0); ctx.lineTo(k, H); } ctx.stroke(); ctx.globalAlpha = 1; }
   } else { // classic: theme gradient + soft blobs + polka dots
     glow(ctx, W * .12, H * .08, W * .55, pal.glow1, .55); glow(ctx, W * .95, H * .55, W * .6, pal.glow2, .5);
-    ctx.fillStyle = pal.main; ctx.globalAlpha = .07; for (let yy = 30; yy < H; yy += 70) for (let xx = (yy / 70 % 2) * 35 + 20; xx < W; xx += 70) { ctx.beginPath(); ctx.arc(xx, yy, 5, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1;
+    if (own) { ctx.fillStyle = pal.main; ctx.globalAlpha = .07; for (let yy = 30; yy < H; yy += 70) for (let xx = (yy / 70 % 2) * 35 + 20; xx < W; xx += 70) { ctx.beginPath(); ctx.arc(xx, yy, 5, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1; }
   }
+  if (!own) paintPat(ctx, LK.pat, W, H, pal);
 }
+function paintPat(ctx, kind, W, H, pal) { // a chosen background pattern (replaces the style's own)
+  ctx.save(); ctx.strokeStyle = ctx.fillStyle = pal.main;
+  if (kind === "dots") { ctx.globalAlpha = .1; for (let yy = 26; yy < H; yy += 54) for (let xx = (Math.round(yy / 54) % 2) * 27 + 20; xx < W; xx += 54) { ctx.beginPath(); ctx.arc(xx, yy, 8, 0, 6.3); ctx.fill(); } }
+  else if (kind === "hearts" || kind === "stars") { const e = kind === "hearts" ? "💗" : "⭐"; for (let yy = 40; yy < H; yy += 96) for (let xx = (Math.round(yy / 96) % 2) * 48 + 30; xx < W; xx += 96) emoji(ctx, e, xx, yy, 34, { alpha: .13, rot: .2 }); }
+  else if (kind === "stripes") { ctx.globalAlpha = .07; ctx.lineWidth = 26; ctx.beginPath(); for (let k = -H; k < W; k += 64) { ctx.moveTo(k, H); ctx.lineTo(k + H, 0); } ctx.stroke(); }
+  else if (kind === "checks") { ctx.globalAlpha = .07; for (let yy = 0; yy < H; yy += 60) for (let xx = 0; xx < W; xx += 60) if ((xx / 60 + yy / 60) % 2 === 0) ctx.fillRect(xx, yy, 60, 60); }
+  else if (kind === "waves") { ctx.globalAlpha = .1; ctx.lineWidth = 5; for (let yy = 30; yy < H + 30; yy += 46) { ctx.beginPath(); for (let xx = 0; xx <= W; xx += 12) { const py = yy + Math.sin(xx / 46 + yy / 40) * 9; xx ? ctx.lineTo(xx, py) : ctx.moveTo(xx, py); } ctx.stroke(); } }
+  ctx.restore();
+}
+function paintFilter(ctx, kind, W, H) { // a colour grade over the finished card (blend modes, so it works everywhere)
+  const mix = (op, col) => { ctx.globalCompositeOperation = op; ctx.fillStyle = col; ctx.fillRect(0, 0, W, H); };
+  ctx.save();
+  if (kind === "warm") mix("multiply", "rgba(255,222,180,.55)");
+  else if (kind === "cool") mix("multiply", "rgba(190,222,255,.5)");
+  else if (kind === "mono") mix("saturation", "#000");
+  else if (kind === "vivid") { mix("saturation", "rgba(255,0,0,.4)"); mix("soft-light", "rgba(255,255,255,.25)"); }
+  else if (kind === "dreamy") { mix("screen", "rgba(255,225,245,.2)"); ctx.globalCompositeOperation = "screen"; glow(ctx, W * .25, H * .12, W * .7, "255,255,255", .35); }
+  else if (kind === "vintage") {
+    mix("multiply", "rgba(240,214,168,.62)"); ctx.globalCompositeOperation = "source-over";
+    const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .35, W / 2, H / 2, Math.max(W, H) * .75); v.addColorStop(0, "rgba(60,30,0,0)"); v.addColorStop(1, "rgba(60,30,0,.5)"); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+    const R = seeded(77); for (let i = 0; i < 5000; i++) { ctx.fillStyle = R() < .5 ? "rgba(0,0,0,.07)" : "rgba(255,255,255,.07)"; ctx.fillRect(R() * W, R() * H, 2, 2); }
+  }
+  ctx.restore();
+}
+function paintStick(ctx, e, W, H) { emoji(ctx, e[0], W - 34, 34, 40); emoji(ctx, e[1], 32, H - 30, 34, { rot: -.3 }); emoji(ctx, e[2], W - 30, H * .52, 30, { alpha: .9 }); } // 3 emoji in the card margins
 function paintDeco(ctx, kind, W, H, pal) { // small decorations in the card margins (the content never reaches them)
-  if (kind === "stars") { emoji(ctx, "✨", W - 34, 34, 40); emoji(ctx, "⭐", 32, H - 30, 34, { rot: -.3 }); emoji(ctx, "✨", W - 30, H * .52, 30, { alpha: .9 }); }
+  if (kind === "stars") paintStick(ctx, STK.sparkle, W, H);
   else if (kind === "tape") [[24, 24, -.62], [W - 24, 24, .62], [24, H - 24, .62], [W - 24, H - 24, -.62]].forEach(([x, y, r]) => {
     ctx.save(); ctx.translate(x, y); ctx.rotate(r); ctx.globalAlpha = .8; ctx.fillStyle = mixc(pal.alt, Wt, .35); ctx.fillRect(-52, -16, 104, 32);
     ctx.beginPath(); ctx.rect(-52, -16, 104, 32); ctx.clip(); ctx.globalAlpha = .5; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); for (let k = -60; k < 60; k += 14) { ctx.moveTo(k, 16); ctx.lineTo(k + 20, -16); } ctx.stroke(); ctx.restore();
@@ -586,10 +625,14 @@ function paintFrame(ctx, kind, d, pal, W, H, inside) { // inside(x, y, w, h, rad
 }
 
 export function drawCard(cv, d, pal0) {
-  const [W, H] = SIZES[d.shape] || SIZES.square; cv.width = W; cv.height = H;
-  const sty = STYLES[d.style] || STYLES.classic, ctx = cv.getContext("2d"), pal = skin(pal0, sty, d.accent); ST = sty;
-  if (!sty.frame) { paintCard(ctx, d, pal, W, H); if (sty.deco) paintDeco(ctx, sty.deco, W, H, pal); return; }
-  paintFrame(ctx, sty.frame, d, pal, W, H, (x, y, w, h, r) => { ctx.save(); rr(ctx, x, y, w, h, r); ctx.clip(); ctx.translate(x, y); paintCard(ctx, d, pal, w, h); ctx.restore(); }); // the card is laid out for the smaller box, so nothing is squashed
+  const [W, H] = SIZES[d.shape] || SIZES.square; cv.width = W; cv.height = H; LK = d.look || {};
+  const sty = STYLES[LK.style] || STYLES.classic, ctx = cv.getContext("2d"), pal = skin(pal0, sty, LK.accent), sk = LK.stick && LK.stick !== "auto" ? LK.stick : ""; ST = sty;
+  if (!sty.frame) {
+    paintCard(ctx, d, pal, W, H);
+    if (sty.deco && !(sk && sty.deco === "stars")) paintDeco(ctx, sty.deco, W, H, pal); // a chosen sticker pack replaces the style's own stars
+    if (STK[sk]) paintStick(ctx, STK[sk], W, H);
+  } else paintFrame(ctx, sty.frame, d, pal, W, H, (x, y, w, h, r) => { ctx.save(); rr(ctx, x, y, w, h, r); ctx.clip(); ctx.translate(x, y); paintCard(ctx, d, pal, w, h); ctx.restore(); }); // the card is laid out for the smaller box, so nothing is squashed
+  if (FILTERS[LK.filt] && LK.filt !== "none") paintFilter(ctx, LK.filt, W, H);
 }
 function paintCard(ctx, d, pal, W, H) { // one card, drawn into a W×H area at the current origin
   const L = layout(d.shape, W, H), hf = pal.hf, bf = pal.bf, pad = L.pad, cw = W - pad * 2;
@@ -646,5 +689,5 @@ function paintCard(ctx, d, pal, W, H) { // one card, drawn into a W×H area at t
   drawScene(ctx, pad, L.garden.y, cw, L.garden.h, d.garden, pal);
 
   // stamp
-  text(ctx, "🍓 MN Study Tracker", W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
+  text(ctx, stampTxt(), W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9, max: 900 });
 }

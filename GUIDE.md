@@ -50,7 +50,7 @@ js/
 
 | File | What's in it |
 |---|---|
-| **css/style.css** (≈630 lines) | Everything visual. Roughly: **lines 1-70** colour variables and all themes (`[data-theme=name]` rules, plus glass themes) · 72-133 avatars, progress ring, cards, study button, buttons, nav pill · 134-224 stats, sheets, time wheel, confetti, calendar, badges, couple level, pet row, cheer pop-up · 225-296 garden scene and pets · 297-421 garden extras (evolution accessories, seeds/shop, CSS-drawn decorations, weather, bigger world) · 422-460 photocard sheet (incl. style chips + accent dots) and inbox · 452-505 collapsible sections, compact home, reduce-motion · 506-528 forest · 529-end to-do board (styles, stickers, palette). Colours always come from theme variables, so everything follows the theme. |
+| **css/style.css** (≈630 lines) | Everything visual. Roughly: **lines 1-70** colour variables and all themes (`[data-theme=name]` rules, plus glass themes) · 72-133 avatars, progress ring, cards, study button, buttons, nav pill · 134-224 stats, sheets, time wheel, confetti, calendar, badges, couple level, pet row, cheer pop-up · 225-296 garden scene and pets · 297-421 garden extras (evolution accessories, seeds/shop, CSS-drawn decorations, weather, bigger world) · 422-470 photocard sheet (incl. style chips, accent dots, "more options") and inbox · 452-505 collapsible sections, compact home, reduce-motion · 506-528 forest · 529-end to-do board (styles, stickers, palette). Colours always come from theme variables, so everything follows the theme. |
 
 ### Core (shared by everything)
 
@@ -95,8 +95,8 @@ js/
 | File | What's in it |
 |---|---|
 | **js/carddata.js** | Builds the **data** each card shows: reads the current theme colours (`cardPal`), snapshots the garden (`gardenSnap`), and `cardData` (me), `cardDataTogether`, `cardDataRecap` (7/30 days: best day, busiest time…), `cardDataMilestone`, `cardDataBoard`. |
-| **js/photocard.js** | The photocard **sheet**: mode / period / shape / garden-or-forest options, the **style chips + accent-colour dots + 🎲 shuffle** (built automatically from `STYLES` / `ACCENTS` in `card.js`, remembered on this device), `renderCard` (draws the preview and passes the chosen `style` / `accent` to `drawCard`), save, share, send to a friend (`giftImg` makes the small JPEG), remembers your latest milestone. |
-| **js/card.js** | Pure canvas drawing (no DOM, no Firebase): `drawCard` and one drawer per card (me, together, recap, milestone, board), plus the garden/forest scene it draws at the bottom. Sizes: square / 4:5 / story. **Card styles** (section "card styles" near the bottom): `STYLES` (10 looks: classic, sticker, glass, midnight, scrapbook, gilded, polaroid, film, ticket, stamp), `ACCENTS` (colour override), `skin` (palette used: forced dark for midnight + accent), `paintBg` (background patterns), `tile` (look of the cards/tiles, reads the current style), `paintDeco` (stars / tape / double border), `paintFrame` (polaroid / film / ticket / stamp: draws the frame and calls back to draw the normal card into a smaller box, so the content re-flows instead of being squashed), `paintCard` (one card without the style wrapper). |
+| **js/photocard.js** | The photocard **sheet**: mode / period / shape / garden-or-forest options, the **look controls**: style chips, accent-colour dots, 🎲 shuffle, and a "more ways to customize" section (font, corners, background pattern, corner stickers, photo filter, dark tone, footer message, reset). All buttons are built automatically from the tables in `card.js` and handled by one `data-look` click handler; `loadLook` / `saveLook` keep the whole look as one JSON string on this device, `renderCard` (draws the preview and passes the chosen look to `drawCard` as `data.look`, and loads the fonts the look needs), save, share, send to a friend (`giftImg` makes the small JPEG), remembers your latest milestone. |
+| **js/card.js** | Pure canvas drawing (no DOM, no Firebase): `drawCard` and one drawer per card (me, together, recap, milestone, board), plus the garden/forest scene it draws at the bottom. Sizes: square / 4:5 / story. **Card styles** (section "card styles" near the bottom): `STYLES` (10 looks: classic, sticker, glass, midnight, scrapbook, gilded, polaroid, film, ticket, stamp), `ACCENTS` (colour override), `skin` (palette used: forced dark for midnight + accent), `paintBg` (background patterns), `tile` (look of the cards/tiles, reads the current style), `paintDeco` (stars / tape / double border), `paintPat` (chosen background pattern: dots / hearts / stars / stripes / checks / waves), `paintFilter` (colour grade over the finished card: warm / cool / vintage / mono / vivid / dreamy), `paintStick` (3 emoji in the margins; `STK` = the sticker packs), `FONTS`, `CORNERS` (tile corner radius via `rad`), `PATTERNS`, `STICKERS`, `FILTERS`, and `d.look` (read once per card into `LK`: `{ style, accent, font, round, pat, stick, filt, dark, msg }`), `paintFrame` (polaroid / film / ticket / stamp: draws the frame and calls back to draw the normal card into a smaller box, so the content re-flows instead of being squashed), `paintCard` (one card without the style wrapper). |
 
 ---
 
@@ -163,7 +163,9 @@ Attach this guide + the files in the **Change** column. "Maybe" files are only n
 | Change photocard sizes | `card.js` (`SIZES`) | `photocard.js` (shape buttons) |
 | Add a photocard **style** (new look) | `card.js` (`STYLES` entry + whatever it uses: `paintBg`, `tile`, `paintDeco`, or `paintFrame`) | `photocard.js` only if it needs a font loaded first (see the `document.fonts.load` line in `renderCard`); the chip appears by itself |
 | Add / change a photocard **accent colour** | `card.js` (`ACCENTS`: `[main, light]`) | `css/style.css` (`.adot`) only for the dot's look |
-| Change how the style chips / colour dots look or behave | `photocard.js` (`cardSheet`), `css/style.css` ("photocard look" block) | |
+| Add a **font / corner shape / background pattern / sticker pack / filter** to the photocard | `card.js` (`FONTS` / `CORNERS` / `PATTERNS` + `paintPat` / `STK` + `STICKERS` / `FILTERS` + `paintFilter`); the button appears by itself | `photocard.js` (font loading in `renderCard`, only for a new font), `index.html` (only if the font isn't loaded yet) |
+| Add a **new kind of option** (a new key in the look) | `card.js` (read it from `LK`), `photocard.js` (`DEF`, `TBL` if it is a pick-list, and a row in the "more ways to customize" HTML) | `css/style.css` |
+| Change how the style chips / colour dots look or behave | `photocard.js` (`cardSheet`), `css/style.css` ("photocard look" block; the chips wrap on purpose, so nothing needs sideways scrolling on a PC) | |
 | Add a **frame** (like polaroid / film) | `card.js` (`paintFrame` + a `STYLES` entry with `frame:`) | |
 
 ### Board
@@ -203,7 +205,7 @@ Attach this guide + the files in the **Change** column. "Maybe" files are only n
 | `users/{uid}/gifts/{id}` | `from`, `name`, `emoji`, `kind`, `img`, `seen`, `at` | `sendGift`, `markGift`, `deleteGift` | `social.js` |
 | `board/{id}` | `text`, `lane`, `o` (order), `color`, `icon`, `by`, `name`, `emoji`, `at` | `addNote`, `moveNote`, `editNote`, `deleteNote`, `clearNotes` | `board.js` |
 
-On this device only (localStorage): theme, photocard style + accent colour (`cardStyle`, `cardAcc`), motion, compact tab, pomodoro on/off, sound, fold state, weather choice, board look, card shape/scene, last milestone, "already celebrated" markers.
+On this device only (localStorage): theme, photocard look (`cardLook`: style, accent, font, corners, pattern, stickers, filter, tone, footer message), motion, compact tab, pomodoro on/off, sound, fold state, weather choice, board look, card shape/scene, last milestone, "already celebrated" markers.
 
 ---
 
@@ -217,7 +219,7 @@ On this device only (localStorage): theme, photocard style + accent colour (`car
 6. **Redraw from another file**: call `ui.render()` (from `state.js`); never import `app.js`.
 7. **New function used by another file**: add it to the `export { … }` line at the bottom of its file and import it where it's used.
 8. **New pet or tree**: also give it an entry in the movement table (`MOVE` in `garden-state.js`) / price+hours (`forest.js` `SPECIES`); missing entries fall back to defaults but won't feel tuned.
-9. **Photocard styles**: a new `STYLES` entry needs nothing else for the chip to show up. If a style draws text in a special font (e.g. `MONO` = Special Elite), load it in `photocard.js` `renderCard` before drawing, or the canvas silently falls back to a plain font. A style that forces its own colours (like `midnight`'s `dark: true`) must set every colour the cards read (`bg1 bg2 card ink sub tint edge glow1 glow2` in `skin`). `tile()` is the only place tiles are drawn; don't draw card backgrounds anywhere else, or the style won't apply to them.
+9. **Photocard styles**: a new `STYLES` entry needs nothing else for the chip to show up. If a style draws text in a special font (e.g. `MONO` = Special Elite), load it in `photocard.js` `renderCard` before drawing, or the canvas silently falls back to a plain font. A **font** other than Fredoka / Nunito must be loaded with `document.fonts.load` before drawing too (already done for the ones in `FONTS`). A style that forces its own colours (like `midnight`'s `dark: true`, or the "dark" tone switch) must set every colour the cards read (`bg1 bg2 card ink sub tint edge glow1 glow2` in `skin`). `tile()` is the only place tiles are drawn; don't draw card backgrounds anywhere else, or the style won't apply to them.
 
 ---
 
