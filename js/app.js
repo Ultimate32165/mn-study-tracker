@@ -1,6 +1,6 @@
 import * as DB from "./db.js";
 import { drawCard } from "./card.js";
-import { boardMain, initBoard, boardBusy, boardSheet, boardStyleSheet, boardDraft, boardKeep, boardRestore, nextOrder } from "./board.js";
+import { boardMain, initBoard, boardBusy, boardSheet, boardStyleSheet, boardDraft, boardKeep, boardRestore, boardSnap, nextOrder } from "./board.js";
 import { forestMain, forestAct, forestGrow, forestCost, forestSnap, forestOf } from "./forest.js";
 import { SIGNUP_CODE } from "./firebase-config.js";
 
@@ -886,13 +886,17 @@ function cardDataMilestone(shape, ms) {
   const lv = Math.min(ms.lv, LV_T.length - 1);
   return { ...out, emo: "💞", title: `Level ${lv + 1}!`, sub: LV_T[lv], spark: ["💞", "✨", "🌸", "⭐"], chips: [["together", fmt(couple().sec)], ["couple level", `${lv + 1} 💞`]] };
 }
+function cardDataBoard(shape) { // the shared to-do board, as a photocard
+  const m = users.find(u => u.id === me.uid) || {};
+  return { kind: "board", shape, name: m.name || "you", avatar: m.emoji || "📚", date: dayLong(Date.now()), board: boardSnap(board), garden: gardenSnap() };
+}
 async function renderCard() {
   const seq = ++cardSeq, img = $("#cimg"), ld = $(".cload"); if (!img) return;
   cardBlob = null; cardCv = null; if (ld) ld.hidden = false; // until the new card is drawn, save / send say "still drawing"
-  try { await Promise.race([Promise.all([document.fonts.load("700 48px Fredoka"), document.fonts.load("800 28px Nunito")]), new Promise(r => setTimeout(r, 1500))]); } catch {}
+  try { await Promise.race([Promise.all([document.fonts.load("700 48px Fredoka"), document.fonts.load("800 28px Nunito"), ...(cardOpt.mode === "board" ? [document.fonts.load("30px Rye"), document.fonts.load("30px 'Special Elite'")] : [])]), new Promise(r => setTimeout(r, 1500))]); } catch {}
   if (seq !== cardSeq) return;
   let data; const md = cardOpt.mode;
-  try { data = md === "together" ? cardDataTogether(cardOpt.shape, cardOpt.fid) : md === "recap" ? await cardDataRecap(cardOpt.shape, cardOpt.period) : md === "milestone" ? cardDataMilestone(cardOpt.shape, cardOpt.ms) : cardData(cardOpt.shape, cardOpt.sid); }
+  try { data = md === "together" ? cardDataTogether(cardOpt.shape, cardOpt.fid) : md === "recap" ? await cardDataRecap(cardOpt.shape, cardOpt.period) : md === "milestone" ? cardDataMilestone(cardOpt.shape, cardOpt.ms) : md === "board" ? cardDataBoard(cardOpt.shape) : cardData(cardOpt.shape, cardOpt.sid); }
   catch { if (seq === cardSeq) { toast("Couldn't draw that card 😢"); if (ld) ld.hidden = true; } return; }
   if (seq !== cardSeq) return;
   const cv = document.createElement("canvas");
@@ -914,11 +918,11 @@ function giftImg() {
 function cardSheet(mode) {
   const sess = sessions.slice(0, 12), friends = users.filter(u => u.id !== me.uid), canShare = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File([""], "a.png", { type: "image/png" })] })); } catch { return false; } })();
   if (!cardOpt.ms) cardOpt.ms = loadMs();
-  cardOpt.mode = mode === "together" && friends.length ? "together" : mode === "milestone" && cardOpt.ms ? "milestone" : mode === "recap" ? "recap" : "me";
+  cardOpt.mode = mode === "together" && friends.length ? "together" : mode === "milestone" && cardOpt.ms ? "milestone" : mode === "recap" ? "recap" : mode === "board" ? "board" : "me";
   if (!sess.some(x => x.id === cardOpt.sid)) cardOpt.sid = "today";
   if (!friends.some(u => u.id === cardOpt.fid)) cardOpt.fid = (friends.find(u => u.status === "studying") || friends[0] || {}).id || "";
   const SH = { square: "▫️ square", portrait: "🖼️ 4:5", story: "📱 story" }, PD = { week: "last 7 days", month: "last 30 days" },
-    MD = { me: "👤 me", ...(friends.length ? { together: "💞 together" } : {}), recap: "🗓️ recap", ...(cardOpt.ms ? { milestone: "🏅 milestone" } : {}) };
+    MD = { me: "👤 me", ...(friends.length ? { together: "💞 together" } : {}), recap: "🗓️ recap", board: "📝 board", ...(cardOpt.ms ? { milestone: "🏅 milestone" } : {}) };
   modal.innerHTML = `<div class="back"><div class="sheet cardsheet"><h3>photocard 📸</h3>
   <div class="seg" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>
   <div class="seg" id="cper">${Object.keys(PD).map(k => `<button data-per="${k}" class="${k === cardOpt.period ? "sel" : ""}">${PD[k]}</button>`).join("")}</div>
@@ -929,7 +933,7 @@ function cardSheet(mode) {
   <div class="cprev"><div class="cload">drawing your card…</div><img id="cimg" alt="photocard preview"></div>
   ${friends.length ? `<button class="btn" id="csend">💌 send</button>` : ""}
   <div class="row"><button class="btn ghost" id="cclose">close</button>${canShare ? `<button class="btn ghost" id="cshare">share</button>` : ""}<button class="btn ghost" id="csave">save ⬇️</button></div></div></div>`;
-  const vis = () => { $("#csel").hidden = cardOpt.mode !== "me"; $("#cfr").hidden = friends.length < 2; $("#cper").hidden = cardOpt.mode !== "recap"; };
+  const vis = () => { $("#csel").hidden = cardOpt.mode !== "me"; $("#cfr").hidden = friends.length < 2; $("#cper").hidden = cardOpt.mode !== "recap"; $("#cscene").hidden = cardOpt.mode === "board"; };
   const sendLbl = () => { const b = $("#csend"), f = friends.find(u => u.id === cardOpt.fid); if (b) { b.textContent = `💌 send to ${f ? f.name : "friend"}`; b.disabled = !f; } };
   const done = () => { cardSeq++; if (cardUrl) { URL.revokeObjectURL(cardUrl); cardUrl = ""; } cardBlob = null; cardCv = null; modal.innerHTML = ""; };
   $("#cclose").onclick = done;
@@ -1156,7 +1160,7 @@ app.onclick = async e => {
     else if (a === "gtreat") await treat(id, mine);
     else if (a === "gvis") await collectVisitor(mine);
     else if (a === "gfind") findPet();
-    else if (a === "card") cardSheet(["together", "recap"].includes(id) ? id : "me");
+    else if (a === "card") cardSheet(["together", "recap", "board"].includes(id) ? id : "me");
     else if (a === "gift") giftSheet(id);
     else if (a === "calnav") { calMonth = Math.min(0, calMonth + +id); render(); }
     else if (a === "day") { const v = +b.dataset.v; toast(`${new Date(id + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${v ? fmt(v) : "no study 💤"}`); }

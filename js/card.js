@@ -1,4 +1,5 @@
 import { treeParts, cellPos, SPECIES, GRID } from "./forest.js";
+import { COLORS } from "./board.js";
 // Photocard: draws a shareable "cozy dashboard" image on a canvas.
 // Pure drawing code: numbers and colours in, pixels out. No DOM, no Firebase (app.js collects the data and the theme colours).
 // The garden is redrawn from the same data as the live scene, shrunk to fit. Keep WW/WH/POND in sync with js/app.js and the garden CSS.
@@ -313,6 +314,108 @@ function drawMilestone(ctx, d, pal, W, H) {
   text(ctx, "🍓 MN Study Tracker", W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
 }
 
+// ---------------------------------------------------------------- board card: the shared to-do list, drawn in the board's own style (js/board.js)
+const K = "rgba(0,0,0,1)", Wt = "rgba(255,255,255,1)";
+const hexc = h => { const n = parseInt(h.replace("#", "").replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},1)`; };
+const ncol = (c, pal) => { const v = COLORS[c] || COLORS[0]; return v[0] === "-" ? pal[v.slice(2)] : hexc(v); };
+const FACES = ["• ᴗ •", "> ᴗ <", "^ ᴗ ^"], STARS = ["★", "★★", "★★★"];
+const BSKIN = { western: { f: '"Special Elite","Courier New",monospace', w: 400, hd: "#fbe9b7", ink: "#4a2f14", hf: "Rye,Georgia,serif" }, cork: { hd: "#4a2f14", ink: "#3d3326" }, chalk: { hd: "#f2f2e8", ink: "#24302c" }, notebook: { hd: "#4a4458", ink: "#4a4458" } };
+
+function flow(ctx, notes, innerW, s, faces, fnt, fw) { // lay the notes out left to right, wrapping like on the board
+  const fs = 30 * s, lh = fs * 1.28, padX = 20 * s, padY = 15 * s, gx = 18 * s, gy = 24 * s, faceH = faces ? 24 * s : 0, maxT = innerW - padX * 2;
+  ctx.font = `${fw} ${fs}px ${fnt}`; let x = 0, y = 0, rowH = 0; const items = [];
+  for (const n of notes) {
+    let lines = [], cur = "";
+    for (const w of String(n.t).split(/\s+/)) { const t = cur ? cur + " " + w : w; if (!cur || ctx.measureText(t).width <= maxT) cur = t; else { lines.push(cur); cur = w; } }
+    if (cur) lines.push(cur);
+    if (lines.length > 3) { lines = lines.slice(0, 3); lines[2] += "…"; }
+    const tw = Math.min(maxT, Math.max(...lines.map(l => ctx.measureText(l).width))), w = tw + padX * 2, h = lines.length * lh + padY * 2 + (n.more ? 0 : faceH);
+    if (x > 0 && x + w > innerW) { x = 0; y += rowH + gy; rowH = 0; }
+    items.push({ n, x, y, w, h, lines, lh, padX, padY }); x += w + gx; rowH = Math.max(rowH, h);
+  }
+  return { items, h: items.length ? y + rowH : 0 };
+}
+
+function drawPanel(ctx, st, B, x, y, w, h, s, pal) { // the lane: wooden planks / cork / chalkboard / lined paper / cute card
+  const R = st === "western" ? 16 : st === "notebook" ? 14 : st === "cork" || st === "chalk" ? 18 : 34, bg = ncol(B.bg, pal), rnd = seeded(7);
+  if (st === "western" || st === "cork" || st === "chalk") { rr(ctx, x, y + 7, w, h, R); ctx.fillStyle = st === "western" ? "#3b2410" : st === "cork" ? "#5a3818" : "#6d4a26"; ctx.fill(); }
+  ctx.save(); rr(ctx, x, y, w, h, R); ctx.clip();
+  if (st === "western") { ctx.fillStyle = "#b07a43"; ctx.fillRect(x, y, w, h); ctx.fillStyle = "#8f5e2f"; for (let yy = y + 28 * s; yy < y + h; yy += 28 * s) ctx.fillRect(x, yy, w, 3); }
+  else if (st === "cork") { ctx.fillStyle = "#c99a62"; ctx.fillRect(x, y, w, h); for (let i = 0; i < w * h / 240; i++) { ctx.fillStyle = rnd() < .5 ? "rgba(0,0,0,.16)" : "rgba(255,255,255,.2)"; ctx.fillRect(x + rnd() * w, y + rnd() * h, 2.5, 2.5); } }
+  else if (st === "chalk") { ctx.fillStyle = "#2d3d38"; ctx.fillRect(x, y, w, h); }
+  else if (st === "notebook") { ctx.fillStyle = "#fffdf5"; ctx.fillRect(x, y, w, h); ctx.fillStyle = "#a9cdee"; for (let yy = y + 28 * s; yy < y + h; yy += 28 * s) ctx.fillRect(x, yy, w, 2); ctx.fillStyle = "rgba(255,138,138,.65)"; ctx.fillRect(x + 46 * s, y, 3, h); ctx.fillStyle = "#d6dbe0"; for (let yy = y + 36 * s; yy < y + h; yy += 70 * s) { ctx.beginPath(); ctx.arc(x + 20 * s, yy, 9 * s, 0, Math.PI * 2); ctx.fill(); } }
+  else { // cute / my own
+    ctx.fillStyle = st === "own" ? mixc(pal.bg2, bg, .38) : pal.card; ctx.fillRect(x, y, w, h);
+    if (st === "own" && B.pat !== "plain") { const pc = mixc(pal.bg2, bg, .6); ctx.fillStyle = pc; ctx.strokeStyle = pc; ctx.lineWidth = B.pat === "stripes" ? 10 * s : 2;
+      if (B.pat === "dots") for (let yy = y + 8 * s; yy < y + h; yy += 16 * s) for (let xx = x + 8 * s; xx < x + w; xx += 16 * s) { ctx.beginPath(); ctx.arc(xx, yy, 2.2 * s, 0, Math.PI * 2); ctx.fill(); }
+      else if (B.pat === "grid") for (let k = 0; k < Math.max(w, h); k += 22 * s) { ctx.beginPath(); ctx.moveTo(x + k, y); ctx.lineTo(x + k, y + h); ctx.moveTo(x, y + k); ctx.lineTo(x + w, y + k); ctx.stroke(); }
+      else if (B.pat === "lines") for (let yy = y + 24 * s; yy < y + h; yy += 24 * s) { ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + w, yy); ctx.stroke(); }
+      else for (let k = -h; k < w; k += 30 * s) { ctx.globalAlpha = .35; ctx.beginPath(); ctx.moveTo(x + k, y); ctx.lineTo(x + k + h, y + h); ctx.stroke(); ctx.globalAlpha = 1; } }
+  }
+  ctx.restore();
+  if (st === "western" || st === "cork" || st === "chalk") { rr(ctx, x + 5, y + 5, w - 10, h - 10, R - 4); ctx.lineWidth = 10; ctx.strokeStyle = st === "western" ? "#5a3818" : st === "cork" ? "#8a5a2b" : "#b98d5a"; ctx.stroke(); }
+  else { rr(ctx, x, y, w, h, R); ctx.lineWidth = 3; ctx.strokeStyle = st === "notebook" ? "#d9d2c0" : st === "own" ? mixc(pal.card, bg, .7) : pal.edge; if (st === "cutie" || st === "own") ctx.setLineDash([14, 10]); ctx.stroke(); ctx.setLineDash([]); }
+  if (st === "western") for (const [nx, ny] of [[x + 24, y + 24], [x + w - 24, y + 24], [x + 24, y + h - 24], [x + w - 24, y + h - 24]]) { ell(ctx, nx, ny, 7, 7, "#8d8d8d"); ell(ctx, nx - 2, ny - 2, 3, 3, "#ddd"); }
+}
+
+function drawNote(ctx, st, it, ox, oy, s, B, pal, skin, lane, fnt, fw) { // one sticky note: paper, tape / pin / nail / magnet, text, face, sticker, author
+  const n = it.n, w = it.w, h = it.h, x = ox + it.x, y = oy + it.y;
+  if (n.more) { rr(ctx, x, y, w, h, 18 * s); ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.fill(); text(ctx, n.t, x + w / 2, y + h / 2, { size: 28 * s, font: pal.bf, weight: 800, color: skin.hd || pal.ink, align: "center", base: "middle", max: w - 10 }); return; }
+  const col = ncol(n.c, pal), ink = skin.ink || pal.ink, cute = st === "cutie" || st === "own" || st === "notebook";
+  ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate((n.r || 0) * Math.PI / 180); ctx.translate(-w / 2, -h / 2);
+  const R = st === "western" ? 4 : st === "cork" ? 6 : st === "chalk" ? 16 * s : st === "notebook" ? 12 * s : 22 * s;
+  rr(ctx, 0, 5 * s, w, h, R); ctx.fillStyle = st === "chalk" ? "rgba(0,0,0,.4)" : st === "western" ? "rgba(0,0,0,.32)" : mixc(col, K, .25).replace(/,[\d.]+\)$/, ",.35)"); ctx.fill(); // shadow
+  rr(ctx, 0, 0, w, h, R);
+  ctx.fillStyle = st === "western" ? mixc(hexc("#f4e4bb"), col, .24) : st === "cork" ? mixc(hexc("#fffdf6"), col, .18) : st === "chalk" ? mixc(col, Wt, .2) : st === "notebook" ? mixc(Wt, col, .38) : mixc(pal.bg2, col, .3); ctx.fill();
+  ctx.lineWidth = 3 * s; ctx.strokeStyle = st === "chalk" ? "rgba(255,255,255,.85)" : st === "western" ? "rgba(139,90,43,.5)" : st === "cork" ? mixc(hexc("#e8dcc4"), col, .4) : st === "notebook" ? mixc(Wt, col, .6) : mixc(pal.bg2, col, .55);
+  if (st === "chalk") ctx.setLineDash([10 * s, 8 * s]); if (st === "western") { ctx.save(); ctx.beginPath(); ctx.rect(9 * s, 9 * s, w - 18 * s, h - 18 * s); ctx.setLineDash([6, 5]); ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); } else ctx.stroke(); ctx.setLineDash([]);
+  if (st === "western") { ctx.fillStyle = col; ctx.fillRect(0, 0, 11 * s, h); }
+  if (cute) { ctx.save(); ctx.translate(w / 2, 0); ctx.rotate(-4 * Math.PI / 180); ctx.fillStyle = mixc(col, Wt, .25); ctx.fillRect(-40 * s, -13 * s, 80 * s, 26 * s); ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 4 * s; ctx.beginPath(); ctx.rect(-40 * s, -13 * s, 80 * s, 26 * s); ctx.clip(); for (let k = -60; k < 60; k += 11 * s) { ctx.beginPath(); ctx.moveTo(k * 1, 14 * s); ctx.lineTo(k + 26 * s, -14 * s); ctx.stroke(); } ctx.restore(); }
+  else if (st === "western") { ell(ctx, w / 2, 14 * s, 9 * s, 9 * s, "#6b6b6b"); ell(ctx, w / 2 - 2 * s, 12 * s, 4 * s, 4 * s, "#eee"); }
+  else if (st === "cork") { ell(ctx, w / 2, 2 * s + 3 * s, 15 * s, 15 * s, "rgba(0,0,0,.25)"); ell(ctx, w / 2, 0, 15 * s, 15 * s, col); ell(ctx, w / 2 - 5 * s, -5 * s, 5 * s, 5 * s, "rgba(255,255,255,.6)"); }
+  else { ell(ctx, w / 2, 0, 14 * s, 14 * s, "#e6e6e6"); ell(ctx, w / 2 - 4 * s, -4 * s, 4 * s, 4 * s, "#fff"); }
+  const top = st === "cork" || st === "chalk" ? 2 * s : 0, x0 = st === "western" ? it.padX + 4 * s : it.padX;
+  it.lines.forEach((l, i) => text(ctx, l, x0, it.padY + top + it.lh * (i + .5), { size: 30 * s, font: fnt, weight: fw, color: ink, base: "middle", max: w - x0 - it.padX + 4 * s }));
+  if (B.faces) text(ctx, st === "western" ? STARS[lane] : FACES[lane], w - it.padX, h - it.padY - 4 * s, { size: 20 * s, font: pal.bf, weight: 800, color: ink, alpha: .55, align: "right", base: "middle" });
+  if (n.i) { ctx.save(); ctx.translate(2 * s, h - 2 * s); ctx.rotate(-12 * Math.PI / 180); emoji(ctx, n.i, 0, 0, 46 * s); ctx.restore(); }
+  if (n.e) { ell(ctx, w - 4 * s, 2 * s, 18 * s, 18 * s, "rgba(255,255,255,.95)"); emoji(ctx, n.e, w - 4 * s, 3 * s, 24 * s); }
+  ctx.restore();
+}
+
+function drawBoard(ctx, d, pal, W, H) {
+  const B = d.board, st = B.style, skin = BSKIN[st] || {}, pad = 54, gap = 22, cw = W - pad * 2, hf = pal.hf, bf = pal.bf, fnt = skin.f || bf, fw = skin.w || 700, sq = d.shape === "square";
+  drawHead(ctx, { head: { y: pad, h: sq ? 92 : 108 }, pad }, pal, W, d.avatar, "our to-do board", d.date);
+  const total = B.lanes.reduce((a, l) => a + l.notes.length, 0), done = B.lanes[2].notes.length, ph = sq ? 92 : 118; let y = pad + (sq ? 92 : 108) + gap;
+  { tile(ctx, pad, y, cw, ph, pal); const inner = 32;
+    text(ctx, "TASKS DONE", pad + inner, y + ph * .3, { size: Math.min(ph * .2, 26), font: bf, weight: 800, color: pal.sub, base: "middle" });
+    text(ctx, `${done}/${total}`, pad + inner, y + ph * .68, { size: ph * .42, font: hf, weight: 700, color: pal.ink, base: "middle", max: cw * .36 });
+    const bx = pad + cw * .42, bw = cw - cw * .42 - inner, bh = 28, by = y + ph / 2 - bh / 2;
+    rr(ctx, bx, by, bw, bh, bh / 2); ctx.fillStyle = pal.bg2; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = pal.edge; ctx.stroke();
+    if (total && done) { const g = ctx.createLinearGradient(bx, 0, bx + bw, 0); g.addColorStop(0, pal.main); g.addColorStop(1, pal.alt); rr(ctx, bx, by, Math.max(bh, bw * done / total), bh, bh / 2); ctx.fillStyle = g; ctx.fill(); }
+    if (total && done === total) emoji(ctx, "🎉", bx + bw - 6, by - 14, 36); }
+  y += ph + gap;
+  const avail = H - pad - 54 - gap - y, show = B.lanes.map(l => l.notes.length); let s = 1, fl;
+  const innerW = sc => st === "notebook" ? cw - 62 * sc - 28 * sc : cw - 56 * sc, laneH = (f, sc) => 28 * sc + 58 * sc + Math.max(f.h, 48 * sc) + 28 * sc;
+  const build = () => { fl = B.lanes.map((l, i) => { const ns = l.notes.slice(0, show[i]); if (show[i] < l.notes.length) ns.push({ t: `+${l.notes.length - show[i]} more`, more: true }); return flow(ctx, ns, innerW(s), s, B.faces, fnt, fw); }); return fl.reduce((a, f) => a + laneH(f, s), 0) + gap * 2; };
+  for (const sc of [1, .9, .8, .72, .64, .58]) { s = sc; if (build() <= avail) break; }
+  for (let g = 0; g < 120 && build() > avail; g++) { let k = -1; show.forEach((n, i) => { if (n > 1 && (k < 0 || n >= show[k])) k = i; }); if (k < 0) break; show[k]--; }
+  const add = Math.min(Math.max(0, avail - build()) / 3, 230 * s);
+  B.lanes.forEach((l, i) => {
+    const hh = laneH(fl[i], s) + add, ox = pad + (st === "notebook" ? 62 * s : 28 * s), hd = skin.hd || pal.ink;
+    drawPanel(ctx, st, B, pad, y, cw, hh, s, pal);
+    const title = st === "western" ? `${l.e} ${l.name}`.toUpperCase() : `${l.e} ${l.name}`, tf = skin.hf || hf;
+    text(ctx, title, ox, y + 28 * s + 29 * s, { size: 34 * s, font: tf, weight: 700, color: hd, base: "middle", max: cw * .6 });
+    ctx.font = `700 ${34 * s}px ${tf}`; const tw = Math.min(ctx.measureText(title).width, cw * .6), cx0 = ox + tw + 16 * s, cs = 38 * s;
+    rr(ctx, cx0, y + 28 * s + 29 * s - cs / 2, cs + 10 * s, cs, cs / 2); ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.fill();
+    text(ctx, String(l.notes.length), cx0 + (cs + 10 * s) / 2, y + 28 * s + 30 * s, { size: 24 * s, font: bf, weight: 800, color: hd, align: "center", base: "middle" });
+    const oy = y + 28 * s + 58 * s;
+    if (!l.notes.length) text(ctx, "nothing here yet ✨", ox, oy + 22 * s, { size: 28 * s, font: bf, weight: 700, color: hd, alpha: .7, base: "middle" });
+    fl[i].items.forEach(it => drawNote(ctx, st, it, ox, oy, s, B, pal, skin, i, fnt, fw));
+    y += hh + gap;
+  });
+  text(ctx, "🍓 MN Study Tracker", W / 2, H - pad - 27 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9 });
+}
+
 export function drawCard(cv, d, pal) {
   const [W, H] = SIZES[d.shape] || SIZES.square; cv.width = W; cv.height = H;
   const ctx = cv.getContext("2d"), L = layout(d.shape, W, H), hf = pal.hf, bf = pal.bf, pad = L.pad, cw = W - pad * 2;
@@ -324,6 +427,7 @@ export function drawCard(cv, d, pal) {
   if (d.kind === "together") { drawTogether(ctx, d, pal, W, H); return; }
   if (d.kind === "recap") { drawRecap(ctx, d, pal, W, H); return; }
   if (d.kind === "milestone") { drawMilestone(ctx, d, pal, W, H); return; }
+  if (d.kind === "board") { drawBoard(ctx, d, pal, W, H); return; }
   // header: avatar + title (left), date (right)
   { const { y, h } = L.head, av = Math.min(h, 84), cy = y + h / 2;
     ctx.beginPath(); ctx.arc(pad + av / 2, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = pal.edge; ctx.stroke();

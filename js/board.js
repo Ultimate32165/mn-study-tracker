@@ -1,6 +1,6 @@
 // Shared to-do board: three lanes of sticky boxes you drag between. Mouse: just drag. Touch: press and hold a box, then drag.
 // Saved in the top-level collection board/{id} = { text, lane 0|1|2, o (order inside the lane), color 0-15, icon (sticker emoji), by, name, emoji, at }.
-const COLORS = ["--main", "--alt", "--live", "#ffc857", "#6fc4ff", "#ff8fb8", "#ffab76", "#ffe66d", "#7fe0b5", "#b79cff", "#d9a7ff", "#ff7b7b", "#fff1d6", "#9fb4d6", "#b9d77a", "#d8517f"]; // the first 5 are the original colours
+export const COLORS = ["--main", "--alt", "--live", "#ffc857", "#6fc4ff", "#ff8fb8", "#ffab76", "#ffe66d", "#7fe0b5", "#b79cff", "#d9a7ff", "#ff7b7b", "#fff1d6", "#9fb4d6", "#b9d77a", "#d8517f"]; // the first 5 are the original colours
 const STICKERS = ["", "🌸", "⭐", "🍓", "🐰", "🐱", "🐻", "☁️", "🍀", "🍰", "🎀", "🧸", "🦋", "🌈", "💖", "🐥", "🍄"];
 const STYLES = { // looks for the whole board (saved on this device only); the notes themselves are shared
   cutie:    { n: "cutie",      e: "🌸", lanes: [["to do", "📝"], ["doing", "🔥"], ["done", "🎉"]] },
@@ -26,9 +26,15 @@ export const nextOrder = (notes, l) => inLane(notes, l).reduce((m, n) => Math.ma
 const preview = () => `<b${draft.color >= 0 ? ` style="--c:${col(COLORS[draft.color])}"` : ""}>${draft.color < 0 ? "🎲" : ""}</b>${draft.icon ? `<b>${draft.icon}</b>` : ""}`;
 const note = n => `<div class="note${n.lane === 2 ? " done" : ""}" data-id="${esc(n.id)}" data-o="${n.o || 0}" data-l="${n.lane}" style="--c:${col(COLORS[n.color] || COLORS[0])};--r:${tilt(n.id)}deg"><span>${esc(n.text)}</span>${STICKERS.includes(n.icon) && n.icon ? `<b class="nstk">${n.icon}</b>` : ""}${n.emoji ? `<i class="by">${esc(n.emoji)}</i>` : ""}</div>`;
 
+// plain data for the photocard (js/card.js draws it): the board's look + the notes in each lane
+export function boardSnap(notes) {
+  const st = getStyle(), S = STYLES[st.s];
+  return { style: st.s, bg: st.bg, pat: st.pat, faces: st.faces, lanes: S.lanes.map(([name, e], l) => ({ name, e, notes: inLane(notes, l).map(n => ({ t: n.text, c: COLORS[n.color] ? n.color : 0, i: STICKERS.includes(n.icon) ? n.icon : "", e: n.emoji || "", r: tilt(n.id) })) })) };
+}
+
 export function boardMain(notes) {
   const st = getStyle(), S = STYLES[st.s];
-  return `<div class="bhead"><h2>our board</h2><button class="chip" data-act="bstyle">🎨 style</button></div>
+  return `<div class="bhead"><h2>our board</h2><span class="bbtns"><button class="chip" data-act="card" data-id="board">📸 photocard</button><button class="chip" data-act="bstyle">🎨 style</button></span></div>
   <div class="bnew"><input id="bnew" maxlength="140" placeholder="what do we need to do? ✏️" autocomplete="off" enterkeyhint="send"><button class="chip" data-act="badd">add</button></div>
   <aside class="bside${palOpen ? " open" : ""}" id="bside"><button class="bside-t" data-bt>🎨 colours &amp; stickers <span class="now" id="bnow">${preview()}</span><i>▾</i></button>
     <div class="bside-b"><h5>colour</h5><div class="bgrid" id="bcol"><button class="rnd${draft.color < 0 ? " sel" : ""}" data-bc="-1" aria-label="surprise colour" title="surprise me">🎲</button>${COLORS.map((c, i) => `<button data-bc="${i}" class="${draft.color === i ? "sel" : ""}" style="--c:${col(c)}" aria-label="colour ${i + 1}"></button>`).join("")}</div>

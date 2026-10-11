@@ -548,7 +548,7 @@ h2.fold.shut .fbtn i{transform:rotate(-90deg)}
 .swat button{width:34px;height:34px;border-radius:50%;background:var(--c);border:3px solid var(--card);box-shadow:var(--sh-s)}
 .swat .sel{outline:3px solid var(--ink)}
 /* ---- board: styles, stickers, cute faces, more colours ---- */
-.bhead{display:flex;align-items:center;justify-content:space-between;gap:10px}.bhead .chip{flex:none}
+.bhead{display:flex;align-items:center;justify-content:space-between;gap:10px}.bhead .chip{flex:none}.bbtns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .swat.wrap{flex-wrap:wrap;gap:8px}.swat.wrap button{width:30px;height:30px}
 .stks{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0}
 .stks button{width:36px;height:36px;border-radius:12px;border:2px solid var(--edge);background:var(--card);font-size:1.15rem;padding:0;color:var(--ink)}.stks .sel{border-color:var(--main);outline:2px solid var(--main)}
