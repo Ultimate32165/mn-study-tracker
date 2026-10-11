@@ -22,14 +22,14 @@ const valid = n => n && typeof n.text === "string" && [0, 1, 2].includes(n.lane)
 const inLane = (notes, l) => notes.filter(n => valid(n) && n.lane === l).sort((a, b) => (a.o || 0) - (b.o || 0) || ((a.at && a.at.seconds) || 0) - ((b.at && b.at.seconds) || 0));
 export const nextOrder = (notes, l) => inLane(notes, l).reduce((m, n) => Math.max(m, n.o || 0), 0) + 1;
 
-const note = n => `<div class="note${n.lane === 2 ? " done" : ""}" data-id="${esc(n.id)}" data-o="${n.o || 0}" data-l="${n.lane}" style="--c:${col(COLORS[n.color] || COLORS[0])};--r:${tilt(n.id)}deg"><span>${esc(n.text)}</span>${STICKERS.includes(n.icon) && n.icon ? `<b class="stk">${n.icon}</b>` : ""}${n.emoji ? `<i class="by">${esc(n.emoji)}</i>` : ""}</div>`;
+const note = n => `<div class="note${n.lane === 2 ? " done" : ""}" data-id="${esc(n.id)}" data-o="${n.o || 0}" data-l="${n.lane}" style="--c:${col(COLORS[n.color] || COLORS[0])};--r:${tilt(n.id)}deg"><span>${esc(n.text)}</span>${STICKERS.includes(n.icon) && n.icon ? `<b class="nstk">${n.icon}</b>` : ""}${n.emoji ? `<i class="by">${esc(n.emoji)}</i>` : ""}</div>`;
 
 export function boardMain(notes) {
   const st = getStyle(), S = STYLES[st.s];
   return `<div class="bhead"><h2>our board</h2><button class="chip" data-act="bstyle">🎨 style</button></div>
   <div class="bnew"><input id="bnew" maxlength="140" placeholder="what do we need to do? ✏️" autocomplete="off" enterkeyhint="send"><button class="chip" data-act="badd">add</button></div>
   <div class="bpick" id="bcol"><button class="rnd${draft.color < 0 ? " sel" : ""}" data-bc="-1" aria-label="surprise colour">🎲</button>${COLORS.map((c, i) => `<button data-bc="${i}" class="${draft.color === i ? "sel" : ""}" style="--c:${col(c)}" aria-label="colour ${i + 1}"></button>`).join("")}</div>
-  <div class="bpick stk" id="bstk">${STICKERS.map(e => `<button data-bi="${e}" class="${draft.icon === e ? "sel" : ""}" aria-label="sticker ${e || "none"}">${e || "∅"}</button>`).join("")}</div>
+  <div class="bpick bstkrow" id="bstk">${STICKERS.map(e => `<button data-bi="${e}" class="${draft.icon === e ? "sel" : ""}" aria-label="sticker ${e || "none"}">${e || "∅"}</button>`).join("")}</div>
   <p class="hint">drag a box to move it · tap to edit · on a phone, press and hold first ✋</p>
   <div class="bd s-${st.s} p-${st.pat}${st.faces ? "" : " nofaces"}" style="--bgc:${col(COLORS[st.bg])}">
   ${S.lanes.map(([name, e], l) => { const list = inLane(notes, l);
