@@ -33,9 +33,59 @@ function ell(ctx, x, y, rx, ry, fill) { ctx.beginPath(); ctx.ellipse(x, y, rx, r
 
 // ---------------------------------------------------------------- garden pieces (origin = feet of the thing, units = world px)
 const BULBS = ["#ff9ccb", "#ffd36f", "#9be37f", "#7fd0ff", "#b79cf5"];
+const FLAT = new Set(["bed", "blanket", "lily", "rug", "bridge", "pbed", "toys", "bowl"]); // items that lie on the ground (keep in sync with ITEMS in decor.js)
+const DEF_L = { g: "meadow", f: "cute", b: "none", p: "none" }; // garden style: ground / fence / border / path (see js/land.js + LAND in garden-state.js)
+const PATH_PTS = [[20, 664], [170, 628], [330, 630], [480, 604], [620, 566], [760, 546], [880, 500], [975, 468]]; // copy of PATH_PTS in garden-state.js
+function drawGround(ctx, k, X, Y, s, x, w, bottom) { // specks on the grass: flowers / sand grains / snow sparkles
+  if (k === "meadow") return;
+  const Q = seeded(41), n = k === "flowers" ? 110 : 150;
+  for (let i = 0; i < n; i++) {
+    const px = x + Q() * w, py = Y(268) + Q() * (bottom - Y(268)), r = Math.max(1.4, (k === "flowers" ? 2.8 : 2) * s * 1.5);
+    ctx.fillStyle = k === "flowers" ? ["#ff9ccb", "#ffffff", "#ffd36f"][i % 3] : k === "sand" ? "rgba(150,110,50,.28)" : i % 2 ? "rgba(255,255,255,.95)" : "rgba(150,180,230,.35)";
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+  }
+}
+function drawFence(ctx, k, X, Y, s, pal) { // the back fence: world x 520-980, y 204-238 (same spot as .gfence in the CSS)
+  if (k === "none") return;
+  const x0 = X(520), w = 460 * s;
+  if (k === "stone") {
+    rr(ctx, x0, Y(210), w, 28 * s, 6 * s); ctx.fillStyle = pal.stone; ctx.fill(); ctx.fillStyle = "rgba(60,70,90,.22)";
+    for (let fx = 22; fx < 460; fx += 24) ctx.fillRect(x0 + fx * s, Y(210), 2 * s, 28 * s);
+    ctx.fillRect(x0, Y(223), w, 2 * s); return;
+  }
+  if (k === "hedge") {
+    rr(ctx, x0, Y(200), w, 38 * s, 16 * s); ctx.fillStyle = pal.hedge; ctx.fill(); ctx.fillStyle = "rgba(255,255,255,.16)";
+    for (let fx = 8; fx < 460; fx += 22) for (let fy = 6; fy < 36; fy += 16) { ctx.beginPath(); ctx.arc(x0 + fx * s, Y(200 + fy), 4 * s, 0, Math.PI * 2); ctx.fill(); }
+    return;
+  }
+  const col = k === "wood" ? pal.wood : k === "bamboo" ? pal.bamboo : pal.fc, pw = k === "bamboo" ? 9 : 8, gap = k === "bamboo" ? 14 : 16;
+  ctx.fillStyle = col;
+  for (let fx = 0; fx < 460; fx += gap) { rr(ctx, x0 + fx * s, Y(204), pw * s, 34 * s, 2 * s); ctx.fill(); }
+  ctx.fillRect(x0, Y(212), w, 5 * s); ctx.fillRect(x0, Y(224), w, 5 * s);
+}
+function drawPath(ctx, k, X, Y, s, pal) { // a smooth trail across the front of the garden (same curve as the live SVG path)
+  if (k === "none") return; const p = PATH_PTS;
+  ctx.save(); ctx.beginPath(); ctx.moveTo(X(p[0][0]), Y(p[0][1]));
+  for (let i = 1; i < p.length - 1; i++) ctx.quadraticCurveTo(X(p[i][0]), Y(p[i][1]), X((p[i][0] + p[i + 1][0]) / 2), Y((p[i][1] + p[i + 1][1]) / 2));
+  ctx.lineTo(X(p[p.length - 1][0]), Y(p[p.length - 1][1])); ctx.lineJoin = "round"; ctx.lineCap = "round";
+  if (k === "dirt") { ctx.strokeStyle = pal.dirt; ctx.lineWidth = 20 * s; }
+  else if (k === "stones") { ctx.strokeStyle = pal.stone; ctx.lineWidth = 16 * s; ctx.setLineDash([0, 34 * s]); }
+  else if (k === "cobble") { ctx.strokeStyle = pal.stone; ctx.lineWidth = 24 * s; ctx.lineCap = "butt"; ctx.setLineDash([10 * s, 3 * s]); }
+  else { ctx.strokeStyle = "#ffb3d1"; ctx.lineWidth = 10 * s; ctx.setLineDash([0, 22 * s]); }
+  ctx.stroke(); ctx.restore();
+}
+function drawBorder(ctx, k, X, Y, s, x, w, bottom, ox, pal) { // a row along the front edge (same spacing as js/land.js borderHtml)
+  if (k === "none") return;
+  if (k === "hedge") { rr(ctx, x, Y(656), w, bottom - Y(656) + 8, 12 * s); ctx.fillStyle = pal.hedge; ctx.fill(); return; }
+  const E = k === "mushrooms" ? ["🍄"] : ["🌷", "🌼", "🌸", "🌻"], SW = [16, 12, 20, 14], i0 = -Math.ceil(Math.max(0, ox - x) / (32 * s));
+  for (let fx = 14 + i0 * 32, i = i0; X(fx) < x + w; fx += 32, i++) {
+    if (k === "stones") ell(ctx, X(fx), Y(673), SW[((i % 4) + 4) % 4] / 2 * s, 4.5 * s, pal.stone);
+    else emoji(ctx, E[((i % E.length) + E.length) % E.length], X(fx), Y(670), (k === "mushrooms" ? 20 : 18) * s);
+  }
+}
 function drawItem(ctx, id, px, py, s, pal, night) {
   ctx.save(); ctx.translate(px, py); ctx.scale(s, s);
-  const flat = id === "bed" || id === "blanket" || id === "lily";
+  const flat = FLAT.has(id);
   if (!flat) { ctx.fillStyle = "rgba(0,0,0,.12)"; ctx.beginPath(); ctx.ellipse(0, -1, 24, 5, 0, 0, Math.PI * 2); ctx.fill(); }
   if (id === "bench") {
     ctx.fillStyle = pal.woodD; ctx.fillRect(-21, -9, 5, 9); ctx.fillRect(16, -9, 5, 9);
@@ -75,6 +125,53 @@ function drawItem(ctx, id, px, py, s, pal, night) {
     ell(ctx, 0, -10, 32, 10, pal.stone); ell(ctx, 0, -12, 26, 6.5, pal.water);
     rr(ctx, -4, -40, 8, 30, 4); ctx.fillStyle = pal.stone; ctx.fill();
     ctx.fillStyle = "#bfe8ff"; [[-15, -30], [0, -44], [15, -30], [-8, -36], [8, -36]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI * 2); ctx.fill(); });
+  } else if (id === "campfire") {
+    if (night) glow(ctx, 0, -22, 50, "255,170,80", .7);
+    ctx.save(); ctx.rotate(.25); rr(ctx, -17, -9, 34, 8, 4); ctx.fillStyle = pal.woodD; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.rotate(-.25); rr(ctx, -17, -9, 34, 8, 4); ctx.fillStyle = pal.wood; ctx.fill(); ctx.restore();
+    emoji(ctx, "🔥", 0, -22, 28);
+  } else if (id === "tent") {
+    emoji(ctx, "⛺", 0, -27, 54);
+  } else if (id === "rug") {
+    ctx.globalAlpha = .6; ell(ctx, 0, -16, 39, 17, pal.main); ctx.globalAlpha = 1; ell(ctx, 0, -16, 31, 12, pal.cloth);
+    ctx.setLineDash([2, 5]); ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(0, -16, 29, 10, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  } else if (id === "ctable") {
+    ctx.fillStyle = pal.woodD; ctx.fillRect(-3, -24, 6, 24); rr(ctx, -14, -5, 28, 5, 2.5); ctx.fill();
+    ell(ctx, 0, -24, 27, 9, pal.woodD); ell(ctx, 0, -27, 27, 9, pal.woodL); emoji(ctx, "☕", -9, -36, 17); emoji(ctx, "🍰", 9, -36, 17);
+  } else if (id === "cherry") {
+    rr(ctx, -5, -38, 10, 38, 4); ctx.fillStyle = pal.wood; ctx.fill();
+    [[-17, -50, 19, "#ffb3d1"], [17, -56, 20, "#ffc2da"], [0, -64, 21, "#ffb3d1"], [-2, -48, 19, "#ff9ccb"]].forEach(([bx, by, br, c]) => ell(ctx, bx, by, br, br * .92, c));
+    emoji(ctx, "🌸", -14, -52, 11); emoji(ctx, "🌸", 12, -60, 11);
+  } else if (id === "windmill") {
+    ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.lineTo(10, -46); ctx.lineTo(-10, -46); ctx.closePath(); ctx.fillStyle = pal.cloth; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -44, 13, Math.PI, 0); ctx.fillStyle = pal.main; ctx.fill();
+    ctx.save(); ctx.translate(0, -44); ctx.rotate(.5); ctx.fillStyle = pal.woodL; rr(ctx, -2, -24, 4, 48, 2); ctx.fill(); ctx.rotate(Math.PI / 2); rr(ctx, -2, -24, 4, 48, 2); ctx.fill(); ctx.restore();
+    ell(ctx, 0, -44, 4, 4, pal.woodD);
+  } else if (id === "bridge") {
+    rr(ctx, -40, -22, 80, 18, 8); ctx.fillStyle = pal.woodL; ctx.fill(); ctx.fillStyle = pal.wood; for (let i = 8; i < 80; i += 10) ctx.fillRect(-40 + i, -22, 2, 18);
+    rr(ctx, -38, -28, 76, 5, 2.5); ctx.fillStyle = pal.woodD; ctx.fill();
+  } else if (id === "mush") {
+    emoji(ctx, "🍄", -9, -13, 28); emoji(ctx, "🍄", 11, -12, 24);
+  } else if (id === "arch") {
+    ctx.lineWidth = 3.7; ["#ff8fa3", "#ffd36f", "#9be37f", "#7fd0ff", "#b79cf5"].forEach((c, i) => { ctx.strokeStyle = c; ctx.beginPath(); ctx.arc(0, 0, 24.7 + i * 3.52, Math.PI, 0); ctx.stroke(); });
+  } else if (id === "crystal") {
+    const gem = (gx, gw, gh, c) => { ctx.beginPath(); ctx.moveTo(gx, -gh); ctx.lineTo(gx + gw / 2, -gh * .65); ctx.lineTo(gx + gw * .4, 0); ctx.lineTo(gx - gw * .4, 0); ctx.lineTo(gx - gw / 2, -gh * .65); ctx.closePath(); ctx.fillStyle = c; ctx.fill(); };
+    if (night) glow(ctx, 0, -22, 44, "183,156,245", .6);
+    gem(-14, 22, 34, "#9a7be0"); gem(2, 26, 46, "#b79cf5"); gem(20, 16, 26, "#d3bfff");
+  } else if (id === "flant") {
+    [[-20, -16], [0, -36], [20, -22]].forEach(([lx, ly]) => { if (night) glow(ctx, lx, ly, 26, "255,200,110", .7); emoji(ctx, "🏮", lx, ly, 22); });
+  } else if (id === "statue") {
+    rr(ctx, -16, -14, 32, 14, 5); ctx.fillStyle = pal.stone; ctx.fill(); emoji(ctx, "🧚", 0, -32, 34);
+  } else if (id === "pbed") {
+    ctx.globalAlpha = .7; ell(ctx, 0, -15, 31, 15, pal.main); ctx.globalAlpha = 1; ell(ctx, 0, -15, 23, 10, pal.cloth); emoji(ctx, "🐾", 0, -15, 13);
+  } else if (id === "toys") {
+    emoji(ctx, "🎾", -19, -10, 18); emoji(ctx, "🧸", 0, -12, 22); emoji(ctx, "🦴", 20, -9, 18);
+  } else if (id === "bowl") {
+    rr(ctx, -19, -13, 38, 13, 6); ctx.fillStyle = pal.main; ctx.fill(); emoji(ctx, "🍖", 0, -17, 15);
+  } else if (id === "phouse") {
+    ctx.fillStyle = pal.cloth; rr(ctx, -23, -30, 46, 30, 3); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-29, -28); ctx.lineTo(29, -28); ctx.lineTo(0, -54); ctx.closePath(); ctx.fillStyle = pal.main; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -11, 8, Math.PI, 0); ctx.lineTo(8, 0); ctx.lineTo(-8, 0); ctx.closePath(); ctx.fillStyle = pal.woodD; ctx.fill();
   }
   ctx.restore();
 }
@@ -137,7 +234,7 @@ function drawForest(ctx, x, y, w, h, g, pal) { // g.forest = [{ s: species, c: t
 function drawScene(ctx, x, y, w, h, g, pal) {
   if (g.forest) return drawForest(ctx, x, y, w, h, g, pal);
   ctx.save(); rr(ctx, x, y, w, h, 36); ctx.clip();
-  const s = Math.min(w / WW, h / WH), ox = x + (w - WW * s) / 2, oy = y + h - WH * s, X = v => ox + v * s, Y = v => oy + v * s, night = !!g.night, R = seeded(7);
+  const s = Math.min(w / WW, h / WH), ox = x + (w - WW * s) / 2, oy = y + h - WH * s, X = v => ox + v * s, Y = v => oy + v * s, night = !!g.night, R = seeded(7), L = g.land || DEF_L;
   // sky
   ctx.fillStyle = pal.sk1; ctx.fillRect(x, y, w, h);
   const sky = ctx.createLinearGradient(0, Y(0), 0, Y(250)); sky.addColorStop(0, pal.sk1); sky.addColorStop(1, pal.sk2); ctx.fillStyle = sky; ctx.fillRect(x, Y(0), w, Y(250) - Y(0));
@@ -155,9 +252,10 @@ function drawScene(ctx, x, y, w, h, g, pal) {
   const hill = (top, ry, fill) => { ctx.beginPath(); ctx.ellipse(cxm, Y(top) + ry, rx, ry, 0, Math.PI, Math.PI * 2); ctx.lineTo(cxm + rx, y + h + 4); ctx.lineTo(cxm - rx, y + h + 4); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); };
   hill(172, 90 * s, pal.grB); hill(236, 60 * s, pal.grF);
   ctx.fillStyle = pal.grF; ctx.fillRect(x, Y(262), w, y + h - Y(262));
+  drawGround(ctx, L.g, X, Y, s, x, w, y + h);
   // fence
-  for (let fx = 520; fx < 980; fx += 38) { ctx.fillStyle = pal.woodL; rr(ctx, X(fx), Y(206), 7 * s, 32 * s, 2 * s); ctx.fill(); }
-  ctx.fillStyle = pal.wood; ctx.fillRect(X(516), Y(214), 468 * s, 4 * s); ctx.fillRect(X(516), Y(227), 468 * s, 4 * s);
+  drawFence(ctx, L.f, X, Y, s, pal);
+  drawPath(ctx, L.p, X, Y, s, pal);
   // pond
   const wg = ctx.createLinearGradient(0, Y(POND.y - POND.ry), 0, Y(POND.y + POND.ry)); wg.addColorStop(0, pal.water); wg.addColorStop(1, pal.water2);
   ell(ctx, X(POND.x), Y(POND.y), POND.rx * s * 1.06, POND.ry * s * 1.1, pal.grB); ell(ctx, X(POND.x), Y(POND.y), POND.rx * s, POND.ry * s, wg);
@@ -171,8 +269,9 @@ function drawScene(ctx, x, y, w, h, g, pal) {
   [[880, 275, "🌳", 3], [80, 275, "🌲", 5], [520, 282, "🌳", 7], [940, 440, "🌲", 8], [40, 540, "🌳", 9], [660, 300, "🌲", 10]].forEach(([tx, ty, e, need]) => { if (lv >= need) emoji(ctx, e, X(tx), Y(ty) - 22 * s * kF, 44 * s * kF); });
   const nb = lv >= 1 ? Math.min(9, 1 + Math.floor(lv / 2) * 2) : 0, B = seeded(23);
   for (let i = 0; i < nb; i++) emoji(ctx, "🦋", X(40 + B() * 900), Y(290 + B() * 340), 16 * s * kF);
+  drawBorder(ctx, L.b, X, Y, s, x, w, y + h, ox, pal);
   // things standing on the ground: flat items first, then everything else sorted by depth
-  const flat = (g.items || []).filter(d => d.i === "bed" || d.i === "blanket" || d.i === "lily");
+  const flat = (g.items || []).filter(d => FLAT.has(d.i));
   flat.forEach(d => drawItem(ctx, d.i, X(d.x * WW), Y(d.y * WH), s * kI, pal, night));
   const list = [];
   (g.items || []).forEach(d => { if (!flat.includes(d)) list.push({ y: d.y, f: () => drawItem(ctx, d.i, X(d.x * WW), Y(d.y * WH), s * kI, pal, night) }); });

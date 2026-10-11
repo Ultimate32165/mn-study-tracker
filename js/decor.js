@@ -8,9 +8,15 @@ import { $, errMsg, modal, toast } from "./util.js";
 
 // ---- seeds + decoration shop: study time earns seeds, seeds buy things you drag into the garden (saved in users/{uid}.decor) ----
 // flat = lies on the ground (pets walk over it), water = only goes on the pond. Order here = order in the shop.
-const ITEMS = { lily: { n: "lily pads", price: 20, flat: true, water: true }, bench: { n: "bench", price: 25 }, bed: { n: "flower bed", price: 30, flat: true }, lantern: { n: "lantern", price: 40 },
-  blanket: { n: "picnic blanket", price: 45, flat: true }, fairy: { n: "fairy lights", price: 60 }, swing: { n: "swing", price: 80 }, fountain: { n: "fountain", price: 120 }, house: { n: "tiny house", price: 150 } };
-const SEED_SEC = 300, MAX_DECOR = 12; // 1 seed per 5 minutes studied, up to 12 things per person
+// c = shop section (CATS). New item = an entry here + an ART drawing + CSS in style.css + a drawItem branch in card.js (+ the FLAT list there if it lies flat).
+const CATS = [["cozy", "🛋️ cozy corner"], ["nature", "🌿 nature"], ["magic", "✨ magical"], ["pets", "🐾 pet corner"]];
+const ITEMS = { lily: { n: "lily pads", price: 20, flat: true, water: true, c: "nature" }, bench: { n: "bench", price: 25, c: "cozy" }, bed: { n: "flower bed", price: 30, flat: true, c: "nature" }, lantern: { n: "lantern", price: 40, c: "magic" },
+  blanket: { n: "picnic blanket", price: 45, flat: true, c: "cozy" }, fairy: { n: "fairy lights", price: 60, c: "magic" }, swing: { n: "swing", price: 80, c: "cozy" }, fountain: { n: "fountain", price: 120, c: "nature" }, house: { n: "tiny house", price: 150, c: "cozy" },
+  campfire: { n: "campfire", price: 50, c: "cozy" }, tent: { n: "tent", price: 70, c: "cozy" }, rug: { n: "cosy rug", price: 35, flat: true, c: "cozy" }, ctable: { n: "cafe table", price: 55, c: "cozy" },
+  cherry: { n: "cherry tree", price: 90, c: "nature" }, windmill: { n: "windmill", price: 110, c: "nature" }, bridge: { n: "little bridge", price: 60, flat: true, water: true, c: "nature" }, mush: { n: "mushrooms", price: 25, c: "nature" },
+  arch: { n: "rainbow arch", price: 100, c: "magic" }, crystal: { n: "crystals", price: 90, c: "magic" }, flant: { n: "floating lanterns", price: 70, c: "magic" }, statue: { n: "fairy statue", price: 110, c: "magic" },
+  pbed: { n: "pet bed", price: 30, flat: true, c: "pets" }, toys: { n: "pet toys", price: 20, flat: true, c: "pets" }, bowl: { n: "food bowl", price: 15, flat: true, c: "pets" }, phouse: { n: "pet house", price: 60, c: "pets" } };
+const SEED_SEC = 300, MAX_DECOR = 20; // 1 seed per 5 minutes studied, up to 20 things per person
 const ART = { // little CSS-drawn items (so they follow every theme); the lantern and the house are emoji
   bench: `<div class="bench"><i class="bk"></i><i class="st"></i><i class="lg"></i><i class="lg r"></i></div>`,
   lantern: `<div class="lant"><i class="gl"></i><i class="pl"></i><em>🏮</em></div>`,
@@ -20,7 +26,23 @@ const ART = { // little CSS-drawn items (so they follow every theme); the lanter
   blanket: `<div class="blank"><i class="bl"></i><em>🧺</em><u>🍓</u></div>`,
   fairy: `<div class="fairy"><i class="fp"></i><i class="fp r"></i><i class="fs"></i>${[0, 1, 2, 3, 4, 5, 6].map(i => `<b style="left:${8 + i * 16}px;top:${(5 + 20 * (1 - ((i - 3) / 3) ** 2)).toFixed(0)}px;--c:${["#ff9ccb", "#ffd36f", "#9be37f", "#7fd0ff", "#b79cf5"][i % 5]}"></b>`).join("")}</div>`,
   lily: `<div class="lily"><i class="lp a"></i><i class="lp b"></i><i class="lp c"></i><em>🌸</em></div>`,
-  fountain: `<div class="fount"><i class="fb"></i><i class="fw"></i><i class="fc"></i><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i></div>`
+  fountain: `<div class="fount"><i class="fb"></i><i class="fw"></i><i class="fc"></i><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i></div>`,
+  campfire: `<div class="camp"><i class="gl"></i><i class="l1"></i><i class="l2"></i><em>🔥</em></div>`,
+  tent: `<div class="tiny">⛺</div>`,
+  rug: `<div class="rug"><i></i></div>`,
+  ctable: `<div class="ctab"><em>☕🍰</em><i class="tp"></i><i class="lg"></i><i class="ft"></i></div>`,
+  cherry: `<div class="chy"><i class="tr"></i><i class="bl a"></i><i class="bl b"></i><i class="bl c"></i><em>🌸</em><em class="e2">🌸</em></div>`,
+  windmill: `<div class="wmill"><i class="bd"></i><i class="rf"></i><div class="bs"><b></b><b></b></div><i class="hb"></i></div>`,
+  bridge: `<div class="brg"><i class="rl"></i><i class="pl"></i></div>`,
+  mush: `<div class="mush">🍄🍄</div>`,
+  arch: `<div class="rbow"></div>`,
+  crystal: `<div class="cry"><i class="c1"></i><i class="c2"></i><i class="c3"></i></div>`,
+  flant: `<div class="flant"><em class="a">🏮</em><em class="b">🏮</em><em class="c">🏮</em></div>`,
+  statue: `<div class="stat"><i class="pd"></i><em>🧚</em></div>`,
+  pbed: `<div class="pbed"><i class="rim"></i><i class="cs"></i><em>🐾</em></div>`,
+  toys: `<div class="toys"><u>🎾</u><u>🧸</u><u>🦴</u></div>`,
+  bowl: `<div class="bowl"><em>🍖</em><i class="bw"></i></div>`,
+  phouse: `<div class="phouse"><i class="rf"></i><i class="bd"></i><i class="dr"></i><em>🐾</em></div>`
 };
 // seeds = study time + visitor bonuses (u.bonus) - treats given (u.treats); spent decoration is subtracted in seedsLeft
 const seedsEarned = u => Math.floor(totalOf(u) / SEED_SEC) + (u.bonus || 0) - (u.treats || 0);
@@ -46,8 +68,8 @@ function gardenPanel() {
     <div class="gbtns"><button class="btn ghost" data-act="gcancel">cancel</button><button class="btn" data-act="gdone">done 💖</button></div>`;
   }
   return `<div class="gtop"><div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds</div><button class="chip" data-act="gwx">🌦️ ${wl}</button></div>
-  <div class="gbtns"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button><button class="btn ghost" data-act="gchoose">🐾 garden pets</button><button class="btn ghost" data-act="card">📸 photocard</button></div>
-  <p class="hint">drag the garden to look around ✋ · tap a pet to say hi 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
+  <div class="gbtns"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button><button class="btn ghost" data-act="gland">🎨 style garden</button><button class="btn ghost" data-act="gchoose">🐾 garden pets</button><button class="btn ghost wide" data-act="card">📸 photocard</button></div>
+  <p class="hint">drag the garden to look around ✋ · tap a pet for tricks, treats & a nickname 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
 }
 function enterEdit(m) {
   G.edit = true; G.work = decorOf(m).map(d => ({ ...d })); G.sel = null;
@@ -69,7 +91,7 @@ function delSel() {
 function shopSheet(mine) {
   const left = seedsLeft(mine);
   modal.innerHTML = `<div class="back"><div class="sheet"><h3>decoration shop 🛍️</h3><p class="hint">You earn 🌱 1 seed for every 5 minutes you study (and from garden visitors).<br><b>🌱 ${left} seeds</b> to spend</p>
-  <div class="shopg">${Object.keys(ITEMS).map(id => { const x = ITEMS[id]; return `<button class="${left >= x.price ? "" : "lock"}" data-buy="${id}"><div class="shopthumb">${ART[id]}</div><b>${x.n}</b><small>🌱 ${x.price}</small></button>`; }).join("")}</div>
+  ${CATS.map(([c, cn]) => `<h4 class="shopcat">${cn}</h4><div class="shopg">${Object.keys(ITEMS).filter(id => ITEMS[id].c === c).map(id => { const x = ITEMS[id]; return `<button class="${left >= x.price ? "" : "lock"}" data-buy="${id}"><div class="shopthumb">${ART[id]}</div><b>${x.n}</b><small>🌱 ${x.price}</small></button>`; }).join("")}</div>`).join("")}
   <button class="link" id="sx">close</button></div></div>`;
   $("#sx").onclick = () => modal.innerHTML = "";
   modal.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => {

@@ -39,7 +39,7 @@ js/
 
 | File | What's in it |
 |---|---|
-| **index.html** | The page shell: empty `#app`, `#modal` and `#toast` boxes. A tiny inline script applies your saved theme / "reduce motion" **before** the page paints (no colour flash). Loads the Google Fonts (Fredoka, Baloo 2, Nunito, Rye, Special Elite), `css/style.css`, `js/app.js`, the manifest and the iOS home-screen tags. |
+| **index.html** | The page shell: empty `#app`, `#modal` and `#toast` boxes. A tiny inline script applies your saved theme, "reduce motion" and theme customizations (`look` / `lookCss`) **before** the page paints (no colour flash). Loads the Google Fonts (Fredoka, Baloo 2, Nunito, Rye, Special Elite), `css/style.css`, `js/app.js`, the manifest and the iOS home-screen tags. |
 | **sw.js** | Service worker (offline support). `C` = cache version, `A` = list of files cached at install. Network-first: it tries the internet and falls back to the cache. **Add every new file to `A` and bump `C`**, or phones keep serving the old code. |
 | **manifest.webmanifest**, **icons/** | PWA name, colours and icons. Not part of this change. |
 | **firebase-config.js** | Your Firebase project keys, and `SIGNUP_CODE` (a secret word required to create an account; `""` = anyone can sign up). |
@@ -50,7 +50,7 @@ js/
 
 | File | What's in it |
 |---|---|
-| **css/style.css** (≈630 lines) | Everything visual. Roughly: **lines 1-70** colour variables and all themes (`[data-theme=name]` rules, plus glass themes) · 72-133 avatars, progress ring, cards, study button, buttons, nav pill · 134-224 stats, sheets, time wheel, confetti, calendar, badges, couple level, pet row, cheer pop-up · 225-296 garden scene and pets · 297-421 garden extras (evolution accessories, seeds/shop, CSS-drawn decorations, weather, bigger world) · 422-470 photocard sheet (incl. style chips, accent dots, "more options") and inbox · 452-505 collapsible sections, compact home, reduce-motion · 506-528 forest · 529-end to-do board (styles, stickers, palette). Colours always come from theme variables, so everything follows the theme. |
+| **css/style.css** (≈660 lines) | Everything visual. Roughly: **lines 1-85** colour variables, all themes (`[data-theme=name]` rules, plus glass themes) and the **extra look** rules (`html[data-bg=…]` background patterns, `html[data-round=…]` corner radius, `html[data-shadow=…]` shadows) · 72-133 avatars, progress ring, cards, study button, buttons, nav pill · 134-224 stats, sheets, time wheel, confetti, calendar, badges, couple level, pet row, cheer pop-up · 225-296 garden scene and pets · 297-421 garden extras (evolution accessories, seeds/shop, CSS-drawn decorations, weather, bigger world) · 422-470 photocard sheet (incl. style chips, accent dots, "more options") and inbox · 452-505 collapsible sections, compact home, reduce-motion · 506-528 forest · 529-end to-do board (styles, stickers, palette). Colours always come from theme variables, so everything follows the theme. (Line ranges after the first block are approximate, about 15 lines later than listed.) |
 
 ### Core (shared by everything)
 
@@ -60,7 +60,7 @@ js/
 | **js/state.js** | The shared store: `me`, `users`, `sessions`, `gifts`, `board`, `tab` (read them anywhere; change them only via `setUsers()`, `setTab()`, …) and `ui.render()`. Also the study-time maths for one user: `elapsed`, `runStart`, `goalOf` (default 4 h), `limitOf` (3 h), `focusOf`/`restOf` (pomodoro 25/5), `liveToday`, `totalOf`; and the couple level: `LV_H` (hours per level), `LV_T` (level names), `couple()`, `coupleCard()`. |
 | **js/util.js** | Helpers with no dependencies: `$`, `app`, `modal`, `esc` (HTML-escape), `EMOJI` (avatar choices), `DAY`, `ls` (safe localStorage), `key` (date → `YYYY-MM-DD`), `fmt` (`1h 5m`), `clock` (`00:05:00`), `split` (cuts a session at midnight), `stats` (today / week / total / streak), `toast`, `errMsg` (friendly error texts), `foldSet` + `sec` (collapsible sections), `burst` (confetti), `notify` (browser notification). |
 | **js/watch.js** | The loop that runs every second while the app is open (plus a full redraw every 30 s): updates the running clocks; pomodoro auto-break and "break's over"; "still studying?" prompt; daily-goal confetti; streak records; badge check; stops sound when the timer stops; checks new garden friends, pet evolution, new seeds, forest growth, couple level-up; keeps the garden in sync. **Anything that should happen on its own, without a click, lives here.** |
-| **js/theme.js** | `THEMES` (name → icon + colour), the lists shown in the profile sheet (`CUTE`, `DARK`, `SEASON`, `GLASS`), `applyTheme`, `setTheme`, and the reduce-motion switch (`calm`, `toggleCalm`). |
+| **js/theme.js** | `THEMES` (name → icon + colour), the lists shown in the profile sheet (`CUTE`, `DARK`, `SEASON`, `GLASS`), `applyTheme`, `setTheme`, and the reduce-motion switch (`calm`, `toggleCalm`). Also the **extra look** (profile sheet → customize theme): `LOOK` (background / corners / shadows choices), `HUES` (background tints), `ACCENTS` (accent colours), `look` (the saved choice), `setLook` (also handles `"random"` and `"reset"`), `applyLook` (sets `data-bg` / `data-round` / `data-shadow` and colour variables on `<html>`, called by `applyTheme`), and the button builders `lookBtns`, `dotBtns`, `isLook`. |
 | **js/sound.js** | Background sounds (rain / cafe / ocean) generated with the Web Audio API (no audio files): `playSound`, `stopSound`, `cycleSound`, `soundLabel`. |
 
 ### Tabs and screens
@@ -86,7 +86,7 @@ js/
 
 | File | What's in it |
 |---|---|
-| **js/sheets.js** | Pop-up sheets: the hours:minutes **time wheel** (`sheet`, used for goal, limits, add/shorten session, pomodoro), `askStill` ("still studying?"), and `profileSheet` (name, emoji, daily goal, still-studying limit, pet, pomodoro lengths, notifications, reduce motion, theme pickers, log out). |
+| **js/sheets.js** | Pop-up sheets: the hours:minutes **time wheel** (`sheet`, used for goal, limits, add/shorten session, pomodoro), `askStill` ("still studying?"), and `profileSheet` (name, emoji, daily goal, still-studying limit, pet, pomodoro lengths, notifications, reduce motion, theme pickers, a collapsible "customize theme" section with background, tint, accent, corners, shadows, 🎲 surprise me and reset, log out). |
 | **js/social.js** | Cheers: `STICKERS` (the text stickers), `cheerCard` (pop-up when you receive one), `stickerSheet`. Cards from friends: `onGifts`, `giftsView` (inbox on the together tab), `giftSheet`, `safeImg` (only accepts plain JPEGs). |
 | **js/milestones.js** | Celebrations: pet evolved pop-up, streak-record and level-up pop-ups, "new garden friend unlocked", and the "make a card" button inside them. |
 
@@ -107,6 +107,7 @@ Attach this guide + the files in the **Change** column. "Maybe" files are only n
 ### Look and feel
 | I want to… | Change | Maybe |
 |---|---|---|
+| Add a background style / corner or shadow choice / accent colour / tint | `theme.js` (`LOOK`, `HUES` or `ACCENTS`), `css/style.css` (the "extra look" block: one `html[data-bg=name]` rule per background) | `sheets.js` only for a new *kind* of option (add a row in the "customize theme" section) |
 | Add or edit a colour theme | `theme.js` (`THEMES` + a list), `css/style.css` (a `[data-theme=name]` block, copy an existing one and define **all** the same variables) | `index.html` only if the default theme changes |
 | Change fonts | `index.html` (font link), `css/style.css` (`--hf` etc.) | |
 | Restyle cards, buttons, nav, sheets | `css/style.css` | the view file that makes the HTML (`home.js`, `stats-view.js`, `sheets.js`…) |
@@ -205,14 +206,14 @@ Attach this guide + the files in the **Change** column. "Maybe" files are only n
 | `users/{uid}/gifts/{id}` | `from`, `name`, `emoji`, `kind`, `img`, `seen`, `at` | `sendGift`, `markGift`, `deleteGift` | `social.js` |
 | `board/{id}` | `text`, `lane`, `o` (order), `color`, `icon`, `by`, `name`, `emoji`, `at` | `addNote`, `moveNote`, `editNote`, `deleteNote`, `clearNotes` | `board.js` |
 
-On this device only (localStorage): theme, photocard look (`cardLook`: style, accent, font, corners, pattern, stickers, filter, tone, footer message), motion, compact tab, pomodoro on/off, sound, fold state, weather choice, board look, card shape/scene, last milestone, "already celebrated" markers.
+On this device only (localStorage): theme, photocard look (`cardLook`: style, accent, font, corners, pattern, stickers, filter, tone, footer message), motion, extra theme look (`look`, plus `lookCss` that `index.html` applies before the first paint), compact tab, pomodoro on/off, sound, fold state, weather choice, board look, card shape/scene, last milestone, "already celebrated" markers.
 
 ---
 
 ## 4. Things that must stay in sync (common sources of bugs)
 
 1. **Garden size** (`WW`, `WH`, `POND`) exists in `garden-state.js` **and** `card.js` (and in `css/style.css`: `#garden{--ww;--wh}` and `.gpond`). Change all of them together.
-2. **Themes**: a name in `theme.js` `THEMES` needs a matching `[data-theme=…]` block in `style.css`. Photocards read the theme's CSS variables, so a new theme must define every variable the others do.
+2. **Themes**: a name in `theme.js` `THEMES` needs a matching `[data-theme=…]` block in `style.css`. Photocards read the theme's CSS variables, so a new theme must define every variable the others do. The extra look (tint, accent) overrides `--bg1 --bg2 --glow1 --glow2 --b1 --b2 --main --main-l --main-d` as inline styles on `<html>`, so it works on every theme; the tint is generated light or dark to match the theme (`isDark` in `theme.js`: keep it in sync when you add a dark theme).
 3. **New files** go into `sw.js` list `A`, and `C` must be bumped, otherwise installed phones keep the old version.
 4. **Firestore rules vs app limits**: board text (app 140, rule 200), cheer emoji (rule 40), gift image (app ≈ 380 000, rule < 700 000). If you raise an app limit, raise the rule and re-publish.
 5. **Shared data** (`me`, `users`, `sessions`, `gifts`, `board`, `tab`) is changed only inside `state.js` (setters). The same goes for `compact`/`pomo` (`home.js`), `theme`/`calm` (`theme.js`), `sound` (`sound.js`).

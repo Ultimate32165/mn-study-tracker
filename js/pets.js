@@ -1,7 +1,7 @@
 // Study pets: the PETS + unlockable EXTRA pets, growth stages, the pet row on the cards.
 import { forestOf } from "./forest.js";
 import { couple, liveToday, totalOf } from "./state.js";
-import { fmt } from "./util.js";
+import { esc, fmt } from "./util.js";
 
 // ---- study pet / garden: grows with total hours, sleepy if no study today ----
 // e = the form at each stage [egg, baby, kid, grown-up]; acc = a little accessory that appears on top at that stage (evolutions!)
@@ -22,6 +22,7 @@ const PETS = {
 const accOf = (t, st) => ((ALLP[t] || {}).acc || [])[st] || "";
 const petFace = (t, st) => ALLP[t].e[st] + (accOf(t, st) ? `<i class="acc">${accOf(t, st)}</i>` : "");
 const petOf = u => PETS[u.pet] ? u.pet : "bunny";
+const nickOf = (u, t) => { const n = u && u.nicks && typeof u.nicks[t] === "string" ? u.nicks[t].trim().slice(0, 14) : ""; return n; }; // pet nickname (users/{uid}.nicks[petType])
 const STAGE = [1800, 18000, 72000]; // seconds studied to reach baby / kid / grown-up
 const stageOf = tot => tot >= STAGE[2] ? 3 : tot >= STAGE[1] ? 2 : tot >= STAGE[0] ? 1 : 0;
 const stageNames = t => t === "plant" ? ["seed", "sprout", "sapling", "tree"] : ["egg", "baby", "kid", "grown-up"];
@@ -29,8 +30,8 @@ function petRow(u) {
   const t = petOf(u), paused = u.status === "paused", on = u.status === "studying", tot = totalOf(u);
   const st = stageOf(tot), fed = liveToday(u) > 0;
   const say = on ? "nom nom 🍓" : paused ? "break time ☕" : fed ? "happy & full 💗" : "sleepy… study to feed me";
-  const names = stageNames(t);
-  return `<div class="petrow ${on ? "feed" : fed || paused ? "" : "sleepy"}"><span class="pet s${st}">${petFace(t, st)}</span><div><b>${say}</b><small>${names[st]}${st < 3 ? ` · ${fmt(STAGE[st] - tot)} to grow` : " · fully grown 👑"}</small></div></div>`;
+  const names = stageNames(t), nk = nickOf(u, t);
+  return `<div class="petrow ${on ? "feed" : fed || paused ? "" : "sleepy"}"><span class="pet s${st}">${petFace(t, st)}</span><div><b>${say}</b><small>${nk ? esc(nk) + " · " : ""}${names[st]}${st < 3 ? ` · ${fmt(STAGE[st] - tot)} to grow` : " · fully grown 👑"}</small></div></div>`;
 }
 
 // Extra pets you can collect. e = [egg, baby, kid, grown-up]; ok(u) = is it unlocked for user u?
@@ -54,4 +55,4 @@ const ALLP = { ...PETS, ...EXTRA };
 const MAX_FRIENDS = 5; // garden friends you can bring along (the garden itself shows 12 animals at most)
 const petName = t => EXTRA[t] ? EXTRA[t].n : t;
 
-export { ALLP, EXTRA, MAX_FRIENDS, PETS, STAGE, accOf, petFace, petName, petOf, petRow, stageNames, stageOf };
+export { ALLP, EXTRA, MAX_FRIENDS, PETS, STAGE, accOf, nickOf, petFace, petName, petOf, petRow, stageNames, stageOf };

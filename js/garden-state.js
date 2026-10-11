@@ -19,7 +19,7 @@ const WX_POOL = ["clear", "clear", "petals", "rain", "snow", "leaves"];
 const pickWx = avoid => { const l = WX_POOL.filter(w => w !== avoid); return l[Math.floor(Math.random() * l.length)]; };
 const WX0 = ls("wx");
 const G = { pets: new Map(), el: null, layer: null, deco: null, fly: null, fx: null, card: null, raf: 0, last: 0, W: WW, H: WH, vw: 340, vh: 408, cardT: 0, decoLv: -1, night: null, ro: null,
-  world: null, cam: { x: 0, y: 0, tx: 0, ty: 0, vx: 0, vy: 0, glide: false }, camInit: false, camT: "", pan: null, drag: null, noClick: -1e9, findI: -1, vis: null, visAt: 0,
+  world: null, cam: { x: 0, y: 0, tx: 0, ty: 0, vx: 0, vy: 0, glide: false }, camInit: false, camT: "", pan: null, drag: null, noClick: -1e9, findI: -1, vis: null, visAt: 0, landSig: "", landEdit: false,
   items: new Map(), edit: false, work: null, sel: null, wx: "", wxMode: WX0 === "auto" || WXL[WX0] ? WX0 : "auto", wxAuto: pickWx(), wxAt: Date.now(), wxEl: null, buddyFx: 0 };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const seeded = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
@@ -28,6 +28,22 @@ const moodOf = u => u.status === "studying" ? "study" : u.status === "paused" ? 
 const inPond = (x, y) => ((x * WW - POND.x) / POND.rx) ** 2 + ((y * WH - POND.y) / POND.ry) ** 2 < 1;
 const nowS = () => performance.now() / 1000;
 
+// ---- garden style (js/land.js): ground, fence, border, path. [emoji, label]. The garden is shared: the most recent choice of either of you wins (users/{uid}.land = { g, f, b, p, at }).
+const LAND = {
+  g: { meadow: ["🌿", "meadow"], flowers: ["🌸", "flower field"], sand: ["🏖️", "sandy"], snow: ["❄️", "snowy"] },
+  f: { cute: ["🤍", "cute picket"], wood: ["🪵", "wooden"], stone: ["🧱", "stone wall"], hedge: ["🌳", "hedge"], bamboo: ["🎋", "bamboo"], none: ["🚫", "no fence"] },
+  b: { none: ["🚫", "none"], flowers: ["🌷", "flowers"], stones: ["🪨", "pebbles"], hedge: ["🌿", "hedge"], mushrooms: ["🍄", "mushrooms"] },
+  p: { none: ["🚫", "none"], dirt: ["🟫", "dirt trail"], stones: ["⚪", "stepping stones"], cobble: ["🧱", "cobbles"], flowers: ["🌼", "flower trail"] }
+};
+const DEF_LAND = { g: "meadow", f: "cute", b: "none", p: "none" };
+const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const landOf = list => { // the newest saved style among everybody (falls back to the classic look)
+  let best = null; (list || []).forEach(u => { const l = u && u.land; if (l && typeof l === "object" && (+l.at || 0) > (best ? +best.at || 0 : -1)) best = l; });
+  const out = { ...DEF_LAND }; if (best) Object.keys(DEF_LAND).forEach(k => { if (typeof best[k] === "string" && has(LAND[k], best[k])) out[k] = best[k]; }); return out;
+};
+const PATH_PTS = [[20, 664], [170, 628], [330, 630], [480, 604], [620, 566], [760, 546], [880, 500], [975, 468]]; // the garden path (world px). card.js has a copy.
+const pathD = p => { let d = `M${p[0][0]} ${p[0][1]}`; for (let i = 1; i < p.length - 1; i++) d += ` Q${p[i][0]} ${p[i][1]} ${(p[i][0] + p[i + 1][0]) / 2} ${(p[i][1] + p[i + 1][1]) / 2}`; return d + ` L${p[p.length - 1][0]} ${p[p.length - 1][1]}`; };
+
 const TREAT = 1, VIS_DAY = 6; // a treat costs 1 seed; at most 6 visitor seeds a day on this device
 
-export { BASE, BOUNDS, BUB, FACE_RIGHT, G, MOVE, POND, RM, SAY, TREAT, VIS_DAY, WH, WW, WXL, inPond, isEvening, moodOf, nowS, pickWx, rnd, seeded };
+export { BASE, BOUNDS, BUB, DEF_LAND, FACE_RIGHT, G, LAND, MOVE, PATH_PTS, POND, RM, SAY, TREAT, VIS_DAY, WH, WW, WXL, inPond, isEvening, landOf, moodOf, nowS, pathD, pickWx, rnd, seeded };

@@ -31,6 +31,8 @@ export const saveGarden = (uid, ids) => updateDoc(userRef(uid), { garden: ids })
 export const giveTreat = uid => updateDoc(userRef(uid), { treats: increment(1) });   // a treat for your pet costs 1 seed (seeds = study time + bonus - treats - decorations)
 export const addBonus = (uid, n) => updateDoc(userRef(uid), { bonus: increment(n) }); // seeds from garden visitors
 export const saveForest = (uid, trees) => updateDoc(userRef(uid), { forest: trees }); // study forest: [{ s: species, c: tile 0-35, t: total study seconds when planted }]
+export const saveNick = (uid, type, name) => updateDoc(userRef(uid), { [`nicks.${type}`]: name }); // pet nickname per pet type ("" = none): users/{uid}.nicks = { bunny: "Mochi" }
+export const saveLand = (uid, land) => updateDoc(userRef(uid), { land }); // garden style: { g: ground, f: fence, b: border, p: path, at: ms } (the newest one among users is shown)
 export const saveDecor = (uid, items) => updateDoc(userRef(uid), { decor: items }); // garden decorations: [{ i: "bench", k: "a1b2c3", x: .42, y: .71 }, ...] (x/y = fraction of the garden scene)
 
 // Save a finished session (and optionally switch status back to offline).

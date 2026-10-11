@@ -3,7 +3,8 @@ import * as DB from "./db.js";
 import { dragApply, gardenPanel, seedsLeft, syncItems } from "./decor.js";
 import { mainPet, runVisits, spawnHeart, syncBuddies, syncVisitor, syncWeather, visStep } from "./garden-fx.js";
 import { BASE, BOUNDS, BUB, FACE_RIGHT, G, MOVE, RM, SAY, TREAT, inPond, isEvening, moodOf, nowS, rnd, seeded } from "./garden-state.js";
-import { ALLP, EXTRA, MAX_FRIENDS, STAGE, accOf, petName, petOf, stageNames, stageOf } from "./pets.js";
+import { syncLand } from "./land.js";
+import { ALLP, EXTRA, MAX_FRIENDS, STAGE, accOf, nickOf, petName, petOf, stageNames, stageOf } from "./pets.js";
 import { couple, me, totalOf, users } from "./state.js";
 import { $, errMsg, esc, fmt, modal, toast } from "./util.js";
 
@@ -21,7 +22,7 @@ function pickSpot(p, near) { // random spot on the grass (not in the pond). `nea
 function buildGarden() { // built ONCE; render() never touches it, so pets never reset
   const el = document.createElement("div"); el.id = "garden";
   el.innerHTML = `<div class="gworld"><div class="gstars"></div><i class="gsun"></i><div class="grain"></div><i class="gcl c1"></i><i class="gcl c2"></i><i class="gcl c3"></i><i class="gcl c4"></i><i class="gcl c5"></i>
-  <div class="ghill h1"></div><div class="gfence"></div><div class="ghill h2"></div><div class="gpond"></div><div class="gdeco"></div><div class="gpets"></div><div class="gfly"></div>
+  <div class="ghill h1"></div><div class="gfence f-cute"></div><div class="ghill h2"></div><svg class="gpath" viewBox="0 0 980 680" aria-hidden="true"></svg><div class="gpond"></div><div class="gborder"></div><div class="gdeco"></div><div class="gpets"></div><div class="gfly"></div>
   <div class="gff">${[...Array(28)].map(() => `<i style="left:${rnd(4, 96).toFixed(1)}%;top:${rnd(36, 96).toFixed(1)}%;animation-delay:${(-rnd(0, 6)).toFixed(1)}s;animation-duration:${rnd(4, 8).toFixed(1)}s"></i>`).join("")}</div>
   <div class="gwx"></div><div class="gfx"></div></div><div class="gcard" hidden></div><button class="gfind" data-act="gfind" aria-label="find my pets">📍</button>`;
   G.el = el; G.world = el.querySelector(".gworld"); G.deco = el.querySelector(".gdeco"); G.layer = el.querySelector(".gpets"); G.fly = el.querySelector(".gfly"); G.fx = el.querySelector(".gfx");
@@ -29,7 +30,7 @@ function buildGarden() { // built ONCE; render() never touches it, so pets never
   G.card.onclick = () => { G.card.hidden = true; };
   G.ro = new ResizeObserver(() => { G.vw = el.clientWidth || G.vw; G.vh = el.clientHeight || G.vh; el.style.setProperty("--gh", G.vh + "px"); }); G.ro.observe(el);
   el.addEventListener("pointerdown", panDown); el.addEventListener("pointermove", panMove); el.addEventListener("pointerup", panUp); el.addEventListener("pointercancel", panUp);
-  G.decoLv = -1; G.night = null; G.wx = ""; G.items.clear();
+  G.decoLv = -1; G.night = null; G.wx = ""; G.landSig = ""; G.items.clear();
 }
 // ---- camera: drag to look around (with a little inertia), or glide to a spot ----
 const clampCam = () => { const c = G.cam; c.x = Math.min(Math.max(0, G.W - G.vw), Math.max(0, c.x)); c.y = Math.min(Math.max(0, G.H - G.vh), Math.max(0, c.y)); };
@@ -100,7 +101,7 @@ function mkPet(key, u, type) {
   const el = document.createElement("div"); el.className = "gp"; el.dataset.act = "gpet"; el.dataset.id = key;
   el.innerHTML = `<i class="gsh"></i><span class="gpe"></span><i class="gbub"></i><b class="gpn"></b>`;
   const p = { key, uid: u.id, type, el, sh: el.children[0], e: el.children[1], bub: el.children[2], nm: el.children[3], x: 0, y: 0, tx: 0, ty: 0, mode: "rest", until: nowS() + rnd(.4, 2.5),
-    fs: 1, face: 1, ph: Math.random() * 6, hp: 0, jump: -9, heartAt: 0, ht: 0, sig: "", mood: "", st: 0, ta: "", tb: "", ov: null, emo: "", hx: rnd(.2, .65), hy: rnd(.6, .9), spin: -9, yawn: -9, nb: false, nt: 0 };
+    fs: 1, face: 1, ph: Math.random() * 6, hp: 0, jump: -9, heartAt: 0, ht: 0, sig: "", mood: "", st: 0, ta: "", tb: "", ov: null, emo: "", hx: rnd(.2, .65), hy: rnd(.6, .9), spin: -9, yawn: -9, wave: -9, sit: 0, nb: false, nt: 0 };
   const s = pickSpot(p); p.x = p.tx = s[0]; p.y = p.ty = s[1];
   el.style.transform = `translate(${(p.x * G.W).toFixed(1)}px,${(p.y * G.H).toFixed(1)}px)`; el.style.zIndex = 10 + Math.round(p.y * G.H);
   G.pets.set(key, p); G.layer.appendChild(el); return p;
@@ -108,10 +109,10 @@ function mkPet(key, u, type) {
 function removePet(p) { clearTimeout(p.ht); p.el.remove(); }
 function clearGarden() { if (G.vis) { G.vis.el.remove(); G.vis = null; } G.camInit = false; G.pets.forEach(removePet); G.pets.clear(); G.items.forEach(o => o.el.remove()); G.items.clear(); G.edit = false; G.work = null; G.sel = null; if (G.el) G.el.classList.remove("editing"); }
 function setPet(p, u, type) { // refresh look + mood from the owner's live data (only touches the DOM when something changed)
-  const st = stageOf(totalOf(u)), mood = moodOf(u), sig = `${type}|${st}|${mood}|${u.name}`;
+  const st = stageOf(totalOf(u)), mood = moodOf(u), nk = nickOf(u, type), sig = `${type}|${st}|${mood}|${u.name}|${nk}`;
   if (sig === p.sig) return; const evolved = !!p.sig && p.st !== st; p.sig = sig; p.type = type; p.st = st;
   p.emo = ALLP[type].e[st]; const acc = accOf(type, st);
-  p.e.innerHTML = `${p.emo}${acc ? `<i class="gacc">${acc}</i>` : ""}<i class="gscf">🧣</i>`; p.e.className = "gpe s" + st; p.el.dataset.st = st; p.nm.textContent = u.name || "";
+  p.e.innerHTML = `${p.emo}${acc ? `<i class="gacc">${acc}</i>` : ""}<i class="gscf">🧣</i>`; p.e.className = "gpe s" + st; p.el.dataset.st = st; p.nm.textContent = nk || u.name || ""; // the name tag shows the pet's nickname if it has one
   if (evolved) p.jump = nowS();
   if (p.mood !== mood) {
     p.mood = mood; p.el.dataset.mood = mood; clearTimeout(p.ht);
@@ -126,7 +127,7 @@ function syncGarden() {
   list.forEach(x => setPet(G.pets.get(x.key) || mkPet(x.key, x.u, x.type), x.u, x.type));
   const lv = couple().lv; if (lv !== G.decoLv) buildDeco(lv);
   const night = isEvening(); if (night !== G.night) { G.night = night; G.el.classList.toggle("night", night); }
-  syncItems(); syncBuddies(); syncWeather(); runVisits(); syncVisitor();
+  syncLand(); syncItems(); syncBuddies(); syncWeather(); runVisits(); syncVisitor();
 }
 function restoreBub(p) { p.bub.className = "gbub " + p.mood + (p.mood === "calm" ? "" : " on"); p.bub.textContent = p.mood === "calm" ? "" : BUB[p.mood]; }
 function endVisit(p, t) { // a cheer visit is over: guest wanders off again, host is free to move
@@ -135,7 +136,7 @@ function endVisit(p, t) { // a cheer visit is over: guest wanders off again, hos
   p.ov = null; p.mode = "rest"; p.until = t + rnd(1, 2.5);
 }
 function stepPet(p, t, dt, still) { // one animation frame for one pet
-  const mv = MOVE[p.type] || [1, 5], o = p.ov, mood = o && o.kind === "visit" ? "calm" : p.mood, moving = !still && !o && p.st > 0 && mood !== "break" && mood !== "sleep";
+  const mv = MOVE[p.type] || [1, 5], o = p.ov, mood = o && o.kind === "visit" ? "calm" : p.mood, moving = !still && !o && !(p.sit > t) && p.st > 0 && mood !== "break" && mood !== "sleep";
   let walking = false, lift = 0, rot = 0, sx = 1, sy = 1, hop = 0;
   if (o && !still) { // errands: "visit" = run to a friend's pet and shower it with hearts, "host" = wait for the guest, "buddy" = meet by the pond and hop together
     if (o.kind === "host") { if (t > o.until) { p.ov = null; p.mode = "rest"; p.until = t + rnd(.5, 1.5); } }
@@ -181,10 +182,11 @@ function stepPet(p, t, dt, still) { // one animation frame for one pet
     const napping = o && o.kind === "nap" && o.arrived;
     if (p.st === 0 && mood !== "sleep") rot = Math.sin(t * 3 + p.ph) * 7;           // eggs rock in place
     else if (mood === "sleep" || napping) { if (p.type !== "plant") rot = napping ? o.rot : -78; sy = 1 + br * .025; } // lying down, breathing slowly
-    else if (mood === "break") { sy = .9 + br * .015; sx = 1.05; }                      // sitting
+    else if (mood === "break" || p.sit > t) { sy = .9 + br * .015; sx = 1.05; }         // sitting (break time, or the "sit" trick)
     else if (!walking && !lift) { sy = 1 + br * .03; sx = 1 - br * .02; }
     const jt = t - p.jump; if (jt >= 0 && jt < .55) { const k = Math.sin(Math.PI * jt / .55); lift += k * 30; sy *= 1 + k * .08; } // tap jump
     const sp = (t - p.spin) / .9; if (sp >= 0 && sp < 1) { rot += 360 * (1 - (1 - sp) ** 2); lift += Math.sin(Math.PI * sp) * 30; }  // treat: happy spin
+    const wv = (t - p.wave) / 1.8; if (wv >= 0 && wv < 1) rot += Math.sin(wv * Math.PI * 8) * 15 * (1 - wv * .6); // trick: wave (happy wiggle)
     const yt = (t - p.yawn) / 1.6; if (yt >= 0 && yt < 1) { const k = Math.sin(Math.PI * yt); sy *= 1 + k * .13; sx *= 1 - k * .05; }  // night: stretch + yawn
   }
   p.fs += (p.face * (FACE_RIGHT.has(p.emo) ? -1 : 1) - p.fs) * Math.min(1, dt * 14); // smooth turn-around
@@ -231,9 +233,32 @@ function gardenTap(key) {
   const tot = totalOf(u), st = stageOf(tot), mood = moodOf(u), own = u.id === me?.uid;
   p.jump = nowS();
   spawnHeart(p.x * G.W, p.y * G.H - 62);
-  G.card.innerHTML = `<b>${ALLP[p.type].e[st]}${accOf(p.type, st)} ${esc(u.name)}'s ${esc(petName(p.type))}</b><small>${stageNames(p.type)[st]} · ${st < 3 ? `${fmt(STAGE[st] - tot)} to grow` : "fully grown 👑"}</small><em>${SAY[mood]}</em>${own ? `<button class="gtreat" data-act="gtreat" data-id="${esc(key)}">🍪 give a treat · ${TREAT} 🌱</button>` : ""}`;
+  const nk = nickOf(u, p.type), kind = esc(petName(p.type)), k = esc(key), tb = (n, e, l) => `<button data-act="gtrick" data-id="${k}" data-k="${n}">${e} ${l}</button>`;
+  G.card.innerHTML = `<b>${ALLP[p.type].e[st]}${accOf(p.type, st)} ${nk ? esc(nk) : `${esc(u.name)}'s ${kind}`}</b><small>${nk ? `${esc(u.name)}'s ${kind} · ` : ""}${stageNames(p.type)[st]} · ${st < 3 ? `${fmt(STAGE[st] - tot)} to grow` : "fully grown 👑"}</small><em>${SAY[mood]}</em>
+  <div class="gtricks">${tb("sit", "🪑", "sit")}${tb("spin", "🌀", "spin")}${tb("wave", "👋", "wave")}${own ? `<button data-act="gname" data-id="${k}">✏️ name</button>` : ""}</div>${own ? `<button class="gtreat" data-act="gtreat" data-id="${k}">🍪 give a treat · ${TREAT} 🌱</button>` : ""}`;
   G.card.hidden = true; void G.card.offsetWidth; G.card.hidden = false;
-  clearTimeout(G.cardT); G.cardT = setTimeout(() => { G.card.hidden = true; }, own ? 6500 : 4200);
+  clearTimeout(G.cardT); G.cardT = setTimeout(() => { G.card.hidden = true; }, own ? 8000 : 6000);
+}
+function trick(key, kind) { // tap-a-pet tricks (a little show only you see): sit, spin, wave
+  const p = G.pets.get(key); if (!p) return; G.card.hidden = true;
+  if (p.st < 1) return toast("Eggs can't do tricks yet 🥚");
+  if (p.ov) return toast("Busy with a friend right now 💞");
+  const t = nowS();
+  if (kind === "spin") p.spin = t;
+  else if (kind === "wave") { p.wave = t; setTimeout(() => spawnHeart(p.x * G.W + 16, p.y * G.H - 70, "👋"), 700); }
+  else p.sit = t + 5;
+  spawnHeart(p.x * G.W, p.y * G.H - 62, kind === "sit" ? "🪑" : kind === "spin" ? "🌀" : "👋");
+}
+function nameSheet(key, m) { // give your pet a nickname (saved per pet type in users/{uid}.nicks)
+  const p = G.pets.get(key); if (!p || p.uid !== m.id) return;
+  modal.innerHTML = `<div class="back"><div class="sheet"><h3>name your ${esc(petName(p.type))} ✏️</h3><p class="hint">Give it a nickname everybody will see. Leave it empty to remove the name.</p>
+  <input id="nk" maxlength="14" placeholder="e.g. Mochi" value="${esc(nickOf(m, p.type))}" autocomplete="off"><div class="row"><button class="btn ghost" id="sx">cancel</button><button class="btn" id="ns">save 💖</button></div></div></div>`;
+  $("#sx").onclick = () => modal.innerHTML = "";
+  $("#ns").onclick = async () => {
+    const v = $("#nk").value.trim().slice(0, 14);
+    try { await DB.saveNick(m.id, p.type, v); modal.innerHTML = ""; toast(v ? `Say hi to ${v}! 💖` : "Nickname removed"); } catch (e) { toast(errMsg(e)); }
+  };
+  setTimeout(() => { const i = $("#nk"); if (i) i.focus(); }, 60);
 }
 function gardenSheet(mine) { // "choose my garden pets" modal: locked pets are greyed out with their unlock requirement
   const sel = new Set((Array.isArray(mine.garden) ? mine.garden : []).filter(id => EXTRA[id] && EXTRA[id].ok(mine)).slice(0, MAX_FRIENDS));
@@ -252,4 +277,4 @@ function gardenSheet(mine) { // "choose my garden pets" modal: locked pets are g
   paint();
 }
 
-export { camTo, clearGarden, findPet, gardenList, gardenMain, gardenSheet, gardenTap, mountGarden, restoreBub, syncGarden, treat };
+export { camTo, clearGarden, findPet, gardenList, gardenMain, gardenSheet, gardenTap, mountGarden, nameSheet, restoreBub, syncGarden, treat, trick };

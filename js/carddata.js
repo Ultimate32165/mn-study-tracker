@@ -3,7 +3,7 @@ import { boardSnap } from "./board.js";
 import * as DB from "./db.js";
 import { decorOf } from "./decor.js";
 import { gardenList } from "./garden.js";
-import { G, inPond, isEvening, moodOf, seeded } from "./garden-state.js";
+import { G, inPond, isEvening, landOf, moodOf, seeded } from "./garden-state.js";
 import { ALLP, accOf, petName, petOf, stageNames, stageOf } from "./pets.js";
 import { LV_T, board, couple, elapsed, goalOf, liveToday, me, sessions, totalOf, users } from "./state.js";
 import { DAY, fmt, key, stats } from "./util.js";
@@ -14,12 +14,12 @@ const hhmm = t => new Date(t).toLocaleTimeString(undefined, { hour: "numeric", m
 const pxc = document.createElement("canvas"); pxc.width = pxc.height = 1; const pxx = pxc.getContext("2d", { willReadFrequently: true });
 function norm(c) { pxx.clearRect(0, 0, 1, 1); pxx.fillStyle = "#000"; pxx.fillStyle = c; pxx.fillRect(0, 0, 1, 1); const [r, g, b, a] = pxx.getImageData(0, 0, 1, 1).data; return { s: `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`, rgb: `${r},${g},${b}` }; }
 function cardPal(night, wx) { // read the CURRENT theme's colours (also the garden's sky / grass for the right time of day and weather)
-  const tmp = document.createElement("div"); tmp.id = "garden"; tmp.className = [night ? "night" : "", wx && wx !== "clear" ? "wx-" + wx : ""].join(" ").trim();
+  const tmp = document.createElement("div"); tmp.id = "garden"; tmp.className = [night ? "night" : "", wx && wx !== "clear" ? "wx-" + wx : "", "gr-" + landOf(users).g].join(" ").trim();
   tmp.style.cssText = "position:fixed;left:-9999px;top:0;width:10px;height:10px;visibility:hidden;pointer-events:none"; document.body.appendChild(tmp);
   const c = e => { const i = document.createElement("i"); i.style.color = e; tmp.appendChild(i); return norm(getComputedStyle(i).color); }, v = n => c(`var(${n})`);
   const pal = {
     bg1: v("--bg1").s, bg2: v("--bg2").s, card: v("--card").s, ink: v("--ink").s, sub: v("--soft").s, main: v("--main").s, alt: v("--alt").s, tint: v("--tint").s, edge: v("--edge").s,
-    sk1: v("--sk1").s, sk2: v("--sk2").s, cl: v("--cl").s, grB: v("--gr-b").s, grF: v("--gr-f").s, wood: v("--wood").s, woodL: v("--wood-l").s, woodD: v("--wood-d").s,
+    sk1: v("--sk1").s, sk2: v("--sk2").s, cl: v("--cl").s, grB: v("--gb").s, grF: v("--gf").s, fc: v("--fc").s, dirt: c("color-mix(in srgb,#c8a06a 70%,var(--bg1))").s, hedge: c("color-mix(in srgb,#3f9f55 78%,var(--bg1))").s, bamboo: c("color-mix(in srgb,#b9d36c 80%,var(--bg1))").s, wood: v("--wood").s, woodL: v("--wood-l").s, woodD: v("--wood-d").s,
     soil: c("color-mix(in srgb,#8a5732 80%,var(--bg1))").s, cloth: c("color-mix(in srgb,#fff 88%,var(--main))").s, pad: c("color-mix(in srgb,#5fcf74 80%,var(--bg1))").s,
     stone: c("color-mix(in srgb,#cfd3dc 75%,var(--bg1))").s, water: c("color-mix(in srgb,#8fd3ff 80%,var(--bg1))").s, water2: c("color-mix(in srgb,#4fb0e8 78%,var(--bg1))").s,
     live: v("--live").s, onBg: v("--on-bg").s, onLine: v("--on-line").s, glow1: v("--glow1").rgb, glow2: v("--glow2").rgb, hf: (getComputedStyle(document.documentElement).getPropertyValue("--hf").trim() || "Fredoka, sans-serif"), bf: "Nunito, system-ui, sans-serif"
@@ -42,7 +42,7 @@ function gardenSnap() { // the saved garden as plain data (live pet positions wh
     placed.push({ x, y });
     return { emo: ALLP[e.type].e[st], acc: accOf(e.type, st), st, x, y, flip: x < .5, sleep: moodOf(e.u) === "sleep" }; // animals on the left look right, on the right look left: everyone faces the middle
   });
-  return { night, wx, lv: couple().lv, items, pets };
+  return { night, wx, lv: couple().lv, land: landOf(users), items, pets };
 }
 function cardData(shape, sid) {
   const m = users.find(u => u.id === me.uid), s = stats(m), d = m.daily || {}, now = Date.now(), goal = goalOf(m), sx = sessions.find(x => x.id === sid);

@@ -69,8 +69,9 @@ function syncBuddies() { // two studying → their pets meet by the pond and hop
   });
 }
 
-// ---- garden visitors: a butterfly, bird or hedgehog drops by now and then; tap it for a seed ----
-const VIS = [["🦋", "butterfly", 60], ["🐦", "bird", 42], ["🦔", "hedgehog", 16]]; // [emoji, name, speed px/s]
+// ---- garden visitors: a butterfly, bird, hedgehog, frog, bunny, duck or (rare) deer drops by now and then; tap it for a seed ----
+const VIS = [["🦋", "butterfly", 60, 5], ["🐦", "bird", 42, 4], ["🦔", "hedgehog", 16, 2], ["🐸", "frog", 34, 3], ["🐰", "bunny", 46, 3], ["🦆", "duck", 30, 3], ["🦌", "deer", 38, 1]]; // [emoji, name, speed px/s, how often]
+const pickVis = () => { let r = Math.random() * VIS.reduce((a, k) => a + k[3], 0); for (const k of VIS) { r -= k[3]; if (r <= 0) return k; } return VIS[0]; };
 const visKey = () => "vis-" + new Date().toDateString().replace(/ /g, "-");
 function syncVisitor() {
   const v = G.vis, t = nowS();
@@ -79,24 +80,24 @@ function syncVisitor() {
   if (!G.visAt) G.visAt = t + rnd(25, 50);
   if (t < G.visAt || (+ls(visKey()) || 0) >= VIS_DAY) return;
   G.visAt = t + rnd(50, 110);
-  const k = VIS[Math.floor(Math.random() * VIS.length)], el = document.createElement("div"); el.className = "gvis"; el.dataset.act = "gvis"; el.innerHTML = `<span>${k[0]}</span>`;
+  const k = pickVis(), el = document.createElement("div"); el.className = "gvis"; el.dataset.act = "gvis"; el.innerHTML = `<span>${k[0]}</span>`;
   const x = Math.min(BOUNDS.x1, Math.max(BOUNDS.x0, (G.cam.x + rnd(.2, .8) * G.vw) / G.W)), y = Math.min(BOUNDS.y1, Math.max(BOUNDS.y0 + .05, (G.cam.y + rnd(.45, .85) * G.vh) / G.H));
   G.vis = { el, x, y, tx: x, ty: y, sp: k[2], kind: k[1], until: t + 28, nt: 0, ph: rnd(0, 6), fs: 1, face: 1 }; G.layer.appendChild(el);
 }
 function visStep(t, dt) {
   const v = G.vis; if (!v) return;
-  if (t >= v.nt) { const far = v.kind === "butterfly" ? 130 : v.kind === "bird" ? 70 : 60; v.tx = Math.min(BOUNDS.x1, Math.max(BOUNDS.x0, v.x + rnd(-far, far) / G.W)); v.ty = Math.min(BOUNDS.y1, Math.max(BOUNDS.y0, v.y + rnd(-far * .5, far * .5) / G.H)); v.nt = t + rnd(1.4, 3.2); }
+  if (t >= v.nt) { const far = v.kind === "butterfly" ? 130 : v.kind === "bird" ? 70 : v.kind === "hedgehog" ? 60 : 90; v.tx = Math.min(BOUNDS.x1, Math.max(BOUNDS.x0, v.x + rnd(-far, far) / G.W)); v.ty = Math.min(BOUNDS.y1, Math.max(BOUNDS.y0, v.y + rnd(-far * .5, far * .5) / G.H)); v.nt = t + rnd(1.4, 3.2); }
   const dx = (v.tx - v.x) * G.W, dy = (v.ty - v.y) * G.H, d = Math.hypot(dx, dy), step = v.sp * dt, moving = d > 2 && !RM.matches;
   if (moving) { const k = Math.min(1, step / d); v.x += (v.tx - v.x) * k; v.y += (v.ty - v.y) * k; if (Math.abs(dx) > 1) v.face = dx > 0 ? -1 : 1; }
   v.fs += (v.face - v.fs) * Math.min(1, dt * 12);
-  const bob = RM.matches ? 0 : v.kind === "butterfly" ? Math.sin(t * 6 + v.ph) * 9 + 14 : v.kind === "bird" ? (moving ? Math.abs(Math.sin(t * 10)) * 7 : 0) : (moving ? Math.sin(t * 9) * 2 : 0);
+  const bob = RM.matches ? 0 : v.kind === "butterfly" ? Math.sin(t * 6 + v.ph) * 9 + 14 : v.kind === "bird" ? (moving ? Math.abs(Math.sin(t * 10)) * 7 : 0) : v.kind === "frog" || v.kind === "bunny" ? (moving ? Math.abs(Math.sin(t * 8)) * 11 : 0) : v.kind === "deer" ? (moving ? Math.abs(Math.sin(t * 6)) * 4 : 0) : (moving ? Math.sin(t * 9) * 2 : 0); // hedgehog + duck: little waddle
   v.el.style.transform = `translate(${(v.x * G.W).toFixed(1)}px,${(v.y * G.H).toFixed(1)}px)`; v.el.style.zIndex = 20 + Math.round(v.y * G.H);
   v.el.firstChild.style.transform = `translateY(${(-bob).toFixed(1)}px) scaleX(${v.fs.toFixed(2)})`;
   v.el.classList.toggle("leave", v.until - t < 2.5);
 }
 async function collectVisitor(m) {
   const v = G.vis; if (!v) return; G.vis = null; v.el.classList.add("got"); setTimeout(() => v.el.remove(), 450);
-  const n = Math.random() < .2 ? 2 : 1; ls(visKey(), (+ls(visKey()) || 0) + 1);
+  const n = v.kind === "deer" || Math.random() < .2 ? 2 : 1; // a shy deer always leaves 2 seeds ls(visKey(), (+ls(visKey()) || 0) + 1);
   spawnHeart(v.x * G.W, v.y * G.H - 40, `+${n}🌱`); burst(["🌱", "✨"], 14);
   try { await DB.addBonus(m.id, n); } catch (e) { toast(errMsg(e)); }
 }
