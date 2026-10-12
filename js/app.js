@@ -94,7 +94,7 @@ app.onclick = async e => {
     else if (a === "gland") landSheet();
     else if (a === "gvis") await collectVisitor(mine);
     else if (a === "gfind") findPet();
-    else if (a === "card") cardSheet(["together", "recap", "board"].includes(id) ? id : "me");
+    else if (a === "card") cardSheet(["together", "recap", "board", "garden"].includes(id) ? id : "me");
     else if (a === "gift") giftSheet(id);
     else if (a === "calnav") { shiftMonth(+id); render(); }
     else if (a === "day") { const v = +b.dataset.v; toast(`${new Date(id + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${v ? fmt(v) : "no study 💤"}`); }

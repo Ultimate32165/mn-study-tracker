@@ -2,7 +2,7 @@
 import { ACCENTS, CORNERS, FILTERS, FONTS, PATTERNS, STICKERS, STYLES, drawCard } from "./card.js";
 import * as DB from "./db.js";
 import { forestSnap } from "./forest.js";
-import { cardData, cardDataBoard, cardDataMilestone, cardDataRecap, cardDataTogether, cardPal } from "./carddata.js";
+import { cardData, cardDataBoard, cardDataGarden, cardDataMilestone, cardDataRecap, cardDataTogether, cardPal } from "./carddata.js";
 import { me, sessions, totalOf, users } from "./state.js";
 import { $, errMsg, esc, fmt, key, ls, modal, toast } from "./util.js";
 
@@ -20,19 +20,22 @@ function loadLook() {
   o.dark = s.dark === true; o.msg = typeof s.msg === "string" ? s.msg.slice(0, 36) : ""; return o;
 }
 const saveLook = () => ls("cardLook", JSON.stringify(cardOpt.look));
-const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today", mode: "me", fid: "", period: "week", ms: loadMs(), scene: ls("cardScene") === "forest" ? "forest" : "garden", look: loadLook() };
+const cardOpt = { shape: ["square", "portrait", "story"].includes(ls("cardShape")) ? ls("cardShape") : "portrait", sid: "today", mode: "me", fid: "", period: "week", ms: loadMs(), scene: ls("cardScene") === "forest" ? "forest" : "none", look: loadLook(), gshape: ["square", "portrait", "story", "wide"].includes(ls("cardGShape")) ? ls("cardGShape") : "wide" }; // scene = what the normal cards show at the bottom: forest / none (the garden has its own card, with its own shape: gshape)
 let cardUrl = "", cardBlob = null, cardCv = null, cardSeq = 0, lastGift = 0;
 async function renderCard() {
   const seq = ++cardSeq, img = $("#cimg"), ld = $(".cload"); if (!img) return;
   cardBlob = null; cardCv = null; if (ld) ld.hidden = false; // until the new card is drawn, save / send say "still drawing"
   try { await Promise.race([Promise.all([document.fonts.load("700 48px Fredoka"), document.fonts.load("800 28px Nunito"), ...(cardOpt.mode === "board" ? [document.fonts.load("30px Rye"), document.fonts.load("30px 'Special Elite'")] : ["film", "ticket"].includes(cardOpt.look.style) || cardOpt.look.font === "type" ? [document.fonts.load("30px 'Special Elite'")] : []), ...(cardOpt.look.font === "western" ? [document.fonts.load("30px Rye")] : []), ...(FONTS[cardOpt.look.font].fam ? [document.fonts.load(`700 48px ${FONTS[cardOpt.look.font].fam}`)] : [])]), new Promise(r => setTimeout(r, 1500))]); } catch {}
   if (seq !== cardSeq) return;
-  let data; const md = cardOpt.mode;
-  try { data = md === "together" ? cardDataTogether(cardOpt.shape, cardOpt.fid) : md === "recap" ? await cardDataRecap(cardOpt.shape, cardOpt.period) : md === "milestone" ? cardDataMilestone(cardOpt.shape, cardOpt.ms) : md === "board" ? cardDataBoard(cardOpt.shape) : cardData(cardOpt.shape, cardOpt.sid); }
+  let data; const md = cardOpt.mode, shp = md === "garden" ? cardOpt.gshape : cardOpt.shape;
+  try { data = md === "together" ? cardDataTogether(shp, cardOpt.fid) : md === "recap" ? await cardDataRecap(shp, cardOpt.period) : md === "milestone" ? cardDataMilestone(shp, cardOpt.ms) : md === "board" ? cardDataBoard(shp) : md === "garden" ? cardDataGarden(shp) : cardData(shp, cardOpt.sid); }
   catch { if (seq === cardSeq) { toast("Couldn't draw that card 😢"); if (ld) ld.hidden = true; } return; }
   if (seq !== cardSeq) return;
   const cv = document.createElement("canvas");
-  if (cardOpt.scene === "forest") { const fm = users.find(u => u.id === me.uid); if (fm) data.garden = { ...data.garden, forest: forestSnap(fm, totalOf(fm)) }; } // forest instead of garden
+  if (md !== "garden") { // the normal cards show the forest or nothing at the bottom; the garden card keeps the whole garden
+    const fm = cardOpt.scene === "forest" && users.find(u => u.id === me.uid);
+    data.garden = fm ? { ...data.garden, forest: forestSnap(fm, totalOf(fm)) } : { ...data.garden, none: true };
+  }
   data.look = cardOpt.look; // style, colour, font, corners, pattern, stickers, filter, dark, footer message
   drawCard(cv, data, cardPal(data.garden.night, data.garden.wx));
   cv.toBlob(b => {
@@ -51,15 +54,15 @@ function giftImg() {
 function cardSheet(mode) {
   const L = cardOpt.look, sess = sessions.slice(0, 12), friends = users.filter(u => u.id !== me.uid), canShare = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File([""], "a.png", { type: "image/png" })] })); } catch { return false; } })();
   if (!cardOpt.ms) cardOpt.ms = loadMs();
-  cardOpt.mode = mode === "together" && friends.length ? "together" : mode === "milestone" && cardOpt.ms ? "milestone" : mode === "recap" ? "recap" : mode === "board" ? "board" : "me";
+  cardOpt.mode = mode === "together" && friends.length ? "together" : mode === "milestone" && cardOpt.ms ? "milestone" : mode === "recap" ? "recap" : mode === "board" ? "board" : mode === "garden" ? "garden" : "me";
   if (!sess.some(x => x.id === cardOpt.sid)) cardOpt.sid = "today";
   if (!friends.some(u => u.id === cardOpt.fid)) cardOpt.fid = (friends.find(u => u.status === "studying") || friends[0] || {}).id || "";
   const SH = { square: "▫️ square", portrait: "🖼️ 4:5", story: "📱 story" }, PD = { week: "last 7 days", month: "last 30 days" },
-    MD = { me: "👤 me", ...(friends.length ? { together: "💞 together" } : {}), recap: "🗓️ recap", board: "📝 board", ...(cardOpt.ms ? { milestone: "🏅 milestone" } : {}) };
+    MD = { me: "👤 me", ...(friends.length ? { together: "💞 together" } : {}), recap: "🗓️ recap", board: "📝 board", garden: "🌳 garden", ...(cardOpt.ms ? { milestone: "🏅 milestone" } : {}) };
   modal.innerHTML = `<div class="back"><div class="sheet cardsheet"><h3>photocard 📸</h3>
   <div class="seg" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>
   <div class="seg" id="cper">${Object.keys(PD).map(k => `<button data-per="${k}" class="${k === cardOpt.period ? "sel" : ""}">${PD[k]}</button>`).join("")}</div>
-  <div class="seg">${Object.keys(SH).map(k => `<button data-shape="${k}" class="${k === cardOpt.shape ? "sel" : ""}">${SH[k]}</button>`).join("")}</div>
+  <div class="seg" id="cshape"></div>
   <div class="seg wrap" id="cstyle" aria-label="card style">${Object.keys(STYLES).map(k => `<button data-look="style" data-v="${k}" class="${k === L.style ? "sel" : ""}">${STYLES[k].label}</button>`).join("")}</div>
   <div class="cacc" id="cacc" aria-label="accent colour">${Object.keys(ACCENTS).map(k => `<button data-look="accent" data-v="${k}" class="adot ${k === "theme" ? "athm" : ""} ${k === L.accent ? "sel" : ""}" ${ACCENTS[k] ? `style="background:${ACCENTS[k][0]}"` : ""} aria-label="${k}">${k === "theme" ? "🎨" : ""}</button>`).join("")}<button class="adot ashuf" id="cshuf" aria-label="surprise me">🎲</button></div>
   <details class="cmore"><summary>🎛️ more ways to customize</summary>
@@ -68,19 +71,23 @@ function cardSheet(mode) {
     <div class="crow"><b>footer message</b><input id="cmsg" maxlength="36" value="${esc(L.msg)}" placeholder="🍓 MN Study Tracker"></div>
     <button class="btn ghost" id="creset">↺ reset the look</button>
   </details>
-  <div class="seg" id="cscene">${[["garden", "🌳 garden"], ["forest", "🌲 forest"]].map(([k, l]) => `<button data-scene="${k}" class="${k === cardOpt.scene ? "sel" : ""}">${l}</button>`).join("")}</div>
+  <div class="seg" id="cscene">${[["forest", "🌲 forest"], ["none", "🚫 none"]].map(([k, l]) => `<button data-scene="${k}" class="${k === cardOpt.scene ? "sel" : ""}">${l}</button>`).join("")}</div>
   <select id="csel" aria-label="which session"><option value="today">Today (all sessions)</option>${sess.map(x => `<option value="${esc(x.id)}" ${x.id === cardOpt.sid ? "selected" : ""}>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} · ${fmt(x.seconds)}</option>`).join("")}</select>
   <select id="cfr" aria-label="which friend">${friends.map(u => `<option value="${esc(u.id)}" ${u.id === cardOpt.fid ? "selected" : ""}>${esc(u.emoji)} ${esc(u.name)}</option>`).join("")}</select>
   <div class="cprev"><div class="cload">drawing your card…</div><img id="cimg" alt="photocard preview"></div>
   ${friends.length ? `<button class="btn" id="csend">💌 send</button>` : ""}
   <div class="row"><button class="btn ghost" id="cclose">close</button>${canShare ? `<button class="btn ghost" id="cshare">share</button>` : ""}<button class="btn ghost" id="csave">save ⬇️</button></div></div></div>`;
-  const vis = () => { $("#csel").hidden = cardOpt.mode !== "me"; $("#cfr").hidden = friends.length < 2; $("#cper").hidden = cardOpt.mode !== "recap"; $("#cscene").hidden = cardOpt.mode === "board"; };
+  const vis = () => { $("#csel").hidden = cardOpt.mode !== "me"; $("#cfr").hidden = friends.length < 2; $("#cper").hidden = cardOpt.mode !== "recap"; $("#cscene").hidden = cardOpt.mode === "board" || cardOpt.mode === "garden"; const sb = $("#csend"); if (sb) sb.hidden = cardOpt.mode === "garden"; }; // the garden card is a big picture to save / share (friend inbox cards are small 640px ones)
+  const shapeUi = () => { // the shape buttons: the garden card also has a wide one, and remembers its own shape
+    const g = cardOpt.mode === "garden", opts = g ? { ...SH, wide: "🏞️ wide" } : SH, cur = g ? cardOpt.gshape : cardOpt.shape, box = $("#cshape");
+    box.innerHTML = Object.keys(opts).map(k => `<button data-shape="${k}" class="${k === cur ? "sel" : ""}">${opts[k]}</button>`).join("");
+    box.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => { const k = b.dataset.shape; if (cardOpt.mode === "garden") { cardOpt.gshape = k; ls("cardGShape", k); } else { cardOpt.shape = k; ls("cardShape", k); } shapeUi(); renderCard(); });
+  };
   const sendLbl = () => { const b = $("#csend"), f = friends.find(u => u.id === cardOpt.fid); if (b) { b.textContent = `💌 send to ${f ? f.name : "friend"}`; b.disabled = !f; } };
   const done = () => { cardSeq++; if (cardUrl) { URL.revokeObjectURL(cardUrl); cardUrl = ""; } cardBlob = null; cardCv = null; modal.innerHTML = ""; };
   $("#cclose").onclick = done;
-  modal.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { cardOpt.mode = b.dataset.mode; modal.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("sel", x === b)); vis(); renderCard(); });
+  modal.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { cardOpt.mode = b.dataset.mode; modal.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("sel", x === b)); vis(); shapeUi(); renderCard(); });
   modal.querySelectorAll("[data-per]").forEach(b => b.onclick = () => { cardOpt.period = b.dataset.per; modal.querySelectorAll("[data-per]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
-  modal.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => { cardOpt.shape = b.dataset.shape; ls("cardShape", cardOpt.shape); modal.querySelectorAll("[data-shape]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
   modal.querySelectorAll("[data-scene]").forEach(b => b.onclick = () => { cardOpt.scene = b.dataset.scene; ls("cardScene", cardOpt.scene); modal.querySelectorAll("[data-scene]").forEach(x => x.classList.toggle("sel", x === b)); renderCard(); });
   const lookUi = () => modal.querySelectorAll("[data-look]").forEach(x => x.classList.toggle("sel", String(cardOpt.look[x.dataset.look]) === x.dataset.v)); // highlight what is chosen
   const setLook = (k, v) => { cardOpt.look[k] = v; saveLook(); lookUi(); renderCard(); };
@@ -107,7 +114,7 @@ function cardSheet(mode) {
     lastGift = Date.now();
     try { await DB.sendGift(f.id, me.uid, mine.name, mine.emoji, cardOpt.mode, giftImg()); toast(`Sent to ${f.name} 💌`); } catch (e) { lastGift = 0; toast(errMsg(e)); }
   };
-  vis(); sendLbl(); lookUi(); renderCard();
+  vis(); shapeUi(); sendLbl(); lookUi(); renderCard();
 }
 
 export { cardOpt, cardSheet, saveMs };

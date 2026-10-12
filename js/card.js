@@ -5,6 +5,8 @@ import { COLORS } from "./board.js";
 // STYLES (see the "card styles" section near the bottom) change the whole look: background, tiles, frame, decorations, accent colour.
 // The garden is redrawn from the same data as the live scene, shrunk to fit. This file draws an OLD-SIZE (980x680) picture of the whole garden: the live garden is 3x bigger, but carddata.js (gardenSnap) converts every y back to the old frame, so WW/WH/POND/PATH_PTS below do NOT follow js/garden-state.js any more. Leave them alone.
 export const SIZES = { square: [1080, 1080], portrait: [1080, 1350], story: [1080, 1920] };
+export const GSIZES = { ...SIZES, wide: [1470, 1020] }; // the garden card: same layout sizes (+ a wide one), but the canvas is drawn GQ times bigger (see drawCard)
+const GQ = 2;
 const WW = 980, WH = 680, POND = { x: 300, y: 500, rx: 80, ry: 44 }; // the card's own old-size garden frame (see the note at the top)
 const SIZE_BY_STAGE = [28, 32, 40, 50];
 
@@ -232,6 +234,7 @@ function drawForest(ctx, x, y, w, h, g, pal) { // g.forest = [{ s: species, c: t
   ctx.restore();
 }
 function drawScene(ctx, x, y, w, h, g, pal) {
+  if (g.none) return; // the normal photocards can have no picture at the bottom (the garden has its own card)
   if (g.forest) return drawForest(ctx, x, y, w, h, g, pal);
   ctx.save(); rr(ctx, x, y, w, h, 36); ctx.clip();
   const s = Math.min(w / WW, h / WH), ox = x + (w - WW * s) / 2, oy = y + h - WH * s, X = v => ox + v * s, Y = v => oy + v * s, night = !!g.night, R = seeded(7), L = g.land || DEF_L;
@@ -286,6 +289,34 @@ function drawScene(ctx, x, y, w, h, g, pal) {
   else if (g.wx === "petals" || g.wx === "leaves") { const E = g.wx === "petals" ? ["🌸", "🌸", "💮", "🌷"] : ["🍂", "🍁", "🍂"]; for (let i = 0; i < 22; i++) emoji(ctx, E[i % E.length], x + W() * w, y + W() * h, (13 + W() * 8) * Math.max(1, s * 1.5), { rot: W() * 6 }); }
   ctx.restore();
   ctx.strokeStyle = pal.edge; ctx.lineWidth = 5; rr(ctx, x, y, w, h, 36); ctx.stroke();
+}
+
+// ---------------------------------------------------------------- the garden card: only the garden (drawScene of the whole garden), on a canvas GQ times bigger than the others
+function drawGardenCard(ctx, d, pal, W, H) {
+  const g = d.garden, wide = d.shape === "wide", pad = wide ? 40 : 54, gap = wide ? 18 : 22, stamp = 54, cw = W - pad * 2, top = pad, bottom = H - pad - stamp, hf = pal.hf, bf = pal.bf;
+  if (wide) { // the garden fills the card; the title and the date float on the sky
+    drawScene(ctx, pad, top, cw, bottom - top, g, pal);
+    const pill = (label, right, av) => {
+      const h = 64, y = top + 22, mx = cw * .42; ctx.font = `700 34px ${hf}`; const w = Math.min(ctx.measureText(label).width, mx) + (av ? 96 : 44), x = right ? pad + cw - 22 - w : pad + 22;
+      rr(ctx, x, y, w, h, h / 2); ctx.fillStyle = "rgba(20,16,40,.45)"; ctx.fill();
+      if (av) emoji(ctx, av, x + 38, y + h / 2 + 2, 36);
+      text(ctx, label, x + (av ? 72 : 22), y + h / 2, { size: 34, font: hf, weight: 700, color: "rgba(255,255,255,1)", base: "middle", max: mx });
+    };
+    pill(d.title, false, d.avatar); pill(d.date, true);
+  } else {
+    const hh = 104, ch = d.shape === "story" ? 150 : 120, ph = d.shape === "story" ? 300 : 0, n = ph ? 4 : 3, avail = bottom - top;
+    const heroH = Math.max(300, Math.min(Math.round(cw * .95), avail - hh - ch - ph - gap * (n - 1))), used = hh + heroH + ch + ph + gap * (n - 1); // a taller box would only be empty sky, so the block is centred instead
+    let y = top + Math.max(0, (avail - used) / 2);
+    drawHead(ctx, { head: { y, h: hh }, pad }, pal, W, d.avatar, d.title, d.date); y += hh + gap;
+    drawScene(ctx, pad, y, cw, heroH, g, pal); y += heroH + gap;
+    const tw = (cw - gap * 2) / 3; d.facts.forEach((t, i) => drawStat(ctx, pad + i * (tw + gap), y, tw, ch, pal, t)); y += ch + gap;
+    if (ph) { // story: a row with the garden's pets
+      tile(ctx, pad, y, cw, ph, pal); text(ctx, "THE GARDEN GANG", pad + 34, y + 46, { size: 26, font: bf, weight: 800, color: pal.sub, base: "middle" });
+      const ps = g.pets.slice(0, 8), slot = (cw - 60) / Math.max(1, ps.length), sc = Math.min(2.4, slot / 70);
+      ps.forEach((p, i) => drawPet(ctx, { ...p, flip: false, sleep: false }, pad + 30 + slot * (i + .5), y + ph - 52, sc, g.wx));
+    }
+  }
+  text(ctx, stampTxt(), W / 2, H - pad - stamp / 2 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9, max: 900 });
 }
 
 // ---------------------------------------------------------------- the card
@@ -358,8 +389,8 @@ function personTile(ctx, x, y, w, h, p, pal) {
 }
 function drawTogether(ctx, d, pal, W, H) {
   const pad = 54, gap = 22, stamp = 54, hf = pal.hf, bf = pal.bf, cw = W - pad * 2;
-  const gh = Math.round(H * (d.shape === "story" ? .34 : d.shape === "portrait" ? .38 : .32)), gy = H - pad - stamp - gh;
-  const avail = gy - gap - pad - 2 * gap, wt = [1, 4.8, 1.1], cap = [120, 620, 130], sum = 6.9;
+  const none = !!d.garden.none, gh = none ? 0 : Math.round(H * (d.shape === "story" ? .34 : d.shape === "portrait" ? .38 : .32)), gy = H - pad - stamp - gh;
+  const avail = gy - gap - pad - 2 * gap, wt = [1, 4.8, 1.1], cap = none ? [150, 800, 170] : [120, 620, 130], sum = 6.9;
   const hs = wt.map((k, i) => Math.min(cap[i], Math.round(avail * k / sum))), gp = gap + Math.max(0, (avail + 2 * gap - hs.reduce((a, b) => a + b, 0) - 2 * gap) / 3);
   let y = pad + (gp - gap) / 2; const Y = hs.map(h => { const v = y; y += h + gp; return v; });
   { const h = hs[0], cy = Y[0] + h / 2, av = Math.min(h, 84);
@@ -410,7 +441,7 @@ function drawBars(ctx, pad, y, cw, h, pal, d) { // bar chart tile for 7 or 30 da
 
 // ---------------------------------------------------------------- recap card: last 7 / 30 days
 function drawRecap(ctx, d, pal, W, H) {
-  const L = layout(d.shape, W, H, [.9, 2.2, 3.1, 2.8], [120, 300, 300, 290], ["head", "ses", "chips", "chart"], d.shape === "story" ? .28 : d.shape === "portrait" ? .26 : .19), pad = L.pad, cw = W - pad * 2, hf = pal.hf, bf = pal.bf;
+  const L = layout(d.shape, W, H, [.9, 2.2, 3.1, 2.8], d.garden.none ? [150, 380, 380, 360] : [120, 300, 300, 290], ["head", "ses", "chips", "chart"], d.garden.none ? 0 : d.shape === "story" ? .28 : d.shape === "portrait" ? .26 : .19), pad = L.pad, cw = W - pad * 2, hf = pal.hf, bf = pal.bf;
   drawHead(ctx, L, pal, W, d.avatar, d.title, d.date);
   { const { y, h } = L.ses; tile(ctx, pad, y, cw, h, pal);
     const inner = h < 200 ? 26 : 34, rD = Math.min(h - inner * 2, 230), r0 = rD / 2, rcx = pad + cw - inner - r0, rcy = y + h / 2, tw = cw - inner * 2 - rD - 30;
@@ -429,7 +460,7 @@ function drawRecap(ctx, d, pal, W, H) {
 
 // ---------------------------------------------------------------- milestone card: pet evolved / streak record / couple level
 function drawMilestone(ctx, d, pal, W, H) {
-  const L = layout(d.shape, W, H, [1, 6, 1.1], [120, 520, 130], ["head", "hero", "chips"]), pad = L.pad, cw = W - pad * 2, hf = pal.hf, bf = pal.bf;
+  const L = layout(d.shape, W, H, [1, 6, 1.1], d.garden.none ? [150, 760, 170] : [120, 520, 130], ["head", "hero", "chips"], d.garden.none ? 0 : undefined), pad = L.pad, cw = W - pad * 2, hf = pal.hf, bf = pal.bf;
   drawHead(ctx, L, pal, W, d.avatar, `${d.name}'s big moment`, d.date);
   { const { y, h } = L.hero, cx = pad + cw / 2, es = Math.min(h * .36, 250), cyE = y + h * .36; tile(ctx, pad, y, cw, h, pal);
     ctx.save(); rr(ctx, pad, y, cw, h, 34); ctx.clip(); glow(ctx, cx, cyE, Math.min(cw, h) * .55, pal.glow1, .8); ctx.restore();
@@ -724,8 +755,8 @@ function paintFrame(ctx, kind, d, pal, W, H, inside) { // inside(x, y, w, h, rad
 }
 
 export function drawCard(cv, d, pal0) {
-  const [W, H] = SIZES[d.shape] || SIZES.square; cv.width = W; cv.height = H; LK = d.look || {};
-  const sty = STYLES[LK.style] || STYLES.classic, ctx = cv.getContext("2d"), pal = skin(pal0, sty, LK.accent), sk = LK.stick && LK.stick !== "auto" ? LK.stick : ""; ST = sty;
+  const gk = d.kind === "garden", Q = gk ? GQ : 1, [W, H] = (gk ? GSIZES : SIZES)[d.shape] || SIZES.square; cv.width = W * Q; cv.height = H * Q; LK = d.look || {}; // W / H = the layout size; the garden card has Q times more pixels (sharper), everything is drawn in layout units through ctx.scale
+  const sty = STYLES[LK.style] || STYLES.classic, ctx = cv.getContext("2d"), pal = skin(pal0, sty, LK.accent), sk = LK.stick && LK.stick !== "auto" ? LK.stick : ""; ST = sty; ctx.scale(Q, Q);
   if (!sty.frame) {
     paintCard(ctx, d, pal, W, H);
     if (sty.deco && !(sk && sty.deco === "stars")) paintDeco(ctx, sty.deco, W, H, pal); // a chosen sticker pack replaces the style's own stars
@@ -734,9 +765,10 @@ export function drawCard(cv, d, pal0) {
   if (FILTERS[LK.filt] && LK.filt !== "none") paintFilter(ctx, LK.filt, W, H);
 }
 function paintCard(ctx, d, pal, W, H) { // one card, drawn into a W×H area at the current origin
-  const L = layout(d.shape, W, H), hf = pal.hf, bf = pal.bf, pad = L.pad, cw = W - pad * 2;
+  const none = !!(d.garden && d.garden.none), L = layout(d.shape, W, H, [1, 2.8, 1.1, 3.2], none ? [150, 440, 170, 380] : [120, 340, 130, 290], undefined, none ? 0 : undefined), hf = pal.hf, bf = pal.bf, pad = L.pad, cw = W - pad * 2; // none = no picture at the bottom: the tiles use the room
   paintBg(ctx, pal, W, H);
 
+  if (d.kind === "garden") { drawGardenCard(ctx, d, pal, W, H); return; }
   if (d.kind === "together") { drawTogether(ctx, d, pal, W, H); return; }
   if (d.kind === "recap") { drawRecap(ctx, d, pal, W, H); return; }
   if (d.kind === "milestone") { drawMilestone(ctx, d, pal, W, H); return; }

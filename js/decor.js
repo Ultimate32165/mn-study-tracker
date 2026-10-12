@@ -69,7 +69,7 @@ function gardenPanel() {
     <div class="gbtns"><button class="btn ghost" data-act="gcancel">cancel</button><button class="btn" data-act="gdone">done 💖</button></div>`;
   }
   return `<div class="gtop"><div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds</div><button class="chip" data-act="gwx">🌦️ ${wl}</button></div>
-  <div class="gbtns"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button><button class="btn ghost" data-act="gland">🎨 style garden</button><button class="btn ghost" data-act="gchoose">🐾 garden pets</button><button class="btn ghost wide" data-act="card">📸 photocard</button></div>
+  <div class="gbtns"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button><button class="btn ghost" data-act="gland">🎨 style garden</button><button class="btn ghost" data-act="gchoose">🐾 garden pets</button><button class="btn ghost wide" data-act="card" data-id="garden">📸 garden photocard</button></div>
   <p class="hint">drag the garden to look around ✋ · pinch or use ＋ － to zoom 🔍 · tap a pet for tricks, treats & a nickname 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
 }
 function enterEdit(m) {

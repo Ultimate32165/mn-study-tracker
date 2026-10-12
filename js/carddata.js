@@ -103,9 +103,16 @@ function cardDataMilestone(shape, ms) {
   const lv = Math.min(ms.lv, LV_T.length - 1);
   return { ...out, emo: "💞", title: `Level ${lv + 1}!`, sub: LV_T[lv], spark: ["💞", "✨", "🌸", "⭐"], chips: [["together", fmt(couple().sec)], ["couple level", `${lv + 1} 💞`]] };
 }
+// ---- garden card: the garden on its own (card.js draws it 2x bigger than the other cards) ----
+const WXN = { clear: "clear skies", rain: "rainy ☔", snow: "snowy ❄️", petals: "petals 🌸", leaves: "autumn 🍂" };
+function cardDataGarden(shape) {
+  const m = users.find(u => u.id === me.uid) || {}, gs = gardenSnap(), name = m.name || "you", lv = Math.min(gs.lv, LV_T.length - 1), n = gs.pets.length;
+  return { kind: "garden", shape, name, avatar: m.emoji || "📚", title: `${name}'s garden`, date: dayLong(Date.now()), garden: gs,
+    facts: [{ l: "garden pets", v: `${n} 🐾`, s: n === 1 ? "one friend" : "wandering around" }, { l: "garden level", v: `${lv + 1} 💞`, s: LV_T[lv] }, { l: "decorations", v: `${gs.items.length} 🪴`, s: `${WXN[gs.wx] || "clear skies"}${gs.night ? " · night 🌙" : ""}` }] };
+}
 function cardDataBoard(shape) { // the shared to-do board, as a photocard
   const m = users.find(u => u.id === me.uid) || {};
   return { kind: "board", shape, name: m.name || "you", avatar: m.emoji || "📚", date: dayLong(Date.now()), board: boardSnap(board), garden: gardenSnap() };
 }
 
-export { cardData, cardDataBoard, cardDataMilestone, cardDataRecap, cardDataTogether, cardPal, dayLong };
+export { cardData, cardDataBoard, cardDataGarden, cardDataMilestone, cardDataRecap, cardDataTogether, cardPal, dayLong };
