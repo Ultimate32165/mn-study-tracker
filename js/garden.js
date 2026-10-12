@@ -1,7 +1,7 @@
 // The living garden scene: building it, the camera (drag to look around, pinch / + - to zoom), pets walking/animating, garden loop, treats, tap card, 'garden friends' sheet.
 import * as DB from "./db.js";
 import { dragApply, gardenPanel, seedsLeft, syncItems } from "./decor.js";
-import { mainPet, runVisits, spawnHeart, syncBuddies, syncVisitor, syncWeather, visStep } from "./garden-fx.js";
+import { mainPet, runVisits, spawnHeart, syncBuddies, syncVisitor, syncWeather, visStep, wxView } from "./garden-fx.js";
 import { BASE, BOUNDS, BUB, FACE_RIGHT, G, GY, K, MOVE, POND, RM, SAY, TREAT, WH, WW, ZMAX, fromClassicY, inPond, isEvening, moodOf, nowS, rnd, seeded } from "./garden-state.js";
 import { syncLand } from "./land.js";
 import { ALLP, EXTRA, MAX_FRIENDS, STAGE, accOf, nickOf, petName, petOf, stageNames, stageOf } from "./pets.js";
@@ -24,7 +24,7 @@ function buildGarden() { // built ONCE; render() never touches it, so pets never
   el.innerHTML = `<div class="gworld"><div class="gstars"></div><i class="gsun"></i><div class="grain"></div><i class="gcl c1"></i><i class="gcl c2"></i><i class="gcl c3"></i><i class="gcl c4"></i><i class="gcl c5"></i>${[...Array(10)].map(() => `<i class="gcl" style="top:${rnd(24, 136).toFixed(0)}px;--s:${rnd(.55, .95).toFixed(2)};animation-duration:${rnd(380, 620).toFixed(0)}s;animation-delay:${(-rnd(0, 600)).toFixed(0)}s"></i>`).join("")}
   <div class="ghill h1"></div><div class="gfence f-cute"></div><div class="ghill h2"></div><svg class="gpath" viewBox="0 0 ${WW} ${WH}" aria-hidden="true"></svg><div class="gpond" style="left:${POND.x - POND.rx}px;top:${POND.y - POND.ry}px;width:${POND.rx * 2}px;height:${POND.ry * 2}px"></div><div class="gborder"></div><div class="gdeco"></div><div class="gpets"></div><div class="gfly"></div>
   <div class="gff">${[...Array(28 * K)].map(() => `<i style="left:${rnd(4, 96).toFixed(1)}%;top:${rnd(17, 95).toFixed(1)}%;animation-delay:${(-rnd(0, 6)).toFixed(1)}s;animation-duration:${rnd(4, 8).toFixed(1)}s"></i>`).join("")}</div>
-  <div class="gfx"></div></div><div class="gwx"></div><div class="gcard" hidden></div><div class="gzoom"><button class="gzi" aria-label="zoom in">＋</button><button class="gzo" aria-label="zoom out">－</button></div><button class="gfind" data-act="gfind" aria-label="find my pets">📍</button>`; // the weather layer (gwx) sits over the window, not inside the world
+  <div class="gwx"></div><div class="gfx"></div></div><div class="gcard" hidden></div><div class="gzoom"><button class="gzi" aria-label="zoom in">＋</button><button class="gzo" aria-label="zoom out">－</button></div><button class="gfind" data-act="gfind" aria-label="find my pets">📍</button>`;
   G.el = el; G.world = el.querySelector(".gworld"); G.deco = el.querySelector(".gdeco"); G.layer = el.querySelector(".gpets"); G.fly = el.querySelector(".gfly"); G.fx = el.querySelector(".gfx");
   G.card = el.querySelector(".gcard"); G.wxEl = el.querySelector(".gwx");
   G.card.onclick = () => { G.card.hidden = true; };
@@ -32,7 +32,7 @@ function buildGarden() { // built ONCE; render() never touches it, so pets never
   el.querySelector(".gzi").onclick = () => zoomBy(1.5); el.querySelector(".gzo").onclick = () => zoomBy(1 / 1.5);
   el.addEventListener("wheel", e => { if (!e.ctrlKey) return; e.preventDefault(); const r = el.getBoundingClientRect(); zoomBy(Math.exp(-e.deltaY * .01), e.clientX - r.left, e.clientY - r.top); }, { passive: false }); // trackpad pinch / ctrl + wheel on a computer
   el.addEventListener("pointerdown", panDown); el.addEventListener("pointermove", panMove); el.addEventListener("pointerup", panUp); el.addEventListener("pointercancel", panUp);
-  G.decoLv = -1; G.night = null; G.wx = ""; G.landSig = ""; G.items.clear();
+  G.decoLv = -1; G.night = null; G.wx = ""; G.wxC.clear(); G.wxR = ""; G.landSig = ""; G.items.clear();
 }
 // ---- camera: drag to look around (with a little inertia), glide to a spot, pinch / + - to zoom ----
 // cam.x / cam.y = the world point at the top-left of the window. G.z = zoom (screen px per world px): the world is drawn as scale(z) translate(-cam).
@@ -97,6 +97,7 @@ function camStep(dt) {
   else if (c.vx || c.vy) { c.x += c.vx * dt; c.y += c.vy * dt; const k = Math.pow(.02, dt); c.vx *= k; c.vy *= k; if (Math.abs(c.vx) < 8 && Math.abs(c.vy) < 8) c.vx = c.vy = 0; }
   clampCam();
   const t = `scale(${G.z.toFixed(4)}) translate(${(-c.x).toFixed(1)}px,${(-c.y).toFixed(1)}px)`; if (t !== G.camT) { G.camT = t; G.world.style.transform = t; }
+  wxView(); // weather chunks follow the camera
   if (G.z !== G.zl) { G.zl = G.z; clearTimeout(G.zT); G.zT = setTimeout(() => { if (!G.world) return; G.world.style.willChange = "auto"; requestAnimationFrame(() => { if (G.world) G.world.style.willChange = ""; }); }, 200); } // once the zoom settles, drop and restore will-change so the browser redraws the garden sharp at the new size
 }
 function findPet() { // the 📍 button: glide to the next pet (yours first)

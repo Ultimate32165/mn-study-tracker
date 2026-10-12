@@ -25,7 +25,7 @@ const pickWx = avoid => { const l = WX_POOL.filter(w => w !== avoid); return l[M
 const WX0 = ls("wx");
 const G = { pets: new Map(), el: null, layer: null, deco: null, fly: null, fx: null, card: null, raf: 0, last: 0, W: WW, H: WH, vw: 340, vh: 408, z: 1, zt: 1, za: null, zl: 1, zT: 0, pts: new Map(), pinch: null, cardT: 0, decoLv: -1, night: null, ro: null,
   world: null, cam: { x: 0, y: 0, tx: 0, ty: 0, vx: 0, vy: 0, glide: false }, camInit: false, camT: "", pan: null, drag: null, noClick: -1e9, findI: -1, vis: null, visAt: 0, landSig: "", landEdit: false,
-  items: new Map(), edit: false, work: null, sel: null, wx: "", wxMode: WX0 === "auto" || WXL[WX0] ? WX0 : "auto", wxAuto: pickWx(), wxAt: Date.now(), wxEl: null, buddyFx: 0 };
+  items: new Map(), edit: false, work: null, sel: null, wx: "", wxMode: WX0 === "auto" || WXL[WX0] ? WX0 : "auto", wxAuto: pickWx(), wxAt: Date.now(), wxEl: null, wxC: new Map(), wxR: "", buddyFx: 0 };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const seeded = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
 const isEvening = () => { const h = new Date().getHours(); return h >= 18 || h < 6; };

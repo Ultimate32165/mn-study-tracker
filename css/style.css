@@ -367,7 +367,8 @@ font-family:var(--hf);color:var(--ink);background:var(--sheet);border:2px solid 
 .tiny{font-size:54px;line-height:1;padding-bottom:2px}
 
 /* weather: random, no network */
-.gwx{inset:0;z-index:260;pointer-events:none;overflow:hidden} /* sits over the window (not inside .gworld), so weather stays the same size when you zoom or pan; --gh (set on #garden by buildGarden) = window height = how far a flake falls */
+.gwx{inset:0;z-index:260;pointer-events:none} /* lives inside .gworld, so it pans and zooms with the garden. It holds 980x680 chunks (.gwc, made in garden-fx.js wxView, only near the window); --gh on a chunk = how far a flake falls */
+.gwc{position:absolute;overflow:hidden;pointer-events:none}
 .gwx i{position:absolute;top:0;font-style:normal;line-height:1;animation:wxfall linear infinite}
 .gwx.snow i{border-radius:50%;background:#fff;box-shadow:0 0 4px rgba(255,255,255,.8);opacity:.92}
 .gwx.rain i{width:2px;border-radius:2px;background:linear-gradient(transparent,rgba(205,232,255,.9));animation-name:wxrain;opacity:.85}

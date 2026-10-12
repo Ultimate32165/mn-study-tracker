@@ -10,19 +10,31 @@ import { burst, errMsg, ls, toast } from "./util.js";
 let visits = [];
 const resetVisits = () => { visits = []; };
 // ---- weather: pure CSS + a few particles, picked at random ----
-function buildWx(w) { // the weather layer covers the WINDOW (not the whole big world), so the amounts are scaled to the window size
-  const k = Math.min(1, Math.max(.2, G.vw * G.vh / (980 * 680))), f = (n, fn) => [...Array(Math.max(8, Math.round(n * k)))].map((_, i) => fn(i)).join(""), L = (a = 0, b = 100) => rnd(a, b).toFixed(1), D = () => (-rnd(0, 10)).toFixed(2);
+const CW = 980, CH = 680; // weather is made in 980x680 chunks that sit IN the world (so it pans and zooms with the garden); only chunks near the window exist
+function wxHtml(w) { // the particles of ONE chunk
+  const f = (n, fn) => [...Array(n)].map((_, i) => fn(i)).join(""), L = (a = 0, b = 100) => rnd(a, b).toFixed(1), D = () => (-rnd(0, 10)).toFixed(2);
   let h = "";
   if (w === "snow") h = f(90, () => { const z = rnd(3, 7).toFixed(1); return `<i style="left:${L()}%;width:${z}px;height:${z}px;--dx:${rnd(-30, 30).toFixed(0)}px;animation-delay:${(-rnd(0, 16)).toFixed(2)}s;animation-duration:${rnd(10, 18).toFixed(1)}s"></i>`; });
   else if (w === "rain") h = f(130, () => `<i style="left:${L(-18)}%;height:${rnd(12, 20).toFixed(0)}px;animation-delay:${D()}s;animation-duration:${rnd(.9, 1.5).toFixed(2)}s"></i>`);
   else if (w === "petals" || w === "leaves") { const E = w === "petals" ? ["🌸", "🌸", "💮", "🌷"] : ["🍂", "🍁", "🍂"]; h = f(50, i => `<i style="left:${L()}%;font-size:${rnd(11, 18).toFixed(0)}px;--dx:${rnd(-70, 70).toFixed(0)}px;--r:${rnd(-540, 540).toFixed(0)}deg;animation-delay:${(-rnd(0, 22)).toFixed(2)}s;animation-duration:${rnd(12, 22).toFixed(1)}s">${E[i % E.length]}</i>`); }
-  G.wxEl.className = "gwx " + w; G.wxEl.innerHTML = h;
+  return h;
+}
+function wxView(force) { // called every frame from camStep: make the chunks around the window, drop the far ones
+  if (!G.wxEl || !G.wx) return;
+  const c = G.cam, x0 = Math.max(0, Math.floor(c.x / CW)), x1 = Math.min(Math.ceil(G.W / CW) - 1, Math.floor((c.x + G.vw / G.z) / CW)), y0 = Math.max(0, Math.floor(c.y / CH)), y1 = Math.min(Math.ceil(G.H / CH) - 1, Math.floor((c.y + G.vh / G.z) / CH));
+  const sig = `${x0},${x1},${y0},${y1},${G.wx}`; if (!force && sig === G.wxR) return; G.wxR = sig;
+  let want = []; for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) want.push([i, j]);
+  const mx = c.x + G.vw / G.z / 2, my = c.y + G.vh / G.z / 2; // zoomed far out: only the 4 chunks nearest the middle of the window
+  if (want.length > 4) want = want.sort((a, b) => Math.hypot((a[0] + .5) * CW - mx, (a[1] + .5) * CH - my) - Math.hypot((b[0] + .5) * CW - mx, (b[1] + .5) * CH - my)).slice(0, 4);
+  const keep = new Set(want.map(([i, j]) => i + "," + j));
+  G.wxC.forEach((el, k) => { if (!keep.has(k)) { el.remove(); G.wxC.delete(k); } });
+  want.forEach(([i, j]) => { const k = i + "," + j; if (G.wxC.has(k)) return; const el = document.createElement("div"); el.className = "gwc"; el.style.cssText = `left:${i * CW}px;top:${j * CH}px;width:${CW}px;height:${CH}px;--gh:${CH}px`; el.innerHTML = wxHtml(G.wx); G.wxEl.appendChild(el); G.wxC.set(k, el); });
 }
 function syncWeather() {
   if (!G.wxEl) return;
   if (G.wxMode === "auto" && Date.now() - G.wxAt > 12 * 60000) { G.wxAuto = pickWx(G.wxAuto); G.wxAt = Date.now(); }
   const w = G.wxMode === "auto" ? G.wxAuto : G.wxMode; if (w === G.wx) return;
-  G.wx = w; Object.keys(WXL).forEach(k => G.el.classList.toggle("wx-" + k, k === w)); buildWx(w);
+  G.wx = w; Object.keys(WXL).forEach(k => G.el.classList.toggle("wx-" + k, k === w)); G.wxEl.className = "gwx " + w; G.wxEl.innerHTML = ""; G.wxC.clear(); wxView(true);
 }
 function cycleWx() {
   const order = ["auto", ...Object.keys(WXL)]; G.wxMode = order[(order.indexOf(G.wxMode) + 1) % order.length]; ls("wx", G.wxMode);
@@ -103,4 +115,4 @@ async function collectVisitor(m) {
   try { await DB.addBonus(m.id, n); } catch (e) { toast(errMsg(e)); }
 }
 
-export { collectVisitor, cycleWx, mainPet, queueVisit, resetVisits, runVisits, spawnHeart, syncBuddies, syncVisitor, syncWeather, visStep };
+export { collectVisitor, cycleWx, mainPet, queueVisit, resetVisits, runVisits, spawnHeart, syncBuddies, syncVisitor, syncWeather, visStep, wxView };
