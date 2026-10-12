@@ -48,7 +48,6 @@ function profileSheet(mine) {
   <button class="btn ghost" id="rm">🍃 reduce motion: ${calm ? "on" : "off"}</button></div>
   <p class="hint">cute themes</p><div class="emojis">${themeBtns(["auto", ...CUTE])}</div><p class="hint">dark themes 🌙</p><div class="emojis">${themeBtns(DARK)}</div><p class="hint">seasons 🍃 · light, then dark</p><div class="emojis">${themeBtns(SEASON)}</div><p class="hint">glass themes ✨</p><div class="emojis">${themeBtns(GLASS)}</div>
   <details class="cmore"><summary>🎨 customize theme</summary>
-  <div class="crow"><b>background</b><div class="seg wrap">${lookBtns("bg")}</div></div>
   <div class="crow"><b>background tint</b><div class="cacc">${dotBtns("hue")}</div></div>
   <div class="crow"><b>accent colour</b><div class="cacc">${dotBtns("acc")}</div></div>
   <div class="crow"><b>corners</b><div class="seg wrap">${lookBtns("round")}</div></div>
