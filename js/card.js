@@ -38,35 +38,35 @@ const BULBS = ["#ff9ccb", "#ffd36f", "#9be37f", "#7fd0ff", "#b79cf5"];
 const FLAT = new Set(["bed", "blanket", "lily", "rug", "bridge", "pbed", "toys", "bowl"]); // items that lie on the ground (keep in sync with ITEMS in decor.js)
 const DEF_L = { g: "meadow", f: "cute", b: "none", p: "none" }; // garden style: ground / fence / border / path (see js/land.js + LAND in garden-state.js)
 const PATH_PTS = [[20, 664], [170, 628], [330, 630], [480, 604], [620, 566], [760, 546], [880, 500], [975, 468]]; // old-size copy of the path (the live garden's PATH_PTS is this x3, see garden-state.js)
-function drawGround(ctx, k, X, Y, s, x, w, bottom) { // specks on the grass: flowers / sand grains / snow sparkles
+function drawGround(ctx, k, X, Y, s, x, w, bottom, m = 1) { // m = how many times more specks (the big world) // specks on the grass: flowers / sand grains / snow sparkles
   if (k === "meadow") return;
-  const Q = seeded(41), n = k === "flowers" ? 110 : 150;
+  const Q = seeded(41), n = Math.round((k === "flowers" ? 110 : 150) * m);
   for (let i = 0; i < n; i++) {
     const px = x + Q() * w, py = Y(268) + Q() * (bottom - Y(268)), r = Math.max(1.4, (k === "flowers" ? 2.8 : 2) * s * 1.5);
     ctx.fillStyle = k === "flowers" ? ["#ff9ccb", "#ffffff", "#ffd36f"][i % 3] : k === "sand" ? "rgba(150,110,50,.28)" : i % 2 ? "rgba(255,255,255,.95)" : "rgba(150,180,230,.35)";
     ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
   }
 }
-function drawFence(ctx, k, X, Y, s, pal) { // the back fence: world x 520-980, y 204-238 (same spot as .gfence in the CSS)
+function drawFence(ctx, k, X, Y, s, pal, fx0 = 520, len = 460) { // the back fence: world x 520-980, y 204-238 (same spot as .gfence in the CSS)
   if (k === "none") return;
-  const x0 = X(520), w = 460 * s;
+  const x0 = X(fx0), w = len * s;
   if (k === "stone") {
     rr(ctx, x0, Y(210), w, 28 * s, 6 * s); ctx.fillStyle = pal.stone; ctx.fill(); ctx.fillStyle = "rgba(60,70,90,.22)";
-    for (let fx = 22; fx < 460; fx += 24) ctx.fillRect(x0 + fx * s, Y(210), 2 * s, 28 * s);
+    for (let fx = 22; fx < len; fx += 24) ctx.fillRect(x0 + fx * s, Y(210), 2 * s, 28 * s);
     ctx.fillRect(x0, Y(223), w, 2 * s); return;
   }
   if (k === "hedge") {
     rr(ctx, x0, Y(200), w, 38 * s, 16 * s); ctx.fillStyle = pal.hedge; ctx.fill(); ctx.fillStyle = "rgba(255,255,255,.16)";
-    for (let fx = 8; fx < 460; fx += 22) for (let fy = 6; fy < 36; fy += 16) { ctx.beginPath(); ctx.arc(x0 + fx * s, Y(200 + fy), 4 * s, 0, Math.PI * 2); ctx.fill(); }
+    for (let fx = 8; fx < len; fx += 22) for (let fy = 6; fy < 36; fy += 16) { ctx.beginPath(); ctx.arc(x0 + fx * s, Y(200 + fy), 4 * s, 0, Math.PI * 2); ctx.fill(); }
     return;
   }
   const col = k === "wood" ? pal.wood : k === "bamboo" ? pal.bamboo : pal.fc, pw = k === "bamboo" ? 9 : 8, gap = k === "bamboo" ? 14 : 16;
   ctx.fillStyle = col;
-  for (let fx = 0; fx < 460; fx += gap) { rr(ctx, x0 + fx * s, Y(204), pw * s, 34 * s, 2 * s); ctx.fill(); }
+  for (let fx = 0; fx < len; fx += gap) { rr(ctx, x0 + fx * s, Y(204), pw * s, 34 * s, 2 * s); ctx.fill(); }
   ctx.fillRect(x0, Y(212), w, 5 * s); ctx.fillRect(x0, Y(224), w, 5 * s);
 }
-function drawPath(ctx, k, X, Y, s, pal) { // a smooth trail across the front of the garden (same curve as the live SVG path)
-  if (k === "none") return; const p = PATH_PTS;
+function drawPath(ctx, k, X, Y, s, pal, pts) { // a smooth trail across the front of the garden (same curve as the live SVG path)
+  if (k === "none") return; const p = pts || PATH_PTS;
   ctx.save(); ctx.beginPath(); ctx.moveTo(X(p[0][0]), Y(p[0][1]));
   for (let i = 1; i < p.length - 1; i++) ctx.quadraticCurveTo(X(p[i][0]), Y(p[i][1]), X((p[i][0] + p[i + 1][0]) / 2), Y((p[i][1] + p[i + 1][1]) / 2));
   ctx.lineTo(X(p[p.length - 1][0]), Y(p[p.length - 1][1])); ctx.lineJoin = "round"; ctx.lineCap = "round";
@@ -233,7 +233,76 @@ function drawForest(ctx, x, y, w, h, g, pal) { // g.forest = [{ s: species, c: t
   if (night) for (let i = 0; i < 14; i++) glow(ctx, x + R() * w, y + h * (.3 + R() * .6), (5 + R() * 5) * Math.max(1, s * 1.4), "255,235,140", .75);
   ctx.restore();
 }
+function drawWx(ctx, x, y, w, h, s, g) { // snow / rain / petals / leaves over a scene box
+  // weather
+  const W = seeded(5);
+  if (g.wx === "snow") { ctx.fillStyle = "#fff"; ctx.globalAlpha = .9; for (let i = 0; i < 70; i++) { ctx.beginPath(); ctx.arc(x + W() * w, y + W() * h, (2 + W() * 3.2) * Math.max(.9, s * 1.5), 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1; }
+  else if (g.wx === "rain") { ctx.strokeStyle = "rgba(205,232,255,.8)"; ctx.lineWidth = 2.2; for (let i = 0; i < 80; i++) { const rx0 = x + W() * w * 1.1, ry0 = y + W() * h; ctx.beginPath(); ctx.moveTo(rx0, ry0); ctx.lineTo(rx0 - 7, ry0 + 20); ctx.stroke(); } }
+  else if (g.wx === "petals" || g.wx === "leaves") { const E = g.wx === "petals" ? ["🌸", "🌸", "💮", "🌷"] : ["🍂", "🍁", "🍂"]; for (let i = 0; i < 22; i++) emoji(ctx, E[i % E.length], x + W() * w, y + W() * h, (13 + W() * 8) * Math.max(1, s * 1.5), { rot: W() * 6 }); }
+}
+// ---------------------------------------------------------------- the WHOLE live garden (garden card). g.world = { K, HZ, WW, WH, pond, path } copied from garden-state.js, so this follows the real size;
+// items, pets, flowers, trees and butterflies are where they really are (same seeds / rules as buildDeco in garden.js). Sky, sun, rainbow, clouds and fence are drawn the way the card always did, spread over the big world.
+function drawWorld(ctx, x, y, w, h, g, pal) {
+  const Wd = g.world, ww = Wd.WW, wh = Wd.WH, KK = Wd.K, HZ = Wd.HZ, PO = Wd.pond, GYw = v => HZ + (v - HZ) * KK;
+  ctx.save(); rr(ctx, x, y, w, h, 36); ctx.clip();
+  const s = Math.min(w / ww, h / wh), ox = x + (w - ww * s) / 2, oy = y + h - wh * s, X = v => ox + v * s, Y = v => oy + v * s, Yb = v => Y(v + wh - 680), night = !!g.night, R = seeded(7), L = g.land || DEF_L, lv = g.lv || 0;
+  const kF = Math.max(1.1, Math.min(1.8, .8 / s)), kI = Math.max(1, Math.min(2.2, 1.05 / s)), kP = Math.max(1.2, Math.min(2.6, 64 / (50 * s))), inP = (fx, fy) => ((fx * ww - PO.x) / PO.rx) ** 2 + ((fy * wh - PO.y) / PO.ry) ** 2 < 1;
+  // sky
+  ctx.fillStyle = pal.sk1; ctx.fillRect(x, y, w, h);
+  const sky = ctx.createLinearGradient(0, Y(0), 0, Y(HZ + 14)); sky.addColorStop(0, pal.sk1); sky.addColorStop(1, pal.sk2); ctx.fillStyle = sky; ctx.fillRect(x, Y(0), w, Y(HZ + 14) - Y(0));
+  if (night) { for (let i = 0; i < 70; i++) { const sx = x + R() * w, sy = y + R() * (Y(HZ - 46) - y); ctx.globalAlpha = .4 + R() * .6; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(sx, sy, (.8 + R() * 1.4) * Math.max(.8, s * 2.2), 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1; }
+  // sun / moon (a little bigger than the world scale says, so it stays visible)
+  const sunX = X(ww * .776 + 22), sunY = Y(50), sr = Math.max(22 * s, w * .016); // .gsun: left 77.6% of the world, top 28px, 44px wide (a bit bigger here so it stays visible)
+  if (night) { glow(ctx, sunX, sunY, sr * 3.2, "255,240,200", .35); ctx.fillStyle = "#fff6d6"; ctx.beginPath(); ctx.arc(sunX, sunY, sr, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = pal.sk1; ctx.beginPath(); ctx.arc(sunX + sr * .4, sunY - sr * .22, sr * .86, 0, Math.PI * 2); ctx.fill(); }
+  else { glow(ctx, sunX, sunY, sr * 3.6, "255,226,140", .55); ctx.fillStyle = "#ffe27a"; ctx.beginPath(); ctx.arc(sunX, sunY, sr, 0, Math.PI * 2); ctx.fill(); }
+  // rainbow (couple level 6+): like .grain in the CSS: a half circle centred on the world, its middle at y 160, 5 bands from radius 140 to 192, half see-through
+  if (lv >= 6) { ["#ff8fa3", "#ffd36f", "#9be37f", "#7fd0ff", "#b79cf5"].forEach((c, i) => { ctx.strokeStyle = c; ctx.globalAlpha = night ? .2 : .5; ctx.lineWidth = Math.max(3, 10.8 * s); ctx.beginPath(); ctx.arc(X(ww / 2), Y(160), (140 + 10.4 * (i + .5)) * s, Math.PI, 0); ctx.stroke(); }); ctx.globalAlpha = 1; }
+  // clouds: the live garden has 15 drifting ones (.gcl: a 64x20 pill with two bumps); here they are spread evenly (a bit bigger so they stay visible)
+  const CY = [30, 70, 105, 48, 128], CK = [1, .75, .6, .85, .7], CR = seeded(5);
+  for (let i = 0; i < 15; i++) {
+    const cx = (i + .3 + CR() * .5) / 15 * ww, cy = CY[i % 5] + (CR() - .5) * 14, u = s * CK[i % 5] * 1.6, bx = X(cx), by = Y(cy);
+    ctx.globalAlpha = night ? .5 : .9; rr(ctx, bx - 32 * u, by - 10 * u, 64 * u, 20 * u, 10 * u); ctx.fillStyle = pal.cl; ctx.fill();
+    ell(ctx, bx - 7 * u, by - 9 * u, 15 * u, 15 * u, pal.cl); ell(ctx, bx + 13 * u, by - 8 * u, 11 * u, 11 * u, pal.cl); ctx.globalAlpha = 1;
+  }
+  // hills + grass
+  const cxm = X(ww / 2), rx = Math.max(ww * .75 * s, w * .75);
+  const hill = (top, ry, fill) => { ctx.beginPath(); ctx.ellipse(cxm, Y(top) + ry, rx, ry, 0, Math.PI, Math.PI * 2); ctx.lineTo(cxm + rx, y + h + 4); ctx.lineTo(cxm - rx, y + h + 4); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); };
+  hill(HZ - 64, 90 * s, pal.grB); hill(HZ, 60 * s, pal.grF);
+  ctx.fillStyle = pal.grF; ctx.fillRect(x, Y(HZ + 26), w, y + h - Y(HZ + 26));
+  drawGround(ctx, L.g, X, Y, s, x, w, y + h, 6);
+  drawFence(ctx, L.f, X, Y, s, pal, Math.round(ww * .5306), ww - Math.round(ww * .5306)); // .gfence: from 53.06% of the world width to the right edge
+  drawPath(ctx, L.p, X, Y, s * 1.5, pal, Wd.path);
+  // pond (real size)
+  const wg = ctx.createLinearGradient(0, Y(PO.y - PO.ry), 0, Y(PO.y + PO.ry)); wg.addColorStop(0, pal.water); wg.addColorStop(1, pal.water2);
+  ell(ctx, X(PO.x), Y(PO.y), PO.rx * s * 1.06, PO.ry * s * 1.1, pal.grB); ell(ctx, X(PO.x), Y(PO.y), PO.rx * s, PO.ry * s, wg);
+  ell(ctx, X(PO.x - PO.rx * .3), Y(PO.y - PO.ry * .3), PO.rx * .26 * s, PO.ry * .14 * s, "rgba(255,255,255,.55)"); // .gpond::after
+  // flowers, trees, butterflies: the same random spots as the live garden (buildDeco in garden.js)
+  const r = seeded(11), FL = ["🌸", "🌼", "🌷", "🌻", "🌺", "🌹"], nF = Math.min(300, 50 + lv * 25);
+  for (let i = 0; i < 300; i++) {
+    const fx = .03 + r() * .94, fy = GYw(272 + r() * 381) / wh, f = FL[Math.floor(r() * FL.length)], sz = 13 + Math.floor(r() * 9);
+    if (i < nF && !inP(fx, fy + 14 / wh)) emoji(ctx, f, X(fx * ww), Y(fy * wh), sz * s * kF);
+  }
+  [[880, 275, "🌳", 3], [80, 275, "🌲", 5], [520, 282, "🌳", 7], [940, 440, "🌲", 8], [40, 540, "🌳", 9], [660, 300, "🌲", 10]].forEach(([tx, ty, e, need]) => { if (lv >= need) emoji(ctx, e, X(tx * KK), Y(GYw(ty)) - 10 * s * kF, 44 * s * kF); });
+  const T = seeded(21);
+  for (let i = 0; i < 14; i++) { const tx = 60 + T() * (ww - 120), ty = GYw(275 + T() * 330), e = T() < .5 ? "🌳" : "🌲"; if (lv >= 2 + i % 9 && !inP(tx / ww, ty / wh)) emoji(ctx, e, X(tx), Y(ty) - 10 * s * kF, 44 * s * kF); }
+  const nb = lv >= 1 ? Math.min(9, 1 + Math.floor(lv / 2) * 2) * KK : 0;
+  for (let i = 0; i < nb; i++) { const bx = (6 + r() * 84) / 100 * ww, by = GYw(258) + r() * (GYw(544) - GYw(258)); r(); r(); emoji(ctx, "🦋", X(bx + 9), Y(by + 9), 18 * s * kF); }
+  drawBorder(ctx, L.b, X, Yb, s * 1.8, x, w, y + h, ox, pal);
+  // things standing on the ground: flat items first, then everything else sorted by depth (items and pets are at their real spots)
+  const flat = (g.items || []).filter(d => FLAT.has(d.i));
+  flat.forEach(d => drawItem(ctx, d.i, X(d.x * ww), Y(d.y * wh), s * kI, pal, night));
+  const list = [];
+  (g.items || []).forEach(d => { if (!flat.includes(d)) list.push({ y: d.y, f: () => drawItem(ctx, d.i, X(d.x * ww), Y(d.y * wh), s * kI, pal, night) }); });
+  (g.pets || []).forEach(p => list.push({ y: p.y, f: () => drawPet(ctx, p, X(p.x * ww), Y(p.y * wh), s * kP, g.wx) }));
+  list.sort((a, b) => a.y - b.y).forEach(o => o.f());
+  if (night) { const FF = seeded(31); for (let i = 0; i < 70; i++) { const fx = x + FF() * w, fy = Y(HZ + 40) + FF() * (y + h - Y(HZ + 40)); glow(ctx, fx, fy, 9 * Math.max(.8, s * 2), "255,240,140", .9); } }
+  drawWx(ctx, x, y, w, h, s * .7, g);
+  ctx.restore();
+  ctx.strokeStyle = pal.edge; ctx.lineWidth = 5; rr(ctx, x, y, w, h, 36); ctx.stroke();
+}
+
 function drawScene(ctx, x, y, w, h, g, pal) {
+  if (g.world) return drawWorld(ctx, x, y, w, h, g, pal); // the garden card: the whole big garden
   if (g.none) return; // the normal photocards can have no picture at the bottom (the garden has its own card)
   if (g.forest) return drawForest(ctx, x, y, w, h, g, pal);
   ctx.save(); rr(ctx, x, y, w, h, 36); ctx.clip();
@@ -282,11 +351,7 @@ function drawScene(ctx, x, y, w, h, g, pal) {
   list.sort((a, b) => a.y - b.y).forEach(o => o.f());
   // night fireflies
   if (night) { const FF = seeded(31); for (let i = 0; i < 26; i++) { const fx = x + FF() * w, fy = Y(300) + FF() * (y + h - Y(300)); glow(ctx, fx, fy, 9 * Math.max(.8, s * 1.5), "255,240,140", .9); } }
-  // weather
-  const W = seeded(5);
-  if (g.wx === "snow") { ctx.fillStyle = "#fff"; ctx.globalAlpha = .9; for (let i = 0; i < 70; i++) { ctx.beginPath(); ctx.arc(x + W() * w, y + W() * h, (2 + W() * 3.2) * Math.max(.9, s * 1.5), 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1; }
-  else if (g.wx === "rain") { ctx.strokeStyle = "rgba(205,232,255,.8)"; ctx.lineWidth = 2.2; for (let i = 0; i < 80; i++) { const rx0 = x + W() * w * 1.1, ry0 = y + W() * h; ctx.beginPath(); ctx.moveTo(rx0, ry0); ctx.lineTo(rx0 - 7, ry0 + 20); ctx.stroke(); } }
-  else if (g.wx === "petals" || g.wx === "leaves") { const E = g.wx === "petals" ? ["🌸", "🌸", "💮", "🌷"] : ["🍂", "🍁", "🍂"]; for (let i = 0; i < 22; i++) emoji(ctx, E[i % E.length], x + W() * w, y + W() * h, (13 + W() * 8) * Math.max(1, s * 1.5), { rot: W() * 6 }); }
+  drawWx(ctx, x, y, w, h, s, g);
   ctx.restore();
   ctx.strokeStyle = pal.edge; ctx.lineWidth = 5; rr(ctx, x, y, w, h, 36); ctx.stroke();
 }
@@ -304,13 +369,13 @@ function drawGardenCard(ctx, d, pal, W, H) {
     };
     pill(d.title, false, d.avatar); pill(d.date, true);
   } else {
-    const hh = 104, ch = d.shape === "story" ? 150 : 120, ph = d.shape === "story" ? 300 : 0, n = ph ? 4 : 3, avail = bottom - top;
-    const heroH = Math.max(300, Math.min(Math.round(cw * .95), avail - hh - ch - ph - gap * (n - 1))), used = hh + heroH + ch + ph + gap * (n - 1); // a taller box would only be empty sky, so the block is centred instead
+    const hh = 104, ch = d.shape === "story" ? 150 : 120, ph = d.shape === "story" ? 300 : d.shape === "portrait" ? 260 : 0, n = ph ? 4 : 3, avail = bottom - top;
+    const heroH = Math.max(300, Math.min(Math.round(cw * (g.world ? g.world.WH / g.world.WW * 1.12 : .95)), avail - hh - ch - ph - gap * (n - 1))), used = hh + heroH + ch + ph + gap * (n - 1); // a taller box would only be empty sky, so the block is centred instead
     let y = top + Math.max(0, (avail - used) / 2);
     drawHead(ctx, { head: { y, h: hh }, pad }, pal, W, d.avatar, d.title, d.date); y += hh + gap;
     drawScene(ctx, pad, y, cw, heroH, g, pal); y += heroH + gap;
     const tw = (cw - gap * 2) / 3; d.facts.forEach((t, i) => drawStat(ctx, pad + i * (tw + gap), y, tw, ch, pal, t)); y += ch + gap;
-    if (ph) { // story: a row with the garden's pets
+    if (ph) { // portrait / story: a row with the garden's pets
       tile(ctx, pad, y, cw, ph, pal); text(ctx, "THE GARDEN GANG", pad + 34, y + 46, { size: 26, font: bf, weight: 800, color: pal.sub, base: "middle" });
       const ps = g.pets.slice(0, 8), slot = (cw - 60) / Math.max(1, ps.length), sc = Math.min(2.4, slot / 70);
       ps.forEach((p, i) => drawPet(ctx, { ...p, flip: false, sleep: false }, pad + 30 + slot * (i + .5), y + ph - 52, sc, g.wx));

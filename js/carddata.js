@@ -3,7 +3,7 @@ import { boardSnap } from "./board.js";
 import * as DB from "./db.js";
 import { decorOf } from "./decor.js";
 import { gardenList } from "./garden.js";
-import { G, fromClassicY, inPond, isEvening, landOf, moodOf, seeded, toClassicY } from "./garden-state.js";
+import { BOUNDS, FACE_RIGHT, G, HZ, K, PATH_PTS, POND, WH, WW, fromClassicY, inPond, isEvening, landOf, moodOf, seeded, toClassicY } from "./garden-state.js";
 import { ALLP, accOf, petName, petOf, stageNames, stageOf } from "./pets.js";
 import { LV_T, board, couple, elapsed, goalOf, liveToday, me, sessions, totalOf, users } from "./state.js";
 import { DAY, fmt, key, stats } from "./util.js";
@@ -104,9 +104,32 @@ function cardDataMilestone(shape, ms) {
   return { ...out, emo: "💞", title: `Level ${lv + 1}!`, sub: LV_T[lv], spark: ["💞", "✨", "🌸", "⭐"], chips: [["together", fmt(couple().sec)], ["couple level", `${lv + 1} 💞`]] };
 }
 // ---- garden card: the garden on its own (card.js draws it 2x bigger than the other cards) ----
+function gardenWorldSnap() { // the WHOLE live garden as it really is: world size from garden-state.js, decorations where they are, pets where they stand right now (G.pets) or, if the garden was never opened, tidy spots
+  const night = isEvening(), wx = G.wxMode === "auto" ? G.wxAuto : G.wxMode, R = seeded(3), items = [];
+  users.forEach(u => decorOf(u).forEach(d => items.push({ i: d.i, x: d.x, y: d.y }))); // already fractions of the big world
+  const list = gardenList(), n = list.length, placed = [];
+  const pets = list.map((e, i) => {
+    const st = stageOf(totalOf(e.u)), live = G.pets.get(e.key), emo = ALLP[e.type].e[st]; let x, y, face = 1;
+    if (live && Number.isFinite(live.x) && Number.isFinite(live.y) && (live.x || live.y)) { x = live.x; y = live.y; face = live.face || 1; }
+    else {
+      const slot = (i + .5) / n; x = slot; y = (BOUNDS.y0 + BOUNDS.y1) / 2;
+      for (let t = 0; t < 40; t++) {
+        x = Math.min(.93, Math.max(.07, .06 + slot * .88 + (R() - .5) * (.7 / n))); y = BOUNDS.y0 + R() * (BOUNDS.y1 - BOUNDS.y0);
+        if (inPond(x, y) || inPond(x, y - .03)) continue;
+        if (items.some(d => Math.abs(d.x - x) < .03 && Math.abs(d.y - y) < .05)) continue;
+        if (placed.some(q => Math.abs(q.x - x) < .05 && Math.abs(q.y - y) < .06)) continue;
+        break;
+      }
+      face = x < .5 ? -1 : 1;
+    }
+    placed.push({ x, y });
+    return { emo, acc: accOf(e.type, st), st, x, y, flip: face * (FACE_RIGHT.has(emo) ? -1 : 1) < 0, sleep: moodOf(e.u) === "sleep" };
+  });
+  return { night, wx, lv: couple().lv, land: landOf(users), items, pets, world: { K, HZ, WW, WH, pond: POND, path: PATH_PTS } };
+}
 const WXN = { clear: "clear skies", rain: "rainy ☔", snow: "snowy ❄️", petals: "petals 🌸", leaves: "autumn 🍂" };
 function cardDataGarden(shape) {
-  const m = users.find(u => u.id === me.uid) || {}, gs = gardenSnap(), name = m.name || "you", lv = Math.min(gs.lv, LV_T.length - 1), n = gs.pets.length;
+  const m = users.find(u => u.id === me.uid) || {}, gs = gardenWorldSnap(), name = m.name || "you", lv = Math.min(gs.lv, LV_T.length - 1), n = gs.pets.length;
   return { kind: "garden", shape, name, avatar: m.emoji || "📚", title: `${name}'s garden`, date: dayLong(Date.now()), garden: gs,
     facts: [{ l: "garden pets", v: `${n} 🐾`, s: n === 1 ? "one friend" : "wandering around" }, { l: "garden level", v: `${lv + 1} 💞`, s: LV_T[lv] }, { l: "decorations", v: `${gs.items.length} 🪴`, s: `${WXN[gs.wx] || "clear skies"}${gs.night ? " · night 🌙" : ""}` }] };
 }

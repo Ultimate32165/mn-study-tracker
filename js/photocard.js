@@ -60,7 +60,7 @@ function cardSheet(mode) {
   const SH = { square: "▫️ square", portrait: "🖼️ 4:5", story: "📱 story" }, PD = { week: "last 7 days", month: "last 30 days" },
     MD = { me: "👤 me", ...(friends.length ? { together: "💞 together" } : {}), recap: "🗓️ recap", board: "📝 board", garden: "🌳 garden", ...(cardOpt.ms ? { milestone: "🏅 milestone" } : {}) };
   modal.innerHTML = `<div class="back"><div class="sheet cardsheet"><h3>photocard 📸</h3>
-  <div class="seg" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>
+  <div class="seg wrap" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>
   <div class="seg" id="cper">${Object.keys(PD).map(k => `<button data-per="${k}" class="${k === cardOpt.period ? "sel" : ""}">${PD[k]}</button>`).join("")}</div>
   <div class="seg" id="cshape"></div>
   <div class="seg wrap" id="cstyle" aria-label="card style">${Object.keys(STYLES).map(k => `<button data-look="style" data-v="${k}" class="${k === L.style ? "sel" : ""}">${STYLES[k].label}</button>`).join("")}</div>
