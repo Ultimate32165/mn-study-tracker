@@ -2,7 +2,7 @@
 import * as DB from "./db.js";
 import { refreshPanel } from "./decor.js";
 import { camTo, restoreBub } from "./garden.js";
-import { BOUNDS, G, RM, VIS_DAY, WXL, nowS, pickWx, rnd } from "./garden-state.js";
+import { BOUNDS, G, GY, K, POND, RM, VIS_DAY, WXL, nowS, pickWx, rnd } from "./garden-state.js";
 import { petOf } from "./pets.js";
 import { me, users } from "./state.js";
 import { burst, errMsg, ls, toast } from "./util.js";
@@ -10,8 +10,8 @@ import { burst, errMsg, ls, toast } from "./util.js";
 let visits = [];
 const resetVisits = () => { visits = []; };
 // ---- weather: pure CSS + a few particles, picked at random ----
-function buildWx(w) {
-  const f = (n, fn) => [...Array(n)].map((_, i) => fn(i)).join(""), L = (a = 0, b = 100) => rnd(a, b).toFixed(1), D = () => (-rnd(0, 10)).toFixed(2);
+function buildWx(w) { // the weather layer covers the WINDOW (not the whole big world), so the amounts are scaled to the window size
+  const k = Math.min(1, Math.max(.2, G.vw * G.vh / (980 * 680))), f = (n, fn) => [...Array(Math.max(8, Math.round(n * k)))].map((_, i) => fn(i)).join(""), L = (a = 0, b = 100) => rnd(a, b).toFixed(1), D = () => (-rnd(0, 10)).toFixed(2);
   let h = "";
   if (w === "snow") h = f(90, () => { const z = rnd(3, 7).toFixed(1); return `<i style="left:${L()}%;width:${z}px;height:${z}px;--dx:${rnd(-30, 30).toFixed(0)}px;animation-delay:${(-rnd(0, 16)).toFixed(2)}s;animation-duration:${rnd(10, 18).toFixed(1)}s"></i>`; });
   else if (w === "rain") h = f(130, () => `<i style="left:${L(-18)}%;height:${rnd(12, 20).toFixed(0)}px;animation-delay:${D()}s;animation-duration:${rnd(.9, 1.5).toFixed(2)}s"></i>`);
@@ -42,13 +42,14 @@ function runVisits() { // a cheer arrived: the sender's pet runs over to yours (
   if (!visits.length || !G.el || !G.el.isConnected || !me) return;
   for (const p of G.pets.values()) if (p.ov && p.ov.kind === "visit") return; // one visit at a time
   const v = visits.shift(), guest = mainPet(v.from), host = mainPet(me.uid); if (!guest || !host || guest === host) return;
-  const t = nowS();
+  const t = nowS(), eta = Math.hypot((guest.x - host.x) * G.W, (guest.y - host.y) * G.H) / 60; // the garden is big: allow the guest time to run all the way over
   if (RM.matches) return spawnHeart(host.x * G.W, host.y * G.H - 58);
-  host.ov = { kind: "host", until: t + 14 }; camTo(host.x * G.W, host.y * G.H);
-  guest.ov = { kind: "visit", host: host.key, side: guest.x < host.x ? -1 : 1, limit: t + 14, nextHeart: 0, arrived: 0 };
+  host.ov = { kind: "host", until: t + 14 + eta }; camTo(host.x * G.W, host.y * G.H);
+  guest.ov = { kind: "visit", host: host.key, side: guest.x < host.x ? -1 : 1, limit: t + 14 + eta, nextHeart: 0, arrived: 0 };
 }
-const BUDDY = [[395, 548, 470, 548], [140, 548, 70, 548]]; // study-buddy meeting places on the banks of the pond: [x1, y1, x2, y2] in world px
-const NAP = [[800, 350, 872, 350], [560, 350, 632, 350]];    // cosy nap places under the trees
+const BANK = POND.y + POND.ry + 4, RIGHT = POND.x + POND.rx, LEFT = POND.x - POND.rx; // just below the pond's edge (world px)
+const BUDDY = [[RIGHT + 15, BANK, RIGHT + 90, BANK], [LEFT - 80, BANK, LEFT - 150, BANK]]; // study-buddy meeting places on the banks of the pond: [x1, y1, x2, y2] in world px
+const NAP = [[800 * K, GY(350), 800 * K + 72, GY(350)], [560 * K, GY(350), 560 * K + 72, GY(350)]];    // cosy nap places under the trees
 function syncBuddies() { // two studying → their pets meet by the pond and hop. Two on a break → they curl up for a nap together.
   const want = new Map();
   if (!RM.matches) {
@@ -81,7 +82,7 @@ function syncVisitor() {
   if (t < G.visAt || (+ls(visKey()) || 0) >= VIS_DAY) return;
   G.visAt = t + rnd(50, 110);
   const k = pickVis(), el = document.createElement("div"); el.className = "gvis"; el.dataset.act = "gvis"; el.innerHTML = `<span>${k[0]}</span>`;
-  const x = Math.min(BOUNDS.x1, Math.max(BOUNDS.x0, (G.cam.x + rnd(.2, .8) * G.vw) / G.W)), y = Math.min(BOUNDS.y1, Math.max(BOUNDS.y0 + .05, (G.cam.y + rnd(.45, .85) * G.vh) / G.H));
+  const x = Math.min(BOUNDS.x1, Math.max(BOUNDS.x0, (G.cam.x + rnd(.2, .8) * G.vw / G.z) / G.W)), y = Math.min(BOUNDS.y1, Math.max(BOUNDS.y0 + 34 / G.H, (G.cam.y + rnd(.45, .85) * G.vh / G.z) / G.H)); // somewhere in the part of the garden you are looking at
   G.vis = { el, x, y, tx: x, ty: y, sp: k[2], kind: k[1], until: t + 28, nt: 0, ph: rnd(0, 6), fs: 1, face: 1 }; G.layer.appendChild(el);
 }
 function visStep(t, dt) {

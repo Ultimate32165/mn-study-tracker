@@ -1,15 +1,15 @@
 // Garden style: ground (meadow / flower field / sand / snow), fence, border along the front edge and a path.
 // Shared garden: the most recently saved style of either of you is what both of you see (users/{uid}.land = { g, f, b, p, at }).
 import * as DB from "./db.js";
-import { G, LAND, PATH_PTS, landOf, pathD } from "./garden-state.js";
+import { G, LAND, PATH_PTS, WW, landOf, pathD } from "./garden-state.js";
 import { me, users } from "./state.js";
 import { $, errMsg, modal, toast } from "./util.js";
 
 const BORDER_EMO = { flowers: ["🌷", "🌼", "🌸", "🌻"], mushrooms: ["🍄"] };
 const STONE_W = [16, 12, 20, 14];
 const borderHtml = b => { // little things in a row along the front edge of the world (card.js draws the same row)
-  if (b === "flowers" || b === "mushrooms") { let h = "", i = 0; for (let x = 14; x < 980; x += 32, i++) h += `<i style="left:${x}px">${BORDER_EMO[b][i % BORDER_EMO[b].length]}</i>`; return h; }
-  if (b === "stones") { let h = "", i = 0; for (let x = 14; x < 980; x += 32, i++) h += `<i class="st" style="left:${x}px;width:${STONE_W[i % 4]}px"></i>`; return h; }
+  if (b === "flowers" || b === "mushrooms") { let h = "", i = 0; for (let x = 14; x < WW; x += 32, i++) h += `<i style="left:${x}px">${BORDER_EMO[b][i % BORDER_EMO[b].length]}</i>`; return h; }
+  if (b === "stones") { let h = "", i = 0; for (let x = 14; x < WW; x += 32, i++) h += `<i class="st" style="left:${x}px;width:${STONE_W[i % 4]}px"></i>`; return h; }
   return "";
 };
 function applyLand(L) { // put a style on the live garden (only touches the DOM when something changed)

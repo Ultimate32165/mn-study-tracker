@@ -3,9 +3,9 @@ import { COLORS } from "./board.js";
 // Photocard: draws a shareable "cozy dashboard" image on a canvas.
 // Pure drawing code: numbers and colours in, pixels out. No DOM, no Firebase (carddata.js collects the data and the theme colours).
 // STYLES (see the "card styles" section near the bottom) change the whole look: background, tiles, frame, decorations, accent colour.
-// The garden is redrawn from the same data as the live scene, shrunk to fit. Keep WW/WH/POND in sync with js/garden-state.js and the garden CSS.
+// The garden is redrawn from the same data as the live scene, shrunk to fit. This file draws an OLD-SIZE (980x680) picture of the whole garden: the live garden is 3x bigger, but carddata.js (gardenSnap) converts every y back to the old frame, so WW/WH/POND/PATH_PTS below do NOT follow js/garden-state.js any more. Leave them alone.
 export const SIZES = { square: [1080, 1080], portrait: [1080, 1350], story: [1080, 1920] };
-const WW = 980, WH = 680, POND = { x: 300, y: 500, rx: 80, ry: 44 };
+const WW = 980, WH = 680, POND = { x: 300, y: 500, rx: 80, ry: 44 }; // the card's own old-size garden frame (see the note at the top)
 const SIZE_BY_STAGE = [28, 32, 40, 50];
 
 const seeded = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; // same generator as the live garden, so flowers sit in the same spots
@@ -35,7 +35,7 @@ function ell(ctx, x, y, rx, ry, fill) { ctx.beginPath(); ctx.ellipse(x, y, rx, r
 const BULBS = ["#ff9ccb", "#ffd36f", "#9be37f", "#7fd0ff", "#b79cf5"];
 const FLAT = new Set(["bed", "blanket", "lily", "rug", "bridge", "pbed", "toys", "bowl"]); // items that lie on the ground (keep in sync with ITEMS in decor.js)
 const DEF_L = { g: "meadow", f: "cute", b: "none", p: "none" }; // garden style: ground / fence / border / path (see js/land.js + LAND in garden-state.js)
-const PATH_PTS = [[20, 664], [170, 628], [330, 630], [480, 604], [620, 566], [760, 546], [880, 500], [975, 468]]; // copy of PATH_PTS in garden-state.js
+const PATH_PTS = [[20, 664], [170, 628], [330, 630], [480, 604], [620, 566], [760, 546], [880, 500], [975, 468]]; // old-size copy of the path (the live garden's PATH_PTS is this x3, see garden-state.js)
 function drawGround(ctx, k, X, Y, s, x, w, bottom) { // specks on the grass: flowers / sand grains / snow sparkles
   if (k === "meadow") return;
   const Q = seeded(41), n = k === "flowers" ? 110 : 150;

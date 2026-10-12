@@ -3,7 +3,7 @@ import { boardSnap } from "./board.js";
 import * as DB from "./db.js";
 import { decorOf } from "./decor.js";
 import { gardenList } from "./garden.js";
-import { G, inPond, isEvening, landOf, moodOf, seeded } from "./garden-state.js";
+import { G, fromClassicY, inPond, isEvening, landOf, moodOf, seeded, toClassicY } from "./garden-state.js";
 import { ALLP, accOf, petName, petOf, stageNames, stageOf } from "./pets.js";
 import { LV_T, board, couple, elapsed, goalOf, liveToday, me, sessions, totalOf, users } from "./state.js";
 import { DAY, fmt, key, stats } from "./util.js";
@@ -26,15 +26,15 @@ function cardPal(night, wx) { // read the CURRENT theme's colours (also the gard
   };
   tmp.remove(); return pal;
 }
-function gardenSnap() { // the saved garden as plain data (live pet positions when the garden is open, tidy spots otherwise)
+function gardenSnap() { // the saved garden as plain data (tidy spots). The card draws an old-size (980x680) picture of the whole garden, so every y here is an OLD-garden fraction (toClassicY / fromClassicY)
   const night = isEvening(), wx = G.wxMode === "auto" ? G.wxAuto : G.wxMode, R = seeded(3), items = [];
-  users.forEach(u => decorOf(u).forEach(d => items.push({ i: d.i, x: d.x, y: d.y })));
+  users.forEach(u => decorOf(u).forEach(d => items.push({ i: d.i, x: d.x, y: toClassicY(d.y) })));
   const list = gardenList(), n = list.length, placed = [];
   const pets = list.map((e, i) => { // scattered: one slot per animal across the width, random depth, away from the pond, decorations and each other
     const st = stageOf(totalOf(e.u)), slot = (i + .5) / n; let x = slot, y = .7;
     for (let t = 0; t < 40; t++) {
       x = Math.min(.93, Math.max(.07, .06 + slot * .88 + (R() - .5) * (.7 / n))); y = .64 + R() * .29;
-      if (inPond(x, y) || inPond(x, y - .04)) continue;
+      if (inPond(x, fromClassicY(y)) || inPond(x, fromClassicY(y - .04))) continue;
       if (items.some(d => Math.abs(d.x - x) < .055 && Math.abs(d.y - y) < .07)) continue;
       if (placed.some(q => Math.abs(q.x - x) < .08 && Math.abs(q.y - y) < .09)) continue;
       break;

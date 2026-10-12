@@ -2,7 +2,7 @@
 import * as DB from "./db.js";
 import { forestCost } from "./forest.js";
 import { camTo } from "./garden.js";
-import { G, POND, WH, WW, WXL, inPond, rnd } from "./garden-state.js";
+import { G, GY, POND, WH, WXL, fromClassicY, inPond, rnd } from "./garden-state.js";
 import { coupleCard, me, totalOf, users } from "./state.js";
 import { $, errMsg, modal, toast } from "./util.js";
 
@@ -46,12 +46,13 @@ const ART = { // little CSS-drawn items (so they follow every theme); the lanter
 };
 // seeds = study time + visitor bonuses (u.bonus) - treats given (u.treats); spent decoration is subtracted in seedsLeft
 const seedsEarned = u => Math.floor(totalOf(u) / SEED_SEC) + (u.bonus || 0) - (u.treats || 0);
-// the first version of the garden stored x/y as fractions of the small 340x408 scene; carry those over into the big world (v:2)
-const upgradeD = d => d.v === 2 ? d : { ...d, v: 2, x: (d.x * 340 + 225) / WW, y: (d.y * 408 + 198) / WH };
+// saved positions are fractions of the world. v:1 = the very first 340x408 scene, v:2 = the old 980x680 garden, v:3 = today's big garden (3x wider and deeper, see garden-state.js).
+// Older items are carried over with the same relative spot (so they spread out with the bigger garden and water items stay on the pond).
+const upgradeD = d => { if (d.v === 3) return d; const c = d.v === 2 ? d : { x: (d.x * 340 + 225) / 980, y: (d.y * 408 + 198) / 680 }; return { ...d, v: 3, x: c.x, y: fromClassicY(c.y) }; };
 const decorOf = u => (Array.isArray(u.decor) ? u.decor : []).filter(d => d && ITEMS[d.i] && typeof d.k === "string" && Number.isFinite(d.x) && Number.isFinite(d.y)).slice(0, MAX_DECOR).map(upgradeD);
 const decorNow = u => G.edit && G.work && u.id === me?.uid ? G.work : decorOf(u); // while decorating, your own list is the unsaved working copy
 const seedsLeft = u => Math.max(0, seedsEarned(u) - decorNow(u).reduce((a, d) => a + ITEMS[d.i].price, 0) - forestCost(u)); // spent seeds (decorations + trees) are simply the price of everything placed
-const clampX = x => Math.min(.96, Math.max(.04, x)), clampY = y => Math.min(.95, Math.max(.38, y));
+const CY0 = GY(258) / WH, CY1 = GY(646) / WH, clampX = x => Math.min(.96, Math.max(.04, x)), clampY = y => Math.min(CY1, Math.max(CY0, y)); // how far back / forward you may place things
 const okSpot = (id, x, y) => ITEMS[id].water ? inPond(x, y) : !inPond(x, y - .02); // lily pads only on the pond, everything else on the grass
 let seedBase = -1;
 const resetSeedBase = () => { seedBase = -1; };
@@ -69,7 +70,7 @@ function gardenPanel() {
   }
   return `<div class="gtop"><div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds</div><button class="chip" data-act="gwx">🌦️ ${wl}</button></div>
   <div class="gbtns"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button><button class="btn ghost" data-act="gland">🎨 style garden</button><button class="btn ghost" data-act="gchoose">🐾 garden pets</button><button class="btn ghost wide" data-act="card">📸 photocard</button></div>
-  <p class="hint">drag the garden to look around ✋ · tap a pet for tricks, treats & a nickname 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
+  <p class="hint">drag the garden to look around ✋ · pinch or use ＋ － to zoom 🔍 · tap a pet for tricks, treats & a nickname 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
 }
 function enterEdit(m) {
   G.edit = true; G.work = decorOf(m).map(d => ({ ...d })); G.sel = null;
@@ -78,7 +79,7 @@ function enterEdit(m) {
 }
 async function exitEdit(save) {
   if (save) {
-    try { await DB.saveDecor(me.uid, G.work.map(d => ({ i: d.i, k: d.k, v: 2, x: +d.x.toFixed(3), y: +d.y.toFixed(3) }))); toast("Garden decorated 🏡"); }
+    try { await DB.saveDecor(me.uid, G.work.map(d => ({ i: d.i, k: d.k, v: 3, x: +d.x.toFixed(3), y: +d.y.toFixed(3) }))); toast("Garden decorated 🏡"); }
     catch (e) { return toast(errMsg(e)); }
   }
   G.edit = false; G.work = null; G.sel = null; if (G.el) G.el.classList.remove("editing");
@@ -99,10 +100,10 @@ function shopSheet(mine) {
     if (decorNow(mine).length >= MAX_DECOR) return toast(`Your garden is full (${MAX_DECOR} things) 🌳`);
     if (have < x.price) return toast(`${x.price - have} more 🌱 needed — keep studying!`);
     if (!G.edit) enterEdit(mine);
-    let sx = (G.cam.x + G.vw / 2 + rnd(-30, 30)) / G.W, sy = (G.cam.y + G.vh * .62 + rnd(-20, 20)) / G.H;
+    let sx = (G.cam.x + G.vw / 2 / G.z + rnd(-30, 30)) / G.W, sy = (G.cam.y + G.vh * .62 / G.z + rnd(-20, 20)) / G.H; // the middle of what you are looking at
     if (x.water) { sx = (POND.x + rnd(-30, 30)) / G.W; sy = (POND.y + rnd(-12, 12)) / G.H; camTo(POND.x, POND.y); }
     else { sx = clampX(sx); sy = clampY(sy); for (let i = 0; i < 12 && !okSpot(id, sx, sy); i++) sy = clampY(sy + .03); }
-    const d = { i: id, k: Math.random().toString(36).slice(2, 8), v: 2, x: +sx.toFixed(3), y: +sy.toFixed(3) };
+    const d = { i: id, k: Math.random().toString(36).slice(2, 8), v: 3, x: +sx.toFixed(3), y: +sy.toFixed(3) };
     G.work.push(d); G.sel = d.k; modal.innerHTML = ""; syncItems(); refreshPanel();
     const o = G.items.get(`${me.uid}:${d.k}`); if (o) { o.el.classList.add("pop"); setTimeout(() => o.el.classList.remove("pop"), 700); }
     toast(`New ${x.n}! Drag it where you like ✋`);
@@ -129,7 +130,7 @@ function syncItems() { // draw everybody's decorations (yours = the working copy
 }
 function dragApply() { // the item follows the finger, in world coordinates (so it keeps up while the window scrolls)
   const g = G.drag; if (!g || !G.el) return;
-  const r = G.el.getBoundingClientRect(), d = g.o.it, nx = clampX((g.px - r.left + G.cam.x) / G.W - g.gx), ny = clampY((g.py - r.top + G.cam.y) / G.H - g.gy);
+  const r = G.el.getBoundingClientRect(), d = g.o.it, nx = clampX(((g.px - r.left) / G.z + G.cam.x) / G.W - g.gx), ny = clampY(((g.py - r.top) / G.z + G.cam.y) / G.H - g.gy); // screen px -> world px: divide by the zoom
   if (Math.hypot(nx - d.x, ny - d.y) > .003) g.moved = true;
   if (!okSpot(d.i, nx, ny)) return; // keep things on the grass (lily pads: on the pond)
   if (nx !== d.x || ny !== d.y) { d.x = nx; d.y = ny; syncItems(); }
@@ -138,7 +139,7 @@ function itemDown(e, o) { // drag-to-place
   if (!G.edit || o.uid !== me?.uid || !G.el) return;
   e.preventDefault(); e.stopPropagation();
   const r = G.el.getBoundingClientRect(), d = o.it, wasSel = G.sel === d.k;
-  G.drag = { o, wasSel, moved: false, px: e.clientX, py: e.clientY, gx: (e.clientX - r.left + G.cam.x) / G.W - d.x, gy: (e.clientY - r.top + G.cam.y) / G.H - d.y };
+  G.drag = { o, wasSel, moved: false, px: e.clientX, py: e.clientY, gx: ((e.clientX - r.left) / G.z + G.cam.x) / G.W - d.x, gy: ((e.clientY - r.top) / G.z + G.cam.y) / G.H - d.y };
   G.sel = d.k; G.cam.vx = G.cam.vy = 0; G.cam.glide = false; syncItems(); refreshPanel();
   const mv = ev => { if (G.drag) { G.drag.px = ev.clientX; G.drag.py = ev.clientY; dragApply(); } };
   const up = () => {

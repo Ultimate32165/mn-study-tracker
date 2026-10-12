@@ -1,8 +1,8 @@
-// The living garden scene: building it, the camera (drag to look around), pets walking/animating, garden loop, treats, tap card, 'garden friends' sheet.
+// The living garden scene: building it, the camera (drag to look around, pinch / + - to zoom), pets walking/animating, garden loop, treats, tap card, 'garden friends' sheet.
 import * as DB from "./db.js";
 import { dragApply, gardenPanel, seedsLeft, syncItems } from "./decor.js";
 import { mainPet, runVisits, spawnHeart, syncBuddies, syncVisitor, syncWeather, visStep } from "./garden-fx.js";
-import { BASE, BOUNDS, BUB, FACE_RIGHT, G, MOVE, RM, SAY, TREAT, inPond, isEvening, moodOf, nowS, rnd, seeded } from "./garden-state.js";
+import { BASE, BOUNDS, BUB, FACE_RIGHT, G, GY, K, MOVE, POND, RM, SAY, TREAT, WH, WW, ZMAX, fromClassicY, inPond, isEvening, moodOf, nowS, rnd, seeded } from "./garden-state.js";
 import { syncLand } from "./land.js";
 import { ALLP, EXTRA, MAX_FRIENDS, STAGE, accOf, nickOf, petName, petOf, stageNames, stageOf } from "./pets.js";
 import { couple, me, totalOf, users } from "./state.js";
@@ -20,39 +20,64 @@ function pickSpot(p, near) { // random spot on the grass (not in the pond). `nea
   return [p.x, p.y];
 }
 function buildGarden() { // built ONCE; render() never touches it, so pets never reset
-  const el = document.createElement("div"); el.id = "garden";
-  el.innerHTML = `<div class="gworld"><div class="gstars"></div><i class="gsun"></i><div class="grain"></div><i class="gcl c1"></i><i class="gcl c2"></i><i class="gcl c3"></i><i class="gcl c4"></i><i class="gcl c5"></i>
-  <div class="ghill h1"></div><div class="gfence f-cute"></div><div class="ghill h2"></div><svg class="gpath" viewBox="0 0 980 680" aria-hidden="true"></svg><div class="gpond"></div><div class="gborder"></div><div class="gdeco"></div><div class="gpets"></div><div class="gfly"></div>
-  <div class="gff">${[...Array(28)].map(() => `<i style="left:${rnd(4, 96).toFixed(1)}%;top:${rnd(36, 96).toFixed(1)}%;animation-delay:${(-rnd(0, 6)).toFixed(1)}s;animation-duration:${rnd(4, 8).toFixed(1)}s"></i>`).join("")}</div>
-  <div class="gwx"></div><div class="gfx"></div></div><div class="gcard" hidden></div><button class="gfind" data-act="gfind" aria-label="find my pets">📍</button>`;
+  const el = document.createElement("div"); el.id = "garden"; el.style.setProperty("--ww", WW + "px"); el.style.setProperty("--wh", WH + "px"); // the world size comes from garden-state.js
+  el.innerHTML = `<div class="gworld"><div class="gstars"></div><i class="gsun"></i><div class="grain"></div><i class="gcl c1"></i><i class="gcl c2"></i><i class="gcl c3"></i><i class="gcl c4"></i><i class="gcl c5"></i>${[...Array(10)].map(() => `<i class="gcl" style="top:${rnd(24, 136).toFixed(0)}px;--s:${rnd(.55, .95).toFixed(2)};animation-duration:${rnd(380, 620).toFixed(0)}s;animation-delay:${(-rnd(0, 600)).toFixed(0)}s"></i>`).join("")}
+  <div class="ghill h1"></div><div class="gfence f-cute"></div><div class="ghill h2"></div><svg class="gpath" viewBox="0 0 ${WW} ${WH}" aria-hidden="true"></svg><div class="gpond" style="left:${POND.x - POND.rx}px;top:${POND.y - POND.ry}px;width:${POND.rx * 2}px;height:${POND.ry * 2}px"></div><div class="gborder"></div><div class="gdeco"></div><div class="gpets"></div><div class="gfly"></div>
+  <div class="gff">${[...Array(28 * K)].map(() => `<i style="left:${rnd(4, 96).toFixed(1)}%;top:${rnd(17, 95).toFixed(1)}%;animation-delay:${(-rnd(0, 6)).toFixed(1)}s;animation-duration:${rnd(4, 8).toFixed(1)}s"></i>`).join("")}</div>
+  <div class="gfx"></div></div><div class="gwx"></div><div class="gcard" hidden></div><div class="gzoom"><button class="gzi" aria-label="zoom in">＋</button><button class="gzo" aria-label="zoom out">－</button></div><button class="gfind" data-act="gfind" aria-label="find my pets">📍</button>`; // the weather layer (gwx) sits over the window, not inside the world
   G.el = el; G.world = el.querySelector(".gworld"); G.deco = el.querySelector(".gdeco"); G.layer = el.querySelector(".gpets"); G.fly = el.querySelector(".gfly"); G.fx = el.querySelector(".gfx");
   G.card = el.querySelector(".gcard"); G.wxEl = el.querySelector(".gwx");
   G.card.onclick = () => { G.card.hidden = true; };
   G.ro = new ResizeObserver(() => { G.vw = el.clientWidth || G.vw; G.vh = el.clientHeight || G.vh; el.style.setProperty("--gh", G.vh + "px"); }); G.ro.observe(el);
+  el.querySelector(".gzi").onclick = () => zoomBy(1.5); el.querySelector(".gzo").onclick = () => zoomBy(1 / 1.5);
+  el.addEventListener("wheel", e => { if (!e.ctrlKey) return; e.preventDefault(); const r = el.getBoundingClientRect(); zoomBy(Math.exp(-e.deltaY * .01), e.clientX - r.left, e.clientY - r.top); }, { passive: false }); // trackpad pinch / ctrl + wheel on a computer
   el.addEventListener("pointerdown", panDown); el.addEventListener("pointermove", panMove); el.addEventListener("pointerup", panUp); el.addEventListener("pointercancel", panUp);
   G.decoLv = -1; G.night = null; G.wx = ""; G.landSig = ""; G.items.clear();
 }
-// ---- camera: drag to look around (with a little inertia), or glide to a spot ----
-const clampCam = () => { const c = G.cam; c.x = Math.min(Math.max(0, G.W - G.vw), Math.max(0, c.x)); c.y = Math.min(Math.max(0, G.H - G.vh), Math.max(0, c.y)); };
+// ---- camera: drag to look around (with a little inertia), glide to a spot, pinch / + - to zoom ----
+// cam.x / cam.y = the world point at the top-left of the window. G.z = zoom (screen px per world px): the world is drawn as scale(z) translate(-cam).
+const zMin = () => Math.max(G.vw / G.W, G.vh / G.H), clampZ = z => Math.min(ZMAX, Math.max(zMin(), z)); // farthest zoom = the whole garden just fits the window
+const clampCam = () => { const c = G.cam, w = G.vw / G.z, h = G.vh / G.z; c.x = Math.min(Math.max(0, G.W - w), Math.max(0, c.x)); c.y = Math.min(Math.max(0, G.H - h), Math.max(0, c.y)); };
+function zoomBy(f, sx = G.vw / 2, sy = G.vh / 2) { // + / - buttons (and ctrl + wheel): glide to a new zoom, keeping the world point under (sx, sy) (window px) where it is
+  const c = G.cam; G.zt = clampZ(G.zt * f); G.za = { sx, sy, wx: c.x + sx / G.z, wy: c.y + sy / G.z }; c.vx = c.vy = 0; c.glide = false;
+}
 function camTo(px, py, instant) { // centre the window on a world position
-  const c = G.cam; c.tx = px - G.vw / 2; c.ty = py - G.vh * .55; c.vx = c.vy = 0;
-  c.tx = Math.min(Math.max(0, G.W - G.vw), Math.max(0, c.tx)); c.ty = Math.min(Math.max(0, G.H - G.vh), Math.max(0, c.ty));
+  const c = G.cam; c.tx = px - G.vw / 2 / G.z; c.ty = py - G.vh * .55 / G.z; c.vx = c.vy = 0;
+  c.tx = Math.min(Math.max(0, G.W - G.vw / G.z), Math.max(0, c.tx)); c.ty = Math.min(Math.max(0, G.H - G.vh / G.z), Math.max(0, c.ty));
   if (instant || RM.matches) { c.x = c.tx; c.y = c.ty; c.glide = false; } else c.glide = true;
 }
 function panDown(e) {
   if (e.button > 0 || G.drag || !G.el) return;
-  const c = G.cam; c.vx = c.vy = 0; c.glide = false;
+  G.pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); // every finger on the garden: one = drag, two = pinch to zoom
+  if (G.pts.size === 2) return pinchStart();
+  if (G.pts.size > 2) return;
+  const c = G.cam; c.vx = c.vy = 0; c.glide = false; G.zt = G.z;
   G.pan = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: c.x, cy: c.y, moved: false, lt: performance.now(), lx: c.x, ly: c.y, vx: 0, vy: 0 };
 }
+function pinchStart() { // the second finger touched down: remember the distance between the fingers and the world point between them
+  const [a, b] = [...G.pts.values()], r = G.el.getBoundingClientRect(), c = G.cam, mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+  if (G.pan) { G.pan = null; G.el.classList.remove("panning"); }
+  G.pinch = { d: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), z: G.z, wx: c.x + mx / G.z, wy: c.y + my / G.z };
+  G.zt = G.z; c.vx = c.vy = 0; c.glide = false; G.noClick = performance.now();
+}
+function pinchMove() { // zoom by how much the fingers spread, and follow the middle point (so two fingers also pan)
+  const pc = G.pinch, [a, b] = [...G.pts.values()]; if (!pc || !b) return;
+  const r = G.el.getBoundingClientRect(), mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top, z = clampZ(pc.z * Math.hypot(a.x - b.x, a.y - b.y) / pc.d);
+  G.z = G.zt = z; G.cam.x = pc.wx - mx / z; G.cam.y = pc.wy - my / z; clampCam(); G.noClick = performance.now();
+}
 function panMove(e) {
+  const q = G.pts.get(e.pointerId); if (q) { q.x = e.clientX; q.y = e.clientY; }
+  if (G.pinch) return pinchMove();
   const p = G.pan; if (!p || e.pointerId !== p.id || G.drag) return;
-  const dx = e.clientX - p.x, dy = e.clientY - p.y;
-  if (!p.moved) { if (Math.hypot(dx, dy) < 7) return; p.moved = true; try { G.el.setPointerCapture(e.pointerId); } catch {} G.el.classList.add("panning"); }
-  const c = G.cam, now = performance.now(), dt = Math.max(.001, (now - p.lt) / 1000), nx = p.cx - dx, ny = p.cy - dy;
+  const sx = e.clientX - p.x, sy = e.clientY - p.y; // finger movement in window px; the world moves by that divided by the zoom
+  if (!p.moved) { if (Math.hypot(sx, sy) < 7) return; p.moved = true; try { G.el.setPointerCapture(e.pointerId); } catch {} G.el.classList.add("panning"); }
+  const c = G.cam, now = performance.now(), dt = Math.max(.001, (now - p.lt) / 1000), nx = p.cx - sx / G.z, ny = p.cy - sy / G.z;
   p.vx = p.vx * .55 + (nx - p.lx) / dt * .45; p.vy = p.vy * .55 + (ny - p.ly) / dt * .45; p.lt = now; p.lx = nx; p.ly = ny;
   c.x = nx; c.y = ny; clampCam();
 }
 function panUp(e) {
+  G.pts.delete(e.pointerId);
+  if (G.pinch) { if (G.pts.size < 2) { G.pinch = null; G.pan = null; G.noClick = performance.now(); } return; } // the finger left over after a pinch does not start a drag
   const p = G.pan; if (!p || e.pointerId !== p.id) return; G.pan = null;
   if (!p.moved) return;
   try { G.el.releasePointerCapture(e.pointerId); } catch {}
@@ -60,32 +85,37 @@ function panUp(e) {
   const c = G.cam, fast = Math.hypot(p.vx, p.vy) > 60 && performance.now() - p.lt < 90; c.vx = fast && !RM.matches ? p.vx : 0; c.vy = fast && !RM.matches ? p.vy : 0;
 }
 function camStep(dt) {
-  const c = G.cam;
+  const c = G.cam, lo = zMin();
+  if (G.z < lo || G.zt < lo) { G.z = Math.max(G.z, lo); G.zt = Math.max(G.zt, lo); } // the window got bigger (rotated phone): never zoom out past "the whole garden fits"
+  if (G.zt !== G.z && !G.pinch && G.za) { G.z += (G.zt - G.z) * (RM.matches ? 1 : Math.min(1, dt * 9)); if (Math.abs(G.zt - G.z) < .003) G.z = G.zt; c.x = G.za.wx - G.za.sx / G.z; c.y = G.za.wy - G.za.sy / G.z; } // glide to the zoom the buttons asked for
   if (G.drag) { // dragging a decoration near the edge scrolls the window
     const g = G.drag, r = G.el.getBoundingClientRect(), ex = g.px - r.left < 36 ? -1 : g.px - r.left > r.width - 36 ? 1 : 0, ey = g.py - r.top < 36 ? -1 : g.py - r.top > r.height - 36 ? 1 : 0;
-    if (ex || ey) { c.x += ex * 240 * dt; c.y += ey * 240 * dt; c.glide = false; clampCam(); }
+    if (ex || ey) { c.x += ex * 240 * dt / G.z; c.y += ey * 240 * dt / G.z; c.glide = false; clampCam(); }
     dragApply();
   } else if (G.pan && G.pan.moved) { /* the finger is steering */ }
   else if (c.glide) { const k = Math.min(1, dt * 5); c.x += (c.tx - c.x) * k; c.y += (c.ty - c.y) * k; if (Math.abs(c.tx - c.x) < .5 && Math.abs(c.ty - c.y) < .5) c.glide = false; }
   else if (c.vx || c.vy) { c.x += c.vx * dt; c.y += c.vy * dt; const k = Math.pow(.02, dt); c.vx *= k; c.vy *= k; if (Math.abs(c.vx) < 8 && Math.abs(c.vy) < 8) c.vx = c.vy = 0; }
   clampCam();
-  const t = `translate(${(-c.x).toFixed(1)}px,${(-c.y).toFixed(1)}px)`; if (t !== G.camT) { G.camT = t; G.world.style.transform = t; }
+  const t = `scale(${G.z.toFixed(4)}) translate(${(-c.x).toFixed(1)}px,${(-c.y).toFixed(1)}px)`; if (t !== G.camT) { G.camT = t; G.world.style.transform = t; }
+  if (G.z !== G.zl) { G.zl = G.z; clearTimeout(G.zT); G.zT = setTimeout(() => { if (!G.world) return; G.world.style.willChange = "auto"; requestAnimationFrame(() => { if (G.world) G.world.style.willChange = ""; }); }, 200); } // once the zoom settles, drop and restore will-change so the browser redraws the garden sharp at the new size
 }
 function findPet() { // the 📍 button: glide to the next pet (yours first)
   const list = [...G.pets.values()].sort((a, b) => (b.uid === me?.uid) - (a.uid === me?.uid) || (a.key < b.key ? -1 : 1)); if (!list.length) return;
   G.findI = (G.findI + 1) % list.length; const p = list[G.findI]; camTo(p.x * G.W, p.y * G.H);
 }
-function buildDeco(lv) { // more flowers, butterflies, trees and a rainbow as the couple level grows
+function buildDeco(lv) { // more flowers, butterflies, trees and a rainbow as the couple level grows (spread over the big garden: y values go through GY)
   G.decoLv = lv;
-  const r = seeded(11), FL = ["🌸", "🌼", "🌷", "🌻", "🌺", "🌹"], n = Math.min(60, 10 + lv * 5); let h = "";
-  for (let i = 0; i < 60; i++) { // always draw the same 60 random spots so flowers never move around when new ones appear
-    const x = .03 + r() * .94, y = .4 + r() * .56, f = FL[Math.floor(r() * FL.length)], s = 13 + Math.floor(r() * 9);
-    if (i < n && !inPond(x, y + .02)) h += `<i style="left:${(x * 100).toFixed(1)}%;top:${(y * 100).toFixed(1)}%;font-size:${s}px">${f}</i>`;
+  const r = seeded(11), FL = ["🌸", "🌼", "🌷", "🌻", "🌺", "🌹"], SP = 300, n = Math.min(SP, 50 + lv * 25); let h = "";
+  for (let i = 0; i < SP; i++) { // always draw the same 300 random spots so flowers never move around when new ones appear
+    const x = .03 + r() * .94, y = GY(272 + r() * 381) / WH, f = FL[Math.floor(r() * FL.length)], s = 13 + Math.floor(r() * 9);
+    if (i < n && !inPond(x, y + 14 / WH)) h += `<i style="left:${(x * 100).toFixed(1)}%;top:${(y * 100).toFixed(1)}%;font-size:${s}px">${f}</i>`;
   }
-  [[880, 275, "🌳", 3], [80, 275, "🌲", 5], [520, 282, "🌳", 7], [940, 440, "🌲", 8], [40, 540, "🌳", 9], [660, 300, "🌲", 10]].forEach(([x, y, e, need]) => { if (lv >= need) h += `<i class="tree" style="left:${x}px;top:${y}px">${e}</i>`; });
+  [[880, 275, "🌳", 3], [80, 275, "🌲", 5], [520, 282, "🌳", 7], [940, 440, "🌲", 8], [40, 540, "🌳", 9], [660, 300, "🌲", 10]].forEach(([x, y, e, need]) => { if (lv >= need) h += `<i class="tree" style="left:${x * K}px;top:${GY(y)}px">${e}</i>`; });
+  const T = seeded(21); // 14 more trees scattered over the big garden, appearing from couple level 2 to 10
+  for (let i = 0; i < 14; i++) { const x = 60 + T() * (WW - 120), y = GY(275 + T() * 330), e = T() < .5 ? "🌳" : "🌲"; if (lv >= 2 + i % 9 && !inPond(x / WW, y / WH)) h += `<i class="tree" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px">${e}</i>`; }
   G.deco.innerHTML = h;
-  let fl = ""; const nb = lv >= 1 ? Math.min(9, 1 + Math.floor(lv / 2) * 2) : 0;
-  for (let i = 0; i < nb; i++) fl += `<i style="left:${(6 + r() * 84).toFixed(1)}%;top:${(38 + r() * 42).toFixed(1)}%;animation-delay:${(-r() * 8).toFixed(1)}s;animation-duration:${(7 + r() * 5).toFixed(1)}s">🦋</i>`;
+  let fl = ""; const nb = lv >= 1 ? Math.min(9, 1 + Math.floor(lv / 2) * 2) * K : 0;
+  for (let i = 0; i < nb; i++) fl += `<i style="left:${(6 + r() * 84).toFixed(1)}%;top:${((GY(258) + r() * (GY(544) - GY(258))) / WH * 100).toFixed(1)}%;animation-delay:${(-r() * 8).toFixed(1)}s;animation-duration:${(7 + r() * 5).toFixed(1)}s">🦋</i>`;
   G.fly.innerHTML = fl;
   G.el.classList.toggle("rainbow", lv >= 6);
 }
@@ -101,13 +131,13 @@ function mkPet(key, u, type) {
   const el = document.createElement("div"); el.className = "gp"; el.dataset.act = "gpet"; el.dataset.id = key;
   el.innerHTML = `<i class="gsh"></i><span class="gpe"></span><i class="gbub"></i><b class="gpn"></b>`;
   const p = { key, uid: u.id, type, el, sh: el.children[0], e: el.children[1], bub: el.children[2], nm: el.children[3], x: 0, y: 0, tx: 0, ty: 0, mode: "rest", until: nowS() + rnd(.4, 2.5),
-    fs: 1, face: 1, ph: Math.random() * 6, hp: 0, jump: -9, heartAt: 0, ht: 0, sig: "", mood: "", st: 0, ta: "", tb: "", ov: null, emo: "", hx: rnd(.2, .65), hy: rnd(.6, .9), spin: -9, yawn: -9, wave: -9, sit: 0, nb: false, nt: 0 };
+    fs: 1, face: 1, ph: Math.random() * 6, hp: 0, jump: -9, heartAt: 0, ht: 0, sig: "", mood: "", st: 0, ta: "", tb: "", ov: null, emo: "", hx: rnd(.32, .62), hy: fromClassicY(rnd(.6, .9)), spin: -9, yawn: -9, wave: -9, sit: 0, nb: false, nt: 0 };
   const s = pickSpot(p); p.x = p.tx = s[0]; p.y = p.ty = s[1];
   el.style.transform = `translate(${(p.x * G.W).toFixed(1)}px,${(p.y * G.H).toFixed(1)}px)`; el.style.zIndex = 10 + Math.round(p.y * G.H);
   G.pets.set(key, p); G.layer.appendChild(el); return p;
 }
 function removePet(p) { clearTimeout(p.ht); p.el.remove(); }
-function clearGarden() { if (G.vis) { G.vis.el.remove(); G.vis = null; } G.camInit = false; G.pets.forEach(removePet); G.pets.clear(); G.items.forEach(o => o.el.remove()); G.items.clear(); G.edit = false; G.work = null; G.sel = null; if (G.el) G.el.classList.remove("editing"); }
+function clearGarden() { if (G.vis) { G.vis.el.remove(); G.vis = null; } G.camInit = false; G.z = G.zt = 1; G.pts.clear(); G.pinch = null; G.pets.forEach(removePet); G.pets.clear(); G.items.forEach(o => o.el.remove()); G.items.clear(); G.edit = false; G.work = null; G.sel = null; if (G.el) G.el.classList.remove("editing"); }
 function setPet(p, u, type) { // refresh look + mood from the owner's live data (only touches the DOM when something changed)
   const st = stageOf(totalOf(u)), mood = moodOf(u), nk = nickOf(u, type), sig = `${type}|${st}|${mood}|${u.name}|${nk}`;
   if (sig === p.sig) return; const evolved = !!p.sig && p.st !== st; p.sig = sig; p.type = type; p.st = st;
@@ -210,6 +240,7 @@ function gardenStart() { if (!G.raf && G.el && G.el.isConnected && !document.hid
 document.addEventListener("visibilitychange", gardenStart);
 function mountGarden() { // put the one living scene into the freshly rendered page
   if (!G.el) buildGarden();
+  G.pts.clear(); G.pinch = null; // no finger can still be down on a freshly mounted garden
   const slot = $("#gslot"); if (slot) slot.replaceWith(G.el);
   G.vw = G.el.clientWidth || G.vw; G.vh = G.el.clientHeight || G.vh; G.el.style.setProperty("--gh", G.vh + "px");
   syncGarden();
