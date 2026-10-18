@@ -39,7 +39,7 @@ js/
 
 | File | What's in it |
 |---|---|
-| **index.html** | The page shell: empty `#app`, `#modal` and `#toast` boxes. A tiny inline script applies your saved theme, "reduce motion" and theme customizations (`look` / `lookCss`) **before** the page paints (no colour flash). Loads the Google Fonts (Fredoka, Baloo 2, Nunito, Rye, Special Elite), `css/style.css`, `js/app.js`, the manifest and the iOS home-screen tags. |
+| **index.html** | The page shell: empty `#app`, `#modal` and `#toast` boxes. A tiny inline script applies your saved theme, "reduce motion" and theme customizations (`look` / `lookCss`) **before** the page paints (no colour flash). Loads the Google Fonts (Fredoka, Baloo 2, Nunito, Rye, Special Elite), `css/style.css`, `js/app.js`, the manifest and the iOS home-screen tags. The same inline script also sets `data-dark` ("1" on dark themes; CSS uses it to turn shadows black): **its regex must list the same dark themes as `isDark` in `theme.js`.** The fonts are preconnected. |
 | **sw.js** | Service worker (offline support). `C` = cache version, `A` = list of files cached at install. Network-first: it tries the internet and falls back to the cache. **Add every new file to `A` and bump `C`**, or phones keep serving the old code. |
 | **manifest.webmanifest**, **icons/** | PWA name, colours and icons. Not part of this change. |
 | **firebase-config.js** | Your Firebase project keys, and `SIGNUP_CODE` (a secret word required to create an account; `""` = anyone can sign up). |
@@ -50,25 +50,25 @@ js/
 
 | File | What's in it |
 |---|---|
-| **css/style.css** (≈810 lines) | Everything visual. Roughly: **lines 1-85** colour variables, all themes (`[data-theme=name]` rules, plus glass themes) and the **extra look** rules (`html[data-round=…]` corner radius, `html[data-shadow=…]` shadows; the old `data-bg` background patterns were removed because they made phones lag) · 72-133 avatars, progress ring, cards, study button, buttons, nav pill · 134-224 stats, sheets, time wheel, confetti, calendar, badges, couple level, pet row, cheer pop-up · 225-296 garden scene and pets · 297-421 garden extras (evolution accessories, seeds/shop, CSS-drawn decorations, weather, bigger world, the ＋ － zoom buttons `.gzoom`; weather `.gwx` / `.gwc` chunks) · 422-470 photocard sheet (incl. style chips, accent dots, "more options") and inbox · 452-505 collapsible sections, compact home, reduce-motion · 506-528 forest · 529-end to-do board (styles, stickers, palette). The **garden style** rules (ground colours, fence variants, path, border, speckles) and the **16 newer shop items** (campfire … pet house) are two blocks at the very **end** of the file, after the board. The **cute cursors** are the very last block of the file (see section 4, item 15). The grass is drawn with `--gb` / `--gf` (a ground style replaces them; by default they just copy `--gr-b` / `--gr-f`). Colours always come from theme variables, so everything follows the theme. (Line ranges after the first block are approximate, about 15 lines later than listed.) |
+| **css/style.css** (≈835 lines) | Everything visual (UI v2). Roughly: **lines 1-43** design tokens (`:root`: `--r` / `--r2` corners, `--sh` / `--sh-s` / `--sh-on` soft shadows built from `--shc`, `--hair`, `--edge`) and all colour themes (`[data-theme=name]` rules, plus glass themes) · 44-59 base, background blobs and the **extra look** rules (`html[data-round=…]` corner radius, `html[data-shadow=…]` shadows) · 60-71 header + page + section titles (`h2`) · 72-90 avatars, progress ring, people cards, mini stats · 91-124 **timer hero** (`.dial` goal ring, `.study` button, `.duo` pause / stop) · 125-142 buttons, chips (`.chip`, `.chip.pri`), inputs, login (`.auth`, `.authcard`, `.logo`) · 143-151 bottom tab bar · 152-175 stats week card (`.wk`, `.bars`, `.trio`), session rows (`.sess`), cheer row · 176-181 cards / tiles switch (`.vt`) · 182-192 sheets + toast · 193-203 time wheel · 204-209 confetti · 210-258 calendar, badges, couple level, pet row, cheer pop-up · 259-465 garden scene, pets and garden extras (not touched by UI v2 stages 1-2) · then photocard sheet, inbox (`.gifts`), collapsible sections (`h2.fold`), `.mtog` (small switch, kept for the settings sheets), compact tiles (`.sq` / `.tile`), compact settings sheet (`.sheet.prof`), compact garden panel, reduce-motion, forest, to-do board, garden style rules and the **16 newer shop items** (campfire … pet house). The **cute cursors** are the very last block of the file (see section 4, item 15). The grass is drawn with `--gb` / `--gf` (a ground style replaces them; by default they copy `--gr-b` / `--gr-f`). Colours always come from theme variables, so everything follows the theme. The design rules are in section 4, item 16. (Line numbers are approximate.) |
 
 ### Core (shared by everything)
 
 | File | What's in it |
 |---|---|
-| **js/app.js** | **Entry point, almost no logic.** `render()` draws header, the current tab and the bottom nav; `addBoardNote` + `initBoard` glue; the big `app.onclick` handler (every `data-act="..."` button: login, tab, study/pause/resume/stop, cheer, sound, garden buttons (incl. `gtrick`, `gname`, `gland`), card, calendar, add/edit/delete session…); boot (`DB.watchAuth` → start the live listeners). **To change what a button does or add a button's action, edit here.** |
+| **js/app.js** | **Entry point, almost no logic.** `render()` draws the header (greeting from `hello()`, big page title from `TITLES`), the current tab and the bottom tab bar (`NAV` = list of `[tab id, icon, label]`; **to rename, reorder or add a tab edit `NAV`**); `addBoardNote` + `initBoard` glue; the big `app.onclick` handler (every `data-act="..."` button: login, tab, study/pause/resume/stop, cheer, sound, garden buttons (incl. `gtrick`, `gname`, `gland`), card, calendar, add/edit/delete session…); boot (`DB.watchAuth` → start the live listeners). **To change what a button does or add a button's action, edit here.** Pressing Enter in a login field clicks "log in". |
 | **js/state.js** | The shared store: `me`, `users`, `sessions`, `gifts`, `board`, `tab` (read them anywhere; change them only via `setUsers()`, `setTab()`, …) and `ui.render()`. Also the study-time maths for one user: `elapsed`, `runStart`, `goalOf` (default 4 h), `limitOf` (3 h), `focusOf`/`restOf` (pomodoro 25/5), `liveToday`, `totalOf`; and the couple level: `LV_H` (hours per level), `LV_T` (level names), `couple()`, `coupleCard()`. |
 | **js/util.js** | Helpers with no dependencies: `$`, `app`, `modal`, `esc` (HTML-escape), `EMOJI` (avatar choices), `DAY`, `ls` (safe localStorage), `key` (date → `YYYY-MM-DD`), `fmt` (`1h 5m`), `clock` (`00:05:00`), `split` (cuts a session at midnight), `stats` (today / week / total / streak), `toast`, `errMsg` (friendly error texts), `foldSet` + `sec` (collapsible sections), `burst` (confetti), `notify` (browser notification). |
 | **js/watch.js** | The loop that runs every second while the app is open (plus a full redraw every 30 s): updates the running clocks; pomodoro auto-break and "break's over"; "still studying?" prompt; daily-goal confetti; streak records; badge check; stops sound when the timer stops; checks new garden friends, pet evolution, new seeds, forest growth, couple level-up; keeps the garden in sync. **Anything that should happen on its own, without a click, lives here.** |
-| **js/theme.js** | `THEMES` (name → icon + colour), the lists shown in the profile sheet (`CUTE`, `DARK`, `SEASON`, `GLASS`), `applyTheme`, `setTheme`, and the reduce-motion switch (`calm`, `toggleCalm`). Also the **extra look** (profile sheet → customize theme): `LOOK` (corners / shadows choices), `HUES` (background tints), `ACCENTS` (accent colours), `look` (the saved choice), `setLook` (also handles `"random"` and `"reset"`), `applyLook` (sets `data-round` / `data-shadow` and colour variables on `<html>`, called by `applyTheme`), and the button builders `lookBtns`, `dotBtns`, `isLook`. |
+| **js/theme.js** | `THEMES` (name → icon + colour), the lists shown in the profile sheet (`CUTE`, `DARK`, `SEASON`, `GLASS`), `applyTheme`, `setTheme`, and the reduce-motion switch (`calm`, `toggleCalm`). Also the **extra look** (profile sheet → customize theme): `LOOK` (corners / shadows choices), `HUES` (background tints), `ACCENTS` (accent colours), `look` (the saved choice), `setLook` (also handles `"random"` and `"reset"`), `applyLook` (sets `data-round` / `data-shadow` and colour variables on `<html>`, called by `applyTheme`), and the button builders `lookBtns`, `dotBtns`, `isLook`. `applyTheme` also sets `<html data-dark>` (from `isDark`) so the CSS can swap shadow colours. |
 | **js/sound.js** | Background sounds (rain / cafe / ocean) generated with the Web Audio API (no audio files): `playSound`, `stopSound`, `cycleSound`, `soundLabel`. |
 
 ### Tabs and screens
 
 | File | What's in it |
 |---|---|
-| **js/home.js** | Login/sign-up screen (`authView`), the "install app" button, and the **together tab**: your timer hero (study / pause / stop, pomodoro chip, sound chip), your card + friend cards (`card`), and the compact "short" square tiles. Owns the `compact` and `pomo` switches. |
-| **js/stats-view.js** | The **my stats tab**: 7-day bars, tiles, calendar heat-map (`calView`), **badges** (`BADGES` list with unlock rules, `badgeCtx`, `badgeView`, `checkBadges`), and the session list with add / edit / delete buttons. |
+| **js/home.js** | Login / sign-up screen (`authView`: logo tile + `.authcard` form), the "install app" button, and the **together tab**: `heroView` (the timer: the study button sits inside the daily-goal ring `.dial`; while studying the clock sits inside the ring and pause / stop are two wide buttons; pomodoro + sound chips), then the people list: your `card` and your friends' cards, or `tile` squares when the **cards / tiles switch** (`.vt`, next to the "together" heading) is on, then the couple level and the card inbox. Owns the `compact` and `pomo` switches. |
+| **js/stats-view.js** | The **my stats tab**: the **week card** (this week's total, 7-day bars where today is solid and days that reached your goal are green, and a today / streak / all-time row), calendar heat-map (`calView`), **badges** (`BADGES` list with unlock rules, `badgeCtx`, `badgeView`, `checkBadges`), and the session list with add / edit / delete buttons. |
 | **js/board.js** | The **board tab** (shared to-do): three lanes of sticky notes, drag & drop (mouse, or press-and-hold on touch), the colour/sticker palette, the edit sheet, the 6 board looks (`STYLES`: cutie, western, cork, chalk, notebook, own), `COLORS` (16), `STICKERS`, and `boardSnap` for the photocard. Notes live in Firestore `board/{id}`. |
 | **js/forest.js** | The **forest tab**: 6×6 isometric grid where you plant trees with seeds. `SPECIES` (price, colours, hours of study needed per growth stage, drawing shapes), the isometric drawing, `forestMain` (screen), `forestAct` (plant / remove), `forestGrow` (toasts when a tree grows), `forestOf`/`forestCost`/`forestSnap`, and `treeParts`/`cellPos` (also used by `card.js`). Saved in `users/{uid}.forest`. |
 
@@ -114,7 +114,10 @@ Attach this guide + the files in the **Change** column. "Maybe" files are only n
 | Change fonts | `index.html` (font link), `css/style.css` (`--hf` etc.) | |
 | Restyle cards, buttons, nav, sheets | `css/style.css` | the view file that makes the HTML (`home.js`, `stats-view.js`, `sheets.js`…) |
 | Change the app title / logo on the login screen | `home.js` (`authView`) | `index.html` (`<title>`), `manifest.webmanifest` |
-| Change the tab bar (rename, reorder, add a tab) | `app.js` (`render` nav + tab switch) | the new tab's view file, `css/style.css` |
+| Change the tab bar (rename, reorder, add a tab) | `app.js` (`NAV` list + `TITLES`, and the tab switch in `render`) | the new tab's view file, `css/style.css` |
+| Change the timer area (study button, goal ring, pause / stop buttons) | `home.js` (`heroView`), `css/style.css` ("timer hero" block) | `app.js` (study / pause / stop actions) |
+| Change the page header (greeting, big title, avatar button) | `app.js` (`hello`, `TITLES`, `render`), `css/style.css` ("header + page") | |
+| Change the design tokens (corner size, shadows, hairlines) | `css/style.css` (`:root` block at the top; `html[data-round]` / `html[data-shadow]`) | `theme.js` (`LOOK` choices) |
 
 ### Studying, timer, stats
 | I want to… | Change | Maybe |
@@ -244,10 +247,43 @@ On this device only (localStorage): theme, photocard look (`cardLook`: style, ac
 
 15. **Cursors**: the last block of `css/style.css` gives every theme four custom properties, all small inline-SVG dots in the theme's colours: `--cur` (normal: 16×16 dot, `--main`, hotspot 8 8), `--cur-p` (clickable things: 22×22 dot with a shine, `--main-d`), `--cur-g` (garden / notes, ready to drag: 26×26 ring with a centre dot) and `--cur-gg` (while panning / dragging: 26×26 filled dot). They are `url("data:image/svg+xml,…")` cursors (browsers ignore anything over 32×32); the hotspot is the centre, and `#` in a colour must be written `%23`. To make them bigger or smaller, change the `width` / `height` / `viewBox` numbers and the two hotspot numbers after each `url(...)` in every theme line (find and replace works well). A cursor image **cannot read CSS variables**, so the colours are written out per theme: **a new theme needs its own four-variable set** (copy a neighbour and swap in the new theme's `--main`, `--main-l`, `--main-d`), otherwise it falls back to the default theme's pink. Rules: `html` uses `--cur`; links, buttons, `[data-act]`, garden pets / visitors, forest cells and fold headers use `--cur-p`; `#garden`, `.note` and editable decor use `--cur-g`, and `#garden.panning` / `.note.ghost` use `--cur-gg`; text inputs keep `text`; touch devices (`@media (hover:none)`) get the normal cursor. The customize-theme accent (set inline on `<html>` by `theme.js` `applyLook`) does **not** recolour the cursor, because that would need JS to rebuild the SVGs and set the four variables on `<html>` from the computed `--main` / `--main-d` (do it in `applyLook`, and re-run it on theme change).
 
+
+16. **UI v2 design rules** (keep to these when you add or change UI):
+    - **Tokens, not hard-coded values**: corners `--r` (big) / `--r2` (inner), shadows `--sh` / `--sh-s` / `--sh-on` (built from `--shc`, which `html[data-dark="1"]` turns black), hairlines `--hair`, borders `1px solid var(--edge)`. No hard "3D" drop shadows any more.
+    - **Buttons**: one main action per area. Main = `.btn` (big) or `.chip.pri` (small); secondary = `.btn.ghost` or `.chip`.
+    - **`render()` rebuilds the whole page** (on every Firestore update and every 30 s), so **never add entrance animations to re-rendered elements** (they would replay). Looping animations are limited to tiny `transform` / `opacity` effects (the `.dial.idle::after` halo) and must be added to the reduce-motion block (`[data-motion=off]`).
+    - **Page title = tab name**: `TITLES` is built from `NAV` in `app.js`, so renaming a tab renames its page title too.
+    - **`.study` is also a class on the garden speech bubble** (`.gbub.study`). A small rule right after `.study:active` keeps the big button look off the bubble: check both when you touch either.
+    - **Dark themes** must be listed in `isDark` (`theme.js`) **and** in the regex in `index.html`; both set `data-dark`.
 ---
 
 ## 5. Message template for the AI
 
 > I'm working on MN Study Tracker (plain-JS PWA + Firebase). I've attached `GUIDE.md` and these files: **[list]**.
 > **Task:** [what you want].
-> Please change only what's needed, keep the style of the existing code, tell me if you need another file, and list exactly which files you changed.
+> Please change only what's needed, keep the style of the existing code, tell me if you need another file, list exactly which files you changed, and return an updated GUIDE.md.
+
+
+---
+
+## 6. UI overhaul log (UI v2)
+
+Goal: a calmer, simpler, still lively look: soft shadows, hairline borders, one main action per area, no clutter. Done in stages; each stage is complete and testable on its own.
+
+| Stage | Files | Status |
+|---|---|---|
+| 1. Design foundation | `css/style.css`, `index.html`, `theme.js` | done |
+| 2. Main flow (together tab, my stats tab, header, tab bar, login) | `app.js`, `home.js`, `stats-view.js` | done |
+| 3. Pop-ups (settings, time wheel, cheers, inbox, celebrations) | `sheets.js`, `social.js`, `milestones.js` | todo (already picks up the new sheets, buttons, chips and inputs from the shared CSS) |
+| 4. Other tabs (board, forest, garden, shop, garden style) | `board.js`, `forest.js`, `garden.js`, `decor.js`, `land.js` | todo (shared tokens already apply) |
+
+**Stage 1-2 changes**
+- New tokens: soft layered shadows, `--hair`, `--r2`, `data-dark`; the old hard shadows are gone. Cards, sheets, nav and inputs use 1px borders.
+- Header now shows a greeting + the tab name as the big title (no more bow icon). The small "short" switch left the header: it is now a **cards / tiles switch** next to the "together" heading.
+- Bottom bar is data-driven (`NAV`), with an active pill and icon lift.
+- Together tab: the study button sits inside a ring that fills with today's goal; no more bobbing or sparkles (a soft halo instead). Running state shows the clock inside the ring with wide pause / stop buttons. One "together" list instead of separate "you" / "friends" headings; the couple level moved below the people.
+- My stats tab: one week card (total, bars, today / streak / all time). Today's bar uses the live time. Goal-hit days are green. Session rows show date, start time and duration. `+ add time` is a primary chip.
+- Login: logo tile, one form card, Enter key logs in.
+- Removed: `.tiles` (replaced by `.trio`), hero sparkles, the duplicated glass-theme block, the `♡` before every heading. Kept: `.mtog` (settings sheets may use it), all `data-act` names and every theme variable, so the other tabs keep working.
+
+**Remember after deploying**: bump `C` in `sw.js` so installed phones drop the old cache (no new files were added, so list `A` stays the same).

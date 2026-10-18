@@ -1,4 +1,4 @@
-// Colour themes (THEMES, applyTheme) and the reduce-motion switch.
+// Colour themes (THEMES, applyTheme; also sets <html data-theme / data-dark>) and the reduce-motion switch.
 import { ls } from "./util.js";
 
 const THEMES = { strawberry: ["🍓", "#ffd6e7"], matcha: ["🍵", "#e0f4d6"], sky: ["☁️", "#d6ecff"], lilac: ["🔮", "#e9dcff"], sunny: ["🍑", "#ffe7bf"], sakura: ["🌸", "#ffeaf1"], mochi: ["🍡", "#f6ecdf"], ocean: ["🐬", "#d4f3f2"], night: ["🌙", "#1e1830"], cocoa: ["🍫", "#2a1f1c"],
@@ -44,6 +44,7 @@ function applyTheme(t) {
   try { localStorage.setItem("theme", t); } catch {}
   const real = t === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "strawberry") : (THEMES[t] ? t : "strawberry");
   document.documentElement.dataset.theme = real;
+  document.documentElement.dataset.dark = isDark(real) ? "1" : "0"; // CSS uses this to turn shadows black on dark themes
   document.querySelector('meta[name="theme-color"]').content = THEMES[real][1];
   applyLook(real);
 }

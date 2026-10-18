@@ -4,14 +4,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MN Study Tracker</title>
 <meta name="theme-color" content="#ffd6e7">
-<script>try{var t=localStorage.getItem("theme")||"strawberry";if(t=="auto")t=matchMedia("(prefers-color-scheme: dark)").matches?"night":"strawberry";document.documentElement.dataset.theme=t;if(localStorage.getItem("motion")=="off")document.documentElement.dataset.motion="off";var d=document.documentElement,l=JSON.parse(localStorage.getItem("look")||"{}");d.dataset.round=l.round||"theme";d.dataset.shadow=l.shadow||"theme";d.style.cssText=localStorage.getItem("lookCss")||""}catch(e){}</script>
+<script>try{var t=localStorage.getItem("theme")||"strawberry";if(t=="auto")t=matchMedia("(prefers-color-scheme: dark)").matches?"night":"strawberry";document.documentElement.dataset.theme=t;document.documentElement.dataset.dark=/^(night|cocoa|berry|forest|deepsea|ink|glass-galaxy)$|-night$/.test(t)?"1":"0";if(localStorage.getItem("motion")=="off")document.documentElement.dataset.motion="off";var d=document.documentElement,l=JSON.parse(localStorage.getItem("look")||"{}");d.dataset.round=l.round||"theme";d.dataset.shadow=l.shadow||"theme";d.style.cssText=localStorage.getItem("lookCss")||""}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MN Study">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&family=Rye&family=Special+Elite&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Baloo+2:wght@600;800&family=Nunito:wght@600;700;800&family=Rye&family=Special+Elite&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head><body>
 <div id="app"></div><div id="modal"></div><div id="toast"></div>

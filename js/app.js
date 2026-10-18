@@ -8,7 +8,7 @@ import { clearGarden, findPet, gardenMain, gardenSheet, gardenTap, mountGarden, 
 import { collectVisitor, cycleWx, queueVisit, resetVisits } from "./garden-fx.js";
 import { G, isEvening } from "./garden-state.js";
 import { landSheet } from "./land.js";
-import { authView, compact, homeView, pomo, runInstall, setCompact, setInstallEvt, togglePomo } from "./home.js";
+import { authView, homeView, pomo, runInstall, setCompact, setInstallEvt, togglePomo } from "./home.js";
 import { cardSheet } from "./photocard.js";
 import { profileSheet, sheet } from "./sheets.js";
 import { cheerCard, giftKnown, giftSheet, onGifts, short, stickerSheet } from "./social.js";
@@ -22,6 +22,9 @@ let unsubs = [], lastCheer = 0;
 ui.render = render; // let the other files ask for a redraw
 
 // ---------- the page ----------
+const NAV = [["home", "🏠", "together"], ["stats", "📊", "my stats"], ["garden", "🌳", "garden"], ["forest", "🌲", "forest"], ["board", "📝", "board"]]; // bottom tab bar: [tab id, icon, label]
+const TITLES = Object.fromEntries(NAV.map(([id, , name]) => [id, name])); // big page title = tab name
+const hello = () => { const h = new Date().getHours(); return h < 5 ? "still up" : h < 12 ? "good morning" : h < 18 ? "good afternoon" : "good evening"; };
 function render() {
   if (!me) return authView();
   const mine = users.find(u => u.id === me.uid);
@@ -33,9 +36,9 @@ function render() {
     syncGarden(); return;
   }
   const kept = tab === "board" ? boardKeep() : null;
-  app.innerHTML = `<header><h1>MN study tracker</h1><div class="hr">${tab === "home" ? `<button class="mtog ${compact ? "on" : ""}" data-act="compact" data-id="${compact ? 0 : 1}" role="switch" aria-checked="${compact}" title="shorter home tab"><em>short</em><i></i></button>` : ""}<button class="av" data-act="profile">${esc(mine.emoji)}</button></div></header>
+  app.innerHTML = `<header><div class="ht"><small>${hello()}, ${esc(mine.name)}</small><h1>${TITLES[tab] || "together"}</h1></div><div class="hr"><button class="av" data-act="profile" aria-label="profile and settings">${esc(mine.emoji)}</button></div></header>
   <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "board" ? boardMain(board) : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine), isEvening() || /night|cocoa|berry|forest|deepsea|ink|galaxy/.test(document.documentElement.dataset.theme || "")) : statsView(mine)}</main>
-  <nav><button class="${tab === "home" ? "act" : ""}" data-act="tab" data-id="home">🏠<span>together</span></button><button class="${tab === "stats" ? "act" : ""}" data-act="tab" data-id="stats">📊<span>my stats</span></button><button class="${tab === "garden" ? "act" : ""}" data-act="tab" data-id="garden">🌳<span>garden</span></button><button class="${tab === "forest" ? "act" : ""}" data-act="tab" data-id="forest">🌲<span>forest</span></button><button class="${tab === "board" ? "act" : ""}" data-act="tab" data-id="board">📝<span>board</span></button></nav>`;
+  <nav>${NAV.map(([id, ic, name]) => `<button class="${tab === id ? "act" : ""}" data-act="tab" data-id="${id}" aria-label="${name}"><i>${ic}</i><span>${name}</span></button>`).join("")}</nav>`;
   if (tab === "garden") mountGarden();
   if (kept) boardRestore(kept);
   tick();
@@ -51,6 +54,7 @@ initBoard(app, {
   move: (id, lane, o, laneChanged) => { DB.moveNote(id, lane, o).catch(e => toast(errMsg(e))); if (laneChanged && lane === 2) { burst(["🎉", "✨"], 20); toast("Done! 🎉"); } },
   tap: id => { const n = board.find(x => x.id === id); if (n) boardSheet(n, { modal, toast, err: errMsg, save: (t, c, ic) => DB.editNote(id, t, c, ic), del: () => DB.deleteNote(id) }); }
 });
+app.addEventListener("keydown", e => { if (e.key === "Enter" && ["u", "p", "c"].includes(e.target.id)) { e.preventDefault(); const go = app.querySelector('[data-act="login"]'); if (go) go.click(); } });
 app.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "bnew") { e.preventDefault(); addBoardNote(users.find(u => u.id === (me && me.uid))); } });
 
 

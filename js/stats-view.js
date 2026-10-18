@@ -1,4 +1,4 @@
-// 'My stats' tab: 7-day bars, calendar, badges (BADGES + checkBadges), session list.
+// 'My stats' tab: week card (7-day bars + today / streak / total), calendar, badges (BADGES + checkBadges), session list.
 import * as DB from "./db.js";
 import { goalOf, liveToday, me, sessions } from "./state.js";
 import { DAY, burst, fmt, key, sec, stats, toast } from "./util.js";
@@ -52,14 +52,16 @@ function checkBadges(m) { // called every second from watch.js: unlock newly ear
   });
 }
 function statsView(mine) {
-  const s = stats(mine), d = mine.daily || {}, now = Date.now();
-  const days = [...Array(7)].map((_, i) => { const t = now - (6 - i) * DAY; return { l: new Date(t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2), v: d[key(t)] || 0 }; });
+  const s = stats(mine), d = mine.daily || {}, now = Date.now(), g = goalOf(mine);
+  const days = [...Array(7)].map((_, i) => { const t = now - (6 - i) * DAY; return { l: new Date(t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2), v: i === 6 ? liveToday(mine) : d[key(t)] || 0 }; });
   const max = Math.max(...days.map(x => x.v), 1);
-  return `<h2>last 7 days <button class="chip" data-act="card">📸 photocard</button><button class="chip" data-act="card" data-id="recap">🗓️ recap</button></h2><div class="bars">${days.map(x => `<div class="bar"><i style="height:${Math.max(4, x.v / max * 100)}%"></i><em>${x.v ? fmt(x.v) : ""}</em><span>${x.l}</span></div>`).join("")}</div>
-  <div class="tiles"><div><b>${fmt(s.today)}</b>today</div><div><b>${fmt(s.week)}</b>this week</div><div><b>${s.streak}🔥</b>day streak</div><div><b>${fmt(s.total)}</b>all time</div></div>
-  ${calView(mine)}${badgeView(mine)}${sec("sess", "sessions", `<button class="chip" data-act="add">+ add time</button>`,
-  sessions.map(x => `<div class="sess"><div><b>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</b>
-  <span>${fmt(x.seconds)}</span></div><button class="ic" data-act="edit" data-id="${x.id}">✏️</button><button class="ic" data-act="del" data-id="${x.id}">🗑️</button></div>`).join("") || `<p class="hint">No sessions yet — press study to begin!</p>`)}`;
+  const bars = days.map((x, i) => `<div class="bar ${i === 6 ? "now" : ""}"><i class="${g && x.v >= g ? "hit" : ""}" style="height:${Math.max(4, x.v / max * 100)}%"></i><em>${x.v ? fmt(x.v) : ""}</em><span>${x.l}</span></div>`).join("");
+  const rows = sessions.map(x => { const t = new Date(x.start.toMillis()); return `<div class="sess"><div><b>${t.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</b>
+  <span>${t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</span></div><b class="sv">${fmt(x.seconds)}</b><button class="ic" data-act="edit" data-id="${x.id}" aria-label="shorten session">✏️</button><button class="ic" data-act="del" data-id="${x.id}" aria-label="delete session">🗑️</button></div>`; }).join("");
+  return `<section class="wk"><div class="wkh"><div><small>this week</small><b>${fmt(s.week)}</b></div><div class="wkc"><button class="chip" data-act="card">📸 photocard</button><button class="chip" data-act="card" data-id="recap">🗓️ recap</button></div></div>
+  <div class="bars">${bars}</div>${g ? `<p class="hint">green days reached your ${fmt(g)} goal</p>` : ""}
+  <div class="trio"><div><b>${fmt(s.today)}</b>today</div><div><b>${s.streak}🔥</b>day streak</div><div><b>${fmt(s.total)}</b>all time</div></div></section>
+  ${calView(mine)}${badgeView(mine)}${sec("sess", "sessions", `<button class="chip pri" data-act="add">+ add time</button>`, rows || `<p class="hint">No sessions yet — press study to begin!</p>`)}`;
 }
 
 export { checkBadges, shiftMonth, statsView };
