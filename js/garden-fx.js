@@ -10,13 +10,14 @@ import { burst, errMsg, ls, toast } from "./util.js";
 let visits = [];
 const resetVisits = () => { visits = []; };
 // ---- weather: pure CSS + a few particles, picked at random ----
+const LITE = matchMedia("(pointer:coarse)").matches; // phones / tablets: fewer weather particles and chunks (each one is a separate animation)
 const CW = 980, CH = 680; // weather is made in 980x680 chunks that sit IN the world (so it pans and zooms with the garden); only chunks near the window exist
 function wxHtml(w) { // the particles of ONE chunk
   const f = (n, fn) => [...Array(n)].map((_, i) => fn(i)).join(""), L = (a = 0, b = 100) => rnd(a, b).toFixed(1), D = () => (-rnd(0, 10)).toFixed(2);
   let h = "";
-  if (w === "snow") h = f(90, () => { const z = rnd(3, 7).toFixed(1); return `<i style="left:${L()}%;width:${z}px;height:${z}px;--dx:${rnd(-30, 30).toFixed(0)}px;animation-delay:${(-rnd(0, 16)).toFixed(2)}s;animation-duration:${rnd(10, 18).toFixed(1)}s"></i>`; });
-  else if (w === "rain") h = f(130, () => `<i style="left:${L(-18)}%;height:${rnd(12, 20).toFixed(0)}px;animation-delay:${D()}s;animation-duration:${rnd(.9, 1.5).toFixed(2)}s"></i>`);
-  else if (w === "petals" || w === "leaves") { const E = w === "petals" ? ["🌸", "🌸", "💮", "🌷"] : ["🍂", "🍁", "🍂"]; h = f(50, i => `<i style="left:${L()}%;font-size:${rnd(11, 18).toFixed(0)}px;--dx:${rnd(-70, 70).toFixed(0)}px;--r:${rnd(-540, 540).toFixed(0)}deg;animation-delay:${(-rnd(0, 22)).toFixed(2)}s;animation-duration:${rnd(12, 22).toFixed(1)}s">${E[i % E.length]}</i>`); }
+  if (w === "snow") h = f(LITE ? 36 : 90, () => { const z = rnd(3, 7).toFixed(1); return `<i style="left:${L()}%;width:${z}px;height:${z}px;--dx:${rnd(-30, 30).toFixed(0)}px;animation-delay:${(-rnd(0, 16)).toFixed(2)}s;animation-duration:${rnd(10, 18).toFixed(1)}s"></i>`; });
+  else if (w === "rain") h = f(LITE ? 50 : 130, () => `<i style="left:${L(-18)}%;height:${rnd(12, 20).toFixed(0)}px;animation-delay:${D()}s;animation-duration:${rnd(.9, 1.5).toFixed(2)}s"></i>`);
+  else if (w === "petals" || w === "leaves") { const E = w === "petals" ? ["🌸", "🌸", "💮", "🌷"] : ["🍂", "🍁", "🍂"]; h = f(LITE ? 20 : 50, i => `<i style="left:${L()}%;font-size:${rnd(11, 18).toFixed(0)}px;--dx:${rnd(-70, 70).toFixed(0)}px;--r:${rnd(-540, 540).toFixed(0)}deg;animation-delay:${(-rnd(0, 22)).toFixed(2)}s;animation-duration:${rnd(12, 22).toFixed(1)}s">${E[i % E.length]}</i>`); }
   return h;
 }
 function wxView(force) { // called every frame from camStep: make the chunks around the window, drop the far ones
@@ -24,8 +25,8 @@ function wxView(force) { // called every frame from camStep: make the chunks aro
   const c = G.cam, x0 = Math.max(0, Math.floor(c.x / CW)), x1 = Math.min(Math.ceil(G.W / CW) - 1, Math.floor((c.x + G.vw / G.z) / CW)), y0 = Math.max(0, Math.floor(c.y / CH)), y1 = Math.min(Math.ceil(G.H / CH) - 1, Math.floor((c.y + G.vh / G.z) / CH));
   const sig = `${x0},${x1},${y0},${y1},${G.wx}`; if (!force && sig === G.wxR) return; G.wxR = sig;
   let want = []; for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) want.push([i, j]);
-  const mx = c.x + G.vw / G.z / 2, my = c.y + G.vh / G.z / 2; // zoomed far out: only the 4 chunks nearest the middle of the window
-  if (want.length > 4) want = want.sort((a, b) => Math.hypot((a[0] + .5) * CW - mx, (a[1] + .5) * CH - my) - Math.hypot((b[0] + .5) * CW - mx, (b[1] + .5) * CH - my)).slice(0, 4);
+  const mx = c.x + G.vw / G.z / 2, my = c.y + G.vh / G.z / 2; // zoomed far out: only the few chunks nearest the middle of the window
+  const CAP = LITE ? 2 : 4; if (want.length > CAP) want = want.sort((a, b) => Math.hypot((a[0] + .5) * CW - mx, (a[1] + .5) * CH - my) - Math.hypot((b[0] + .5) * CW - mx, (b[1] + .5) * CH - my)).slice(0, CAP);
   const keep = new Set(want.map(([i, j]) => i + "," + j));
   G.wxC.forEach((el, k) => { if (!keep.has(k)) { el.remove(); G.wxC.delete(k); } });
   want.forEach(([i, j]) => { const k = i + "," + j; if (G.wxC.has(k)) return; const el = document.createElement("div"); el.className = "gwc"; el.style.cssText = `left:${i * CW}px;top:${j * CH}px;width:${CW}px;height:${CH}px;--gh:${CH}px`; el.innerHTML = wxHtml(G.wx); G.wxEl.appendChild(el); G.wxC.set(k, el); });

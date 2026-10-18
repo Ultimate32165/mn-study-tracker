@@ -14,12 +14,14 @@ function split(start, sec) { // split a session across midnight into per-day sec
   while (t < end) { const n = new Date(t); n.setHours(24, 0, 0, 0); const e = Math.min(n.getTime(), end), k = key(t); days[k] = (days[k] || 0) + Math.round((e - t) / 1000); t = e; }
   return days;
 }
+const NO_DAYS = {}, statsMemo = new WeakMap(); // stats() is called many times a second: remember the answer per daily-totals object and day
 function stats(u) {
-  const d = u.daily || {}, now = Date.now(); let total = 0, week = 0, streak = 0;
+  const d = u.daily || NO_DAYS, now = Date.now(), today = key(now), c = statsMemo.get(d); if (c && c.k === today) return c.v;
+  let total = 0, week = 0, streak = 0;
   for (const k in d) total += d[k];
   for (let i = 0; i < 7; i++) week += d[key(now - i * DAY)] || 0;
-  let i = d[key(now)] > 0 ? 0 : 1; while (d[key(now - i * DAY)] > 0) { streak++; i++; }
-  return { today: d[key(now)] || 0, week, total, streak };
+  let i = d[today] > 0 ? 0 : 1; while (d[key(now - i * DAY)] > 0) { streak++; i++; }
+  const v = { today: d[today] || 0, week, total, streak }; statsMemo.set(d, { k: today, v }); return v;
 }
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.className = "show"; clearTimeout(toast.t); toast.t = setTimeout(() => t.className = "", 2600); }
 const errMsg = e => ({ "auth/email-already-in-use": "That username is taken.", "auth/invalid-credential": "Wrong username or password.", "auth/weak-password": "Password needs at least 6 characters.", "auth/network-request-failed": "No internet connection.", "permission-denied": "Not allowed. Did you publish the new firestore.rules?" }[e.code] || e.message);

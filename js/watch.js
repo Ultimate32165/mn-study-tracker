@@ -38,7 +38,7 @@ function watch() { // runs every second for the logged-in user
   const cl = couple().lv, seen = ls("lvl");
   if (seen == null) ls("lvl", cl); else if (cl > +seen) { ls("lvl", cl); burst(); const ms = { type: "level", lv: cl, at: Date.now() }; saveMs(ms); setTimeout(() => milestonePop(ms), 1800); }
 }
-setInterval(() => { tick(); watch(); if (G.el && G.el.isConnected) syncGarden(); }, 1000);
+setInterval(() => { watch(); if (document.hidden) return; tick(); if (G.el && G.el.isConnected) syncGarden(); }, 1000); // watch() keeps running in the background (break / still-studying alerts); drawing waits until the app is visible
 setInterval(() => me && ui.render(), 30000);
 
 export { tick };

@@ -18,17 +18,17 @@ import { shiftMonth, statsView } from "./stats-view.js";
 import { $, EMOJI, app, burst, errMsg, esc, fmt, foldSet, key, ls, modal, notify, split, toast } from "./util.js";
 import { tick } from "./watch.js";
 
-let unsubs = [], lastCheer = 0;
-ui.render = render; // let the other files ask for a redraw
+let unsubs = [], lastCheer = 0, lastHtml = "";
+
 
 // ---------- the page ----------
 const NAV = [["home", "🏠", "together"], ["stats", "📊", "my stats"], ["garden", "🌳", "garden"], ["forest", "🌲", "forest"], ["board", "📝", "board"]]; // bottom tab bar: [tab id, icon, label]
 const TITLES = Object.fromEntries(NAV.map(([id, , name]) => [id, name])); // big page title = tab name
 const hello = () => { const h = new Date().getHours(); return h < 5 ? "still up" : h < 12 ? "good morning" : h < 18 ? "good afternoon" : "good evening"; };
 function render() {
-  if (!me) return authView();
+  if (!me) { lastHtml = ""; return authView(); }
   const mine = users.find(u => u.id === me.uid);
-  if (!mine) return app.innerHTML = `<div class="auth"><div class="logo">📚</div><p class="hint">loading…</p></div>`;
+  if (!mine) { lastHtml = ""; return app.innerHTML = `<div class="auth"><div class="logo">📚</div><p class="hint">loading…</p></div>`; }
   if (boardBusy()) return; // a box is in your hand: don't redraw under your finger
   if (tab === "garden" && G.el && G.el.isConnected) { // garden is showing: leave the live scene alone, refresh only what sits around it
     const av = app.querySelector("header .av"); if (av && av.textContent !== mine.emoji) av.textContent = mine.emoji;
@@ -36,13 +36,27 @@ function render() {
     syncGarden(); return;
   }
   const kept = tab === "board" ? boardKeep() : null;
-  app.innerHTML = `<header><div class="ht"><small>${hello()}, ${esc(mine.name)}</small><h1>${TITLES[tab] || "together"}</h1></div><div class="hr"><button class="av" data-act="profile" aria-label="profile and settings">${esc(mine.emoji)}</button></div></header>
+  const html = `<header><div class="ht"><small>${hello()}, ${esc(mine.name)}</small><h1>${TITLES[tab] || "together"}</h1></div><div class="hr"><button class="av" data-act="profile" aria-label="profile and settings">${esc(mine.emoji)}</button></div></header>
   <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "board" ? boardMain(board) : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine), isEvening() || /night|cocoa|berry|forest|deepsea|ink|galaxy/.test(document.documentElement.dataset.theme || "")) : statsView(mine)}</main>
   <nav>${NAV.map(([id, ic, name]) => `<button class="${tab === id ? "act" : ""}" data-act="tab" data-id="${id}" aria-label="${name}"><i>${ic}</i><span>${name}</span></button>`).join("")}</nav>`;
-  if (tab === "garden") mountGarden();
-  if (kept) boardRestore(kept);
+  if (html !== lastHtml) { // only touch the page when something you can see changed (keeps scrolling smooth, doesn't restart animations or re-decode images)
+    lastHtml = html; app.innerHTML = html;
+    if (tab === "garden") mountGarden();
+    if (kept) boardRestore(kept);
+  }
   tick();
 }
+// Redraws that come from Firestore / timers wait until you stop touching or scrolling, and several in a row become one.
+let touching = 0, lastScroll = 0, softT = 0, softRaf = 0;
+addEventListener("scroll", () => { lastScroll = Date.now(); }, { passive: true, capture: true });
+addEventListener("touchstart", () => { touching = Date.now(); }, { passive: true });
+addEventListener("touchend", () => { touching = 0; }, { passive: true }); addEventListener("touchcancel", () => { touching = 0; }, { passive: true });
+function softRender() {
+  clearTimeout(softT);
+  if ((touching && Date.now() - touching < 4000) || Date.now() - lastScroll < 250) { softT = setTimeout(softRender, 250); return; }
+  if (!softRaf) softRaf = requestAnimationFrame(() => { softRaf = 0; render(); });
+}
+ui.render = softRender; // let the other files ask for a redraw (button handlers below call render() directly, so they stay instant)
 
 // ---- shared to-do board (js/board.js) ----
 async function addBoardNote(mine) {
@@ -125,7 +139,7 @@ app.onclick = async e => {
 // ---------- boot ----------
 DB.watchAuth(u => {
   unsubs.forEach(f => f()); unsubs = []; resetData(u); giftKnown.clear(); clearGarden(); resetSeedBase(); resetVisits();
-  if (u) unsubs = [DB.watchUsers(x => { setUsers(x); render(); }), DB.watchBoard(x => { setBoard(x); render(); }), DB.watchSessions(u.uid, x => { setSessions(x); render(); }),
+  if (u) unsubs = [DB.watchUsers(x => { setUsers(x); softRender(); }), DB.watchBoard(x => { setBoard(x); softRender(); }), DB.watchSessions(u.uid, x => { setSessions(x); softRender(); }),
     DB.watchCheers(u.uid, list => {
       cheerCard(list); list.forEach(c => queueVisit(c.from)); burst(list.map(c => short(c.emoji) ? c.emoji : "💌"), 24);
       notify(`${list[0].name || "Your friend"} sent you a cheer!`, list.map(c => c.emoji).join("  "));
