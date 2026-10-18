@@ -54,7 +54,7 @@ function cardData(shape, sid) {
     const tod = liveToday(m), cnt = sessions.filter(x => key(x.start.toMillis()) === key(now)).length;
     ses = { label: "Today's studying", time: fmt(tod), sub: cnt ? `${cnt} session${cnt > 1 ? "s" : ""} so far` : "every minute counts ✨", pct: goal ? tod / goal : null, goalText: `of ${gfmt(goal)} goal` };
   }
-  const week = [...Array(7)].map((_, i) => { const t = now - (6 - i) * DAY, v = d[key(t)] || 0; return { l: new Date(t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2), v, t: v ? fmt(v) : "", today: i === 6 }; });
+  const week = [...Array(7)].map((_, i) => { const t = now - (6 - i) * DAY, v = i === 6 ? liveToday(m) : d[key(t)] || 0; return { l: new Date(t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2), v, t: v ? fmt(v) : "", today: i === 6, hit: goal > 0 && v >= goal }; }); // today uses the live time; hit = reached the daily goal (drawn green)
   return { shape, name: m.name || "you", avatar: m.emoji || "📚", pet: ALLP[petOf(m)].e[stageOf(totalOf(m))], date, session: ses, todayLabel: "today", todayText: fmt(liveToday(m)),
     streakText: `${s.streak} day${s.streak === 1 ? "" : "s"} 🔥`, week, weekTotal: fmt(week.reduce((a, k) => a + k.v, 0)), garden: gardenSnap() };
 }
@@ -90,7 +90,7 @@ async function cardDataRecap(shape, period) {
       { l: "longest session", v: long ? fmt(long.seconds) : "–", s: long ? dayShort(long.start.toMillis()) + (isManual(long) ? "" : " · " + hhmm(long.start.toMillis())) : "" },
       { l: "busiest time", v: bw ? `${hourLbl(bh)}–${hourLbl(bh + 2)}` : "–", s: bw ? part : "track a session ⏱️" },
       { l: "daily average", v: fmt(total / n), s: `${studied} of ${n} days studied` }],
-    bars: days.map((x, i) => ({ v: x.v, today: i === n - 1, t: n <= 7 && x.v ? fmt(x.v) : "", l: n <= 7 ? new Date(x.t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2) : i % 5 === 0 || i === n - 1 ? String(new Date(x.t).getDate()) : "" })), garden: gardenSnap() };
+    bars: days.map((x, i) => ({ v: x.v, hit: goalOf(m) > 0 && x.v >= goalOf(m), today: i === n - 1, t: n <= 7 && x.v ? fmt(x.v) : "", l: n <= 7 ? new Date(x.t).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2) : i % 5 === 0 || i === n - 1 ? String(new Date(x.t).getDate()) : "" })), garden: gardenSnap() };
 }
 // ---- milestone card: ms = { type: "evolve" | "streak" | "level", ... } saved when it happened ----
 function cardDataMilestone(shape, ms) {

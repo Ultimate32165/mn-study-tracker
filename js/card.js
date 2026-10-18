@@ -298,7 +298,7 @@ function drawWorld(ctx, x, y, w, h, g, pal) {
   if (night) { const FF = seeded(31); for (let i = 0; i < 70; i++) { const fx = x + FF() * w, fy = Y(HZ + 40) + FF() * (y + h - Y(HZ + 40)); glow(ctx, fx, fy, 9 * Math.max(.8, s * 2), "255,240,140", .9); } }
   drawWx(ctx, x, y, w, h, s * .7, g);
   ctx.restore();
-  ctx.strokeStyle = pal.edge; ctx.lineWidth = 5; rr(ctx, x, y, w, h, 36); ctx.stroke();
+  ctx.strokeStyle = pal.edge; ctx.lineWidth = 3; rr(ctx, x, y, w, h, 34); ctx.stroke();
 }
 
 function drawScene(ctx, x, y, w, h, g, pal) {
@@ -353,7 +353,7 @@ function drawScene(ctx, x, y, w, h, g, pal) {
   if (night) { const FF = seeded(31); for (let i = 0; i < 26; i++) { const fx = x + FF() * w, fy = Y(300) + FF() * (y + h - Y(300)); glow(ctx, fx, fy, 9 * Math.max(.8, s * 1.5), "255,240,140", .9); } }
   drawWx(ctx, x, y, w, h, s, g);
   ctx.restore();
-  ctx.strokeStyle = pal.edge; ctx.lineWidth = 5; rr(ctx, x, y, w, h, 36); ctx.stroke();
+  ctx.strokeStyle = pal.edge; ctx.lineWidth = 3; rr(ctx, x, y, w, h, 34); ctx.stroke();
 }
 
 // ---------------------------------------------------------------- the garden card: only the garden (drawScene of the whole garden), on a canvas GQ times bigger than the others
@@ -416,38 +416,48 @@ function tile(ctx, x, y, w, h, pal) {
     if (w > 240) { ctx.save(); ctx.translate(x + w / 2, y + 2); ctx.rotate(((Math.round(x * 7 + y * 3) % 9) - 4) * Math.PI / 180); ctx.globalAlpha = .8; ctx.fillStyle = mixc(pal.alt, Wt, .45); ctx.fillRect(-46, -14, 92, 28); ctx.restore(); }
     return;
   }
-  ctx.save(); ctx.shadowColor = "rgba(0,0,0,.10)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8; rr(ctx, x, y, w, h, rad(34)); ctx.fillStyle = pal.card; ctx.fill(); ctx.restore();
-  rr(ctx, x, y, w, h, rad(34)); ctx.strokeStyle = pal.edge; ctx.lineWidth = 3; ctx.stroke();
+  ctx.save(); ctx.shadowColor = "rgba(40,20,60,.09)"; ctx.shadowBlur = 34; ctx.shadowOffsetY = 14; rr(ctx, x, y, w, h, rad(32)); ctx.fillStyle = pal.card; ctx.fill(); ctx.restore(); // soft, wide shadow
+  ctx.save(); ctx.shadowColor = "rgba(40,20,60,.10)"; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2; rr(ctx, x, y, w, h, rad(32)); ctx.strokeStyle = pal.edge; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); // thin border with a tiny contact shadow
 }
-function ring(ctx, cx, cy, r, lw, pct, pal) {
+function ring(ctx, cx, cy, r, lw, pct, pal) { // goal ring: solid accent, green once the goal is reached (same as the app)
   ctx.lineCap = "round"; ctx.lineWidth = lw; ctx.strokeStyle = pal.tint; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-  if (pct > 0) { const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r); g.addColorStop(0, pal.alt); g.addColorStop(1, pal.main); ctx.strokeStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp01(pct)); ctx.stroke(); }
+  if (pct > 0) { ctx.strokeStyle = pct >= 1 ? pal.live : pal.main; ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp01(pct)); ctx.stroke(); }
+}
+function chip(ctx, x, y, w, h, pal, lab, val) { // a small stat tile: tiny label on top, big value underneath
+  tile(ctx, x, y, w, h, pal); const inner = Math.min(30, w * .07), mw = w - inner * 2;
+  text(ctx, String(lab).toUpperCase(), x + inner, y + h * .3, { size: Math.min(h * .2, 24), font: pal.bf, weight: 800, color: pal.sub, base: "middle", max: mw });
+  text(ctx, val, x + inner, y + h * .68, { size: Math.min(h * .4, 54), font: pal.hf, weight: 700, color: pal.ink, base: "middle", max: mw });
+}
+function avatarDot(ctx, cx, cy, av, e, pal) { // round avatar with a soft shadow and a thin border
+  ctx.save(); ctx.shadowColor = "rgba(40,20,60,.12)"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6; ctx.beginPath(); ctx.arc(cx, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.card; ctx.fill(); ctx.restore();
+  ctx.beginPath(); ctx.arc(cx, cy, av / 2, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = pal.edge; ctx.stroke(); emoji(ctx, e, cx, cy + 2, av * .56);
 }
 
 // ---------------------------------------------------------------- "together" card: both of you, live
 function personTile(ctx, x, y, w, h, p, pal) {
   const live = p.status === "studying", inner = Math.min(30, w * .065), hf = pal.hf, bf = pal.bf;
-  ctx.save(); if (live) { ctx.shadowColor = pal.live; ctx.shadowBlur = 34; } tile(ctx, x, y, w, h, pal); ctx.restore();
-  if (live) { rr(ctx, x, y, w, h, 34); ctx.strokeStyle = pal.live; ctx.lineWidth = 5; ctx.stroke(); }
-  const av = Math.min(h * .15, 58), petS = Math.min(h * .21, 88), cy = y + inner + av / 2;
-  ctx.beginPath(); ctx.arc(x + inner + av / 2, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.tint; ctx.fill(); emoji(ctx, p.avatar, x + inner + av / 2, cy + 2, av * .58);
-  text(ctx, p.name, x + inner + av + 14, cy, { size: Math.min(h * .1, 42), font: hf, weight: 700, color: pal.ink, base: "middle", max: w - inner * 2 - av - 14 - petS * 1.05 });
-  emoji(ctx, p.pet.emo, x + w - inner - petS / 2, y + inner + petS * .55, petS, { rot: p.status === "rest" && p.pet.st > 0 ? 0 : 0 });
-  if (p.pet.acc) emoji(ctx, p.pet.acc, x + w - inner - petS / 2, y + inner + petS * .05, petS * .42);
-  // status pill
-  const ph = Math.min(h * .09, 40), py = y + inner + av + 16; ctx.font = `800 ${ph * .6}px ${bf}`; const pw = ctx.measureText(p.statusText).width + ph * .95;
-  rr(ctx, x + inner, py, pw, ph, ph / 2); ctx.fillStyle = live ? pal.onBg : pal.tint; ctx.fill(); ctx.strokeStyle = live ? pal.onLine : pal.edge; ctx.lineWidth = 2.5; ctx.stroke();
-  text(ctx, p.statusText, x + inner + pw / 2, py + ph / 2 + 1, { size: ph * .6, font: bf, weight: 800, color: live ? pal.live : pal.sub, align: "center", base: "middle" });
-  // the big number: this session while studying / on a break, otherwise today's total
-  const bigS = Math.min(h * .2, 100), midY = y + h * .6;
-  text(ctx, p.label.toUpperCase(), x + inner, midY - bigS * .72, { size: Math.min(h * .065, 24), font: bf, weight: 800, color: pal.sub });
-  text(ctx, p.big, x + inner, midY + bigS * .22, { size: bigS, font: hf, weight: 700, color: pal.ink, max: w - inner * 2 });
-  // goal bar + footer line
-  const bh = Math.min(18, h * .05), by = y + h - inner - Math.min(h * .08, 32) - bh - 14, tw = w - inner * 2;
+  tile(ctx, x, y, w, h, pal);
+  if (live) { ctx.save(); ctx.shadowColor = pal.live; ctx.shadowBlur = 26; ctx.shadowOffsetY = 6; rr(ctx, x, y, w, h, rad(32)); ctx.lineWidth = 4; ctx.strokeStyle = pal.live; ctx.stroke(); ctx.restore(); } // studying: green outline with a soft glow
+  const av = Math.min(h * .14, 56), rg = av / 2 + 9, acx = x + inner + rg, acy = y + inner + rg, petS = Math.min(h * .2, 84);
+  ctx.beginPath(); ctx.arc(acx, acy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.tint; ctx.fill(); emoji(ctx, p.avatar, acx, acy + 2, av * .6);
+  ring(ctx, acx, acy, rg - 3, 6, p.pct || 0, pal); // the avatar sits inside today's goal ring, like in the app
+  const nx = acx + rg + 16, nw = x + w - inner - petS * 1.05 - nx;
+  text(ctx, p.name, nx, acy - rg * .52, { size: Math.min(h * .07, 34), font: hf, weight: 700, color: pal.ink, base: "middle", max: nw });
+  const ph = Math.min(h * .07, 34), py = acy + rg * .06; ctx.font = `800 ${ph * .58}px ${bf}`; const pw = Math.min(ctx.measureText(p.statusText).width + ph * .95, nw + petS);
+  rr(ctx, nx, py, pw, ph, ph / 2); ctx.fillStyle = live ? pal.onBg : pal.tint; ctx.fill(); ctx.strokeStyle = live ? pal.onLine : pal.edge; ctx.lineWidth = 2; ctx.stroke();
+  text(ctx, p.statusText, nx + pw / 2, py + ph / 2 + 1, { size: ph * .58, font: bf, weight: 800, color: live ? pal.live : pal.sub, align: "center", base: "middle", max: pw - 8 });
+  emoji(ctx, p.pet.emo, x + w - inner - petS / 2, acy + petS * .08, petS);
+  if (p.pet.acc) emoji(ctx, p.pet.acc, x + w - inner - petS / 2, acy - petS * .44, petS * .4);
+  // goal bar + footer line at the bottom
+  const bh = Math.min(16, h * .045), by = y + h - inner - Math.min(h * .08, 32) - bh - 14, tw = w - inner * 2;
   if (p.pct != null) {
     rr(ctx, x + inner, by, tw, bh, bh / 2); ctx.fillStyle = pal.tint; ctx.fill();
-    if (p.pct > 0) { const g = ctx.createLinearGradient(x + inner, 0, x + inner + tw, 0); g.addColorStop(0, pal.alt); g.addColorStop(1, pal.main); rr(ctx, x + inner, by, Math.max(bh, tw * clamp01(p.pct)), bh, bh / 2); ctx.fillStyle = g; ctx.fill(); }
+    if (p.pct > 0) { rr(ctx, x + inner, by, Math.max(bh, tw * clamp01(p.pct)), bh, bh / 2); ctx.fillStyle = p.pct >= 1 ? pal.live : pal.main; ctx.fill(); }
   }
+  // the big number: centred in the space between the header row and the goal bar
+  const top = acy + rg + 8, low = by - 14, labS = Math.min(h * .06, 24), bigS = Math.min(h * .19, 100), blk = labS + 12 + bigS, c0 = top + Math.max(0, (low - top - blk) / 2);
+  text(ctx, p.label.toUpperCase(), x + inner, c0 + labS / 2, { size: labS, font: bf, weight: 800, color: pal.sub, base: "middle" });
+  text(ctx, p.big, x + inner, c0 + labS + 12 + bigS / 2, { size: bigS, font: hf, weight: 700, color: pal.ink, base: "middle", max: w - inner * 2 });
   const fy = y + h - inner - Math.min(h * .08, 32) / 2, fs = Math.min(h * .062, 26);
   text(ctx, `today ${p.today}${p.goalText ? " · " + p.goalText : ""}`, x + inner, fy, { size: fs, font: bf, weight: 800, color: pal.sub, base: "middle", max: tw * .72 });
   text(ctx, `🔥 ${p.streak}`, x + w - inner, fy, { size: fs * 1.1, font: bf, weight: 800, color: pal.sub, align: "right", base: "middle" });
@@ -459,33 +469,27 @@ function drawTogether(ctx, d, pal, W, H) {
   const hs = wt.map((k, i) => Math.min(cap[i], Math.round(avail * k / sum))), gp = gap + Math.max(0, (avail + 2 * gap - hs.reduce((a, b) => a + b, 0) - 2 * gap) / 3);
   let y = pad + (gp - gap) / 2; const Y = hs.map(h => { const v = y; y += h + gp; return v; });
   { const h = hs[0], cy = Y[0] + h / 2, av = Math.min(h, 84);
-    d.people.forEach((p, i) => { const cx = pad + av / 2 + i * av * .62; ctx.beginPath(); ctx.arc(cx, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = pal.edge; ctx.stroke(); emoji(ctx, p.avatar, cx, cy + 2, av * .56); });
-    const dateW = Math.min(cw * .36, 340), tx = pad + av * 1.62 + 20;
-    text(ctx, d.date, W - pad, cy, { size: Math.min(h * .46, 28), font: bf, weight: 700, color: pal.sub, align: "right", base: "middle", max: dateW });
-    text(ctx, d.title, tx, cy, { size: Math.min(h * .72, 48), font: hf, weight: 700, color: pal.ink, base: "middle", max: W - pad - tx - dateW - 20 }); }
+    d.people.forEach((p, i) => avatarDot(ctx, pad + av / 2 + i * av * .62, cy, av, p.avatar, pal));
+    const tx = pad + av * 1.62 + 22, tw = W - pad - tx;
+    text(ctx, d.title, tx, cy - h * .1, { size: Math.min(h * .5, 44), font: hf, weight: 700, color: pal.ink, base: "middle", max: tw });
+    text(ctx, d.date, tx, cy + h * .28, { size: Math.min(h * .26, 26), font: bf, weight: 700, color: pal.sub, base: "middle", max: tw }); }
   { const tw = (cw - gap) / 2; d.people.forEach((p, i) => personTile(ctx, pad + i * (tw + gap), Y[1], tw, hs[1], p, pal)); }
   { const h = hs[2], cwid = (cw - gap) / 2;
-    [["together today", d.togetherToday], ["couple level", d.coupleText]].forEach(([lab, val], i) => {
-      const x = pad + i * (cwid + gap); tile(ctx, x, Y[2], cwid, h, pal); const fs = Math.min(h * .46, 54), ls = Math.min(h * .3, 28);
-      text(ctx, lab, x + 28, Y[2] + h / 2, { size: ls, font: bf, weight: 800, color: pal.sub, base: "middle" });
-      ctx.font = `800 ${ls}px ${bf}`; const lw = ctx.measureText(lab).width;
-      text(ctx, val, x + cwid - 28, Y[2] + h / 2, { size: fs, font: hf, weight: 700, color: pal.ink, align: "right", base: "middle", max: cwid - 56 - lw - 10 });
-    }); }
+    [["together today", d.togetherToday], ["couple level", d.coupleText]].forEach(([lab, val], i) => chip(ctx, pad + i * (cwid + gap), Y[2], cwid, h, pal, lab, val)); }
   drawScene(ctx, pad, gy, cw, gh, d.garden, pal);
   text(ctx, stampTxt(), W / 2, H - pad - stamp / 2 + 8, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9, max: 900 });
 }
 
 // ---------------------------------------------------------------- shared pieces for the recap + milestone cards
-function drawHead(ctx, L, pal, W, avatar, title, date) { // avatar circle + title (left), date (right)
-  const { y, h } = L.head, pad = L.pad, cw = W - pad * 2, av = Math.min(h, 84), cy = y + h / 2, dateW = Math.min(cw * .34, 330);
-  ctx.beginPath(); ctx.arc(pad + av / 2, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = pal.edge; ctx.stroke();
-  emoji(ctx, avatar, pad + av / 2, cy + 2, av * .56);
-  text(ctx, date, W - pad, cy, { size: Math.min(h * .5, 30), font: pal.bf, weight: 700, color: pal.sub, align: "right", base: "middle", max: dateW });
-  text(ctx, title, pad + av + 20, cy, { size: Math.min(h * .72, 48), font: pal.hf, weight: 700, color: pal.ink, base: "middle", max: cw - av - 40 - dateW });
+function drawHead(ctx, L, pal, W, avatar, title, date) { // avatar (left), title with the date underneath (like the app's header)
+  const { y, h } = L.head, pad = L.pad, cw = W - pad * 2, av = Math.min(h, 84), cy = y + h / 2, tx = pad + av + 22, tw = cw - av - 22;
+  avatarDot(ctx, pad + av / 2, cy, av, avatar, pal);
+  text(ctx, title, tx, cy - h * .1, { size: Math.min(h * .5, 44), font: pal.hf, weight: 700, color: pal.ink, base: "middle", max: tw });
+  text(ctx, date, tx, cy + h * .28, { size: Math.min(h * .26, 26), font: pal.bf, weight: 700, color: pal.sub, base: "middle", max: tw });
 }
 function drawStat(ctx, x, y, w, h, pal, t) { // a stat tile: small label, big value, small note underneath
   tile(ctx, x, y, w, h, pal); const inner = Math.min(28, w * .06), mw = w - inner * 2;
-  text(ctx, t.l, x + inner, y + h * .24, { size: Math.min(h * .17, 26), font: pal.bf, weight: 800, color: pal.sub, base: "middle", max: mw });
+  text(ctx, String(t.l).toUpperCase(), x + inner, y + h * .24, { size: Math.min(h * .17, 26), font: pal.bf, weight: 800, color: pal.sub, base: "middle", max: mw });
   text(ctx, t.v, x + inner, y + h * .56, { size: Math.min(h * .38, 56), font: pal.hf, weight: 700, color: pal.ink, base: "middle", max: mw });
   if (t.s) text(ctx, t.s, x + inner, y + h * .85, { size: Math.min(h * .15, 22), font: pal.bf, weight: 700, color: pal.sub, base: "middle", max: mw });
 }
@@ -498,7 +502,7 @@ function drawBars(ctx, pad, y, cw, h, pal, d) { // bar chart tile for 7 or 30 da
   d.bars.forEach((k, i) => {
     const x = pad + inner + i * (bw + gp), v = k.v ? Math.max(.06, k.v / mx) : 0, bhh = Math.max(8, v * (bh - (bh > 90 ? 26 : 0)));
     rr(ctx, x, bottom - 8, bw, 8, Math.min(4, bw / 2)); ctx.fillStyle = pal.tint; ctx.fill();
-    if (v) { rr(ctx, x, bottom - bhh, bw, bhh, Math.min(14, bw / 2)); const gr = ctx.createLinearGradient(0, bottom - bhh, 0, bottom); gr.addColorStop(0, k.today ? pal.main : pal.alt); gr.addColorStop(1, k.today ? pal.alt : pal.tint); ctx.fillStyle = gr; ctx.fill(); }
+    if (v) { rr(ctx, x, bottom - bhh, bw, bhh, Math.min(14, bw / 2)); ctx.fillStyle = k.hit ? (k.today ? pal.live : mixc(pal.live, pal.card, .35)) : k.today ? pal.main : mixc(pal.main, pal.card, .55); ctx.fill(); } // today = solid, other days lighter, days that reached the goal = green
     if (bh > 90 && k.v && k.t) text(ctx, k.t, x + bw / 2, bottom - bhh - 8, { size: Math.min(lblH * .85, 22), font: bf, weight: 800, color: pal.sub, align: "center", max: bw + gp - 2 });
     if (k.l) text(ctx, k.l, x + bw / 2, bottom + lblH * .85, { size: lblH * .9, font: bf, weight: k.today ? 800 : 700, color: k.today ? pal.ink : pal.sub, align: "center", max: bw + gp * 2 });
   });
@@ -544,12 +548,7 @@ function drawMilestone(ctx, d, pal, W, H) {
     text(ctx, d.title, cx, y + h * .75, { size: Math.min(h * .115, 58), font: hf, weight: 700, color: pal.ink, align: "center", base: "middle", max: cw - 80 });
     text(ctx, d.sub, cx, y + h * .88, { size: Math.min(h * .07, 32), font: bf, weight: 800, color: pal.sub, align: "center", base: "middle", max: cw - 80 }); }
   { const { y, h } = L.chips, cwid = (cw - 22) / 2;
-    d.chips.forEach(([lab, val], i) => {
-      const x = pad + i * (cwid + 22); tile(ctx, x, y, cwid, h, pal); const fs = Math.min(h * .46, 54);
-      text(ctx, lab, x + 28, y + h / 2, { size: Math.min(h * .3, 28), font: bf, weight: 800, color: pal.sub, base: "middle" });
-      ctx.font = `700 ${Math.min(h * .3, 28)}px ${bf}`; const lw = ctx.measureText(lab).width;
-      text(ctx, val, x + cwid - 28, y + h / 2, { size: fs, font: hf, weight: 700, color: pal.ink, align: "right", base: "middle", max: cwid - 56 - lw - 10 });
-    }); }
+    d.chips.forEach(([lab, val], i) => chip(ctx, pad + i * (cwid + 22), y, cwid, h, pal, lab, val)); }
   drawScene(ctx, pad, L.garden.y, cw, L.garden.h, d.garden, pal);
   text(ctx, stampTxt(), W / 2, L.stampY, { size: 28, font: hf, weight: 700, color: pal.sub, align: "center", base: "middle", alpha: .9, max: 900 });
 }
@@ -838,13 +837,8 @@ function paintCard(ctx, d, pal, W, H) { // one card, drawn into a W×H area at t
   if (d.kind === "recap") { drawRecap(ctx, d, pal, W, H); return; }
   if (d.kind === "milestone") { drawMilestone(ctx, d, pal, W, H); return; }
   if (d.kind === "board") { drawBoard(ctx, d, pal, W, H); return; }
-  // header: avatar + title (left), date (right)
-  { const { y, h } = L.head, av = Math.min(h, 84), cy = y + h / 2;
-    ctx.beginPath(); ctx.arc(pad + av / 2, cy, av / 2, 0, Math.PI * 2); ctx.fillStyle = pal.card; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = pal.edge; ctx.stroke();
-    emoji(ctx, d.avatar, pad + av / 2, cy + 2, av * .56);
-    ctx.font = `600 ${Math.min(h * .7, 46)}px ${bf}`;
-    const dateW = Math.min(cw * .34, 330); text(ctx, d.date, W - pad, cy, { size: Math.min(h * .5, 30), font: bf, weight: 700, color: pal.sub, align: "right", base: "middle", max: dateW });
-    text(ctx, `${d.name}'s study day`, pad + av + 20, cy, { size: Math.min(h * .72, 48), font: hf, weight: 700, color: pal.ink, base: "middle", max: cw - av - 40 - dateW }); }
+  // header: avatar + title with the date underneath
+  drawHead(ctx, L, pal, W, d.avatar, `${d.name}'s study day`, d.date);
 
   // session tile: label, big time, sub, goal ring (or the pet when there is no goal)
   { const { y, h } = L.ses; tile(ctx, pad, y, cw, h, pal);
@@ -861,25 +855,10 @@ function paintCard(ctx, d, pal, W, H) { // one card, drawn into a W×H area at t
 
   // two chips: today + streak
   { const { y, h } = L.chips, cwid = (cw - 22) / 2;
-    [[d.todayLabel, d.todayText], ["streak", d.streakText]].forEach(([lab, val], i) => {
-      const x = pad + i * (cwid + 22); tile(ctx, x, y, cwid, h, pal); const fs = Math.min(h * .46, 54);
-      text(ctx, lab, x + 28, y + h / 2, { size: Math.min(h * .3, 28), font: bf, weight: 800, color: pal.sub, base: "middle" });
-      ctx.font = `700 ${Math.min(h * .3, 28)}px ${bf}`; const lw = ctx.measureText(lab).width;
-      text(ctx, val, x + cwid - 28, y + h / 2, { size: fs, font: hf, weight: 700, color: pal.ink, align: "right", base: "middle", max: cwid - 56 - lw - 10 });
-    }); }
+    [[d.todayLabel, d.todayText], ["streak", d.streakText]].forEach(([lab, val], i) => chip(ctx, pad + i * (cwid + 22), y, cwid, h, pal, lab, val)); }
 
   // 7-day chart
-  { const { y, h } = L.chart; tile(ctx, pad, y, cw, h, pal); const inner = h < 200 ? 24 : 30, ts = Math.min(h * .13, 28);
-    text(ctx, "LAST 7 DAYS", pad + inner, y + inner + ts * .6, { size: ts, font: bf, weight: 800, color: pal.sub });
-    text(ctx, d.weekTotal, pad + cw - inner, y + inner + ts * .6, { size: ts * 1.15, font: hf, weight: 700, color: pal.ink, align: "right" });
-    const top = y + inner + ts * 1.35 + 8, lblH = Math.min(h * .13, 30), bottom = y + h - inner * .8 - lblH, bh = Math.max(20, bottom - top), n = d.week.length, gp = 18, bw = (cw - inner * 2 - gp * (n - 1)) / n, mx = Math.max(1, ...d.week.map(k => k.v));
-    d.week.forEach((k, i) => {
-      const x = pad + inner + i * (bw + gp), v = k.v ? Math.max(.06, k.v / mx) : 0, bhh = Math.max(8, v * (bh - (bh > 90 ? 26 : 0)));
-      rr(ctx, x, bottom - 8, bw, 8, 4); ctx.fillStyle = pal.tint; ctx.fill();
-      if (v) { rr(ctx, x, bottom - bhh, bw, bhh, Math.min(14, bw / 2)); const gr = ctx.createLinearGradient(0, bottom - bhh, 0, bottom); gr.addColorStop(0, k.today ? pal.main : pal.alt); gr.addColorStop(1, k.today ? pal.alt : pal.tint); ctx.fillStyle = gr; ctx.fill(); }
-      if (bh > 90 && k.v) text(ctx, k.t, x + bw / 2, bottom - bhh - 8, { size: Math.min(lblH * .85, 22), font: bf, weight: 800, color: pal.sub, align: "center", max: bw + gp - 2 });
-      text(ctx, k.l, x + bw / 2, bottom + lblH * .85, { size: lblH * .9, font: bf, weight: k.today ? 800 : 700, color: k.today ? pal.ink : pal.sub, align: "center" });
-    }); }
+  drawBars(ctx, pad, L.chart.y, cw, L.chart.h, pal, { label: "LAST 7 DAYS", weekTotal: d.weekTotal, bars: d.week });
 
   // garden snapshot (whole garden shrunk to fit)
   drawScene(ctx, pad, L.garden.y, cw, L.garden.h, d.garden, pal);

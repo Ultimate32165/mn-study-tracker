@@ -1,4 +1,4 @@
-// Photocard UI: the options sheet (cardSheet), drawing the preview (renderCard), save / share / send; remembers the latest milestone.
+// Photocard UI (UI v2): the options sheet (cardSheet: preview on top, then card / size / bottom picture / look, actions pinned at the bottom), drawing the preview (renderCard), save / share / send; remembers the latest milestone.
 import { ACCENTS, CORNERS, FILTERS, FONTS, PATTERNS, STICKERS, STYLES, drawCard } from "./card.js";
 import * as DB from "./db.js";
 import { forestSnap } from "./forest.js";
@@ -59,25 +59,26 @@ function cardSheet(mode) {
   if (!friends.some(u => u.id === cardOpt.fid)) cardOpt.fid = (friends.find(u => u.status === "studying") || friends[0] || {}).id || "";
   const SH = { square: "▫️ square", portrait: "🖼️ 4:5", story: "📱 story" }, PD = { week: "last 7 days", month: "last 30 days" },
     MD = { me: "👤 me", ...(friends.length ? { together: "💞 together" } : {}), recap: "🗓️ recap", board: "📝 board", garden: "🌳 garden", ...(cardOpt.ms ? { milestone: "🏅 milestone" } : {}) };
+  const grp = (t, body) => `<p class="sg">${t}</p>${body}`, selOpts = `<option value="today">Today (all sessions)</option>${sess.map(x => `<option value="${esc(x.id)}" ${x.id === cardOpt.sid ? "selected" : ""}>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} · ${fmt(x.seconds)}</option>`).join("")}`;
   modal.innerHTML = `<div class="back"><div class="sheet cardsheet"><h3>photocard 📸</h3>
-  <div class="seg wrap" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>
+  <div class="cprev"><div class="cload">drawing your card…</div><img id="cimg" alt="photocard preview"></div>
+  ${grp("card", `<div class="seg wrap" id="cmode">${Object.keys(MD).map(k => `<button data-mode="${k}" class="${k === cardOpt.mode ? "sel" : ""}">${MD[k]}</button>`).join("")}</div>
   <div class="seg" id="cper">${Object.keys(PD).map(k => `<button data-per="${k}" class="${k === cardOpt.period ? "sel" : ""}">${PD[k]}</button>`).join("")}</div>
-  <div class="seg" id="cshape"></div>
-  <div class="seg wrap" id="cstyle" aria-label="card style">${Object.keys(STYLES).map(k => `<button data-look="style" data-v="${k}" class="${k === L.style ? "sel" : ""}">${STYLES[k].label}</button>`).join("")}</div>
-  <div class="cacc" id="cacc" aria-label="accent colour">${Object.keys(ACCENTS).map(k => `<button data-look="accent" data-v="${k}" class="adot ${k === "theme" ? "athm" : ""} ${k === L.accent ? "sel" : ""}" ${ACCENTS[k] ? `style="background:${ACCENTS[k][0]}"` : ""} aria-label="${k}">${k === "theme" ? "🎨" : ""}</button>`).join("")}<button class="adot ashuf" id="cshuf" aria-label="surprise me">🎲</button></div>
+  <select id="csel" aria-label="which session">${selOpts}</select>
+  <select id="cfr" aria-label="which friend">${friends.map(u => `<option value="${esc(u.id)}" ${u.id === cardOpt.fid ? "selected" : ""}>${esc(u.emoji)} ${esc(u.name)}</option>`).join("")}</select>`)}
+  ${grp("size", `<div class="seg" id="cshape"></div>`)}
+  <div id="cscenebox">${grp("bottom picture", `<div class="seg" id="cscene">${[["forest", "🌲 forest"], ["none", "🚫 none"]].map(([k, l]) => `<button data-scene="${k}" class="${k === cardOpt.scene ? "sel" : ""}">${l}</button>`).join("")}</div>`)}</div>
+  ${grp("look", `<div class="seg wrap" id="cstyle" aria-label="card style">${Object.keys(STYLES).map(k => `<button data-look="style" data-v="${k}" class="${k === L.style ? "sel" : ""}">${STYLES[k].label}</button>`).join("")}</div>
+  <div class="cacc" id="cacc" aria-label="accent colour">${Object.keys(ACCENTS).map(k => `<button data-look="accent" data-v="${k}" class="adot ${k === "theme" ? "athm" : ""} ${k === L.accent ? "sel" : ""}" ${ACCENTS[k] ? `style="background:${ACCENTS[k][0]}"` : ""} aria-label="${k}">${k === "theme" ? "🎨" : ""}</button>`).join("")}<button class="adot ashuf" id="cshuf" aria-label="surprise me">🎲</button></div>`)}
   <details class="cmore"><summary>🎛️ more ways to customize</summary>
     ${[["font", "font", Object.fromEntries(Object.keys(FONTS).map(k => [k, FONTS[k].label]))], ["round", "corners", CORNERS], ["pat", "background pattern", PATTERNS], ["stick", "corner stickers", STICKERS], ["filt", "photo filter", FILTERS]].map(([key, lab, tb]) => `<div class="crow"><b>${lab}</b><div class="seg wrap">${Object.keys(tb).map(k => `<button data-look="${key}" data-v="${k}" class="${k === L[key] ? "sel" : ""}">${tb[k]}</button>`).join("")}</div></div>`).join("")}
     <div class="crow"><b>tone</b><div class="seg wrap"><button data-look="dark" data-v="false" class="${L.dark ? "" : "sel"}">☀️ style's own</button><button data-look="dark" data-v="true" class="${L.dark ? "sel" : ""}">🌙 dark</button></div></div>
     <div class="crow"><b>footer message</b><input id="cmsg" maxlength="36" value="${esc(L.msg)}" placeholder="🍓 MN Study Tracker"></div>
     <button class="btn ghost" id="creset">↺ reset the look</button>
   </details>
-  <div class="seg" id="cscene">${[["forest", "🌲 forest"], ["none", "🚫 none"]].map(([k, l]) => `<button data-scene="${k}" class="${k === cardOpt.scene ? "sel" : ""}">${l}</button>`).join("")}</div>
-  <select id="csel" aria-label="which session"><option value="today">Today (all sessions)</option>${sess.map(x => `<option value="${esc(x.id)}" ${x.id === cardOpt.sid ? "selected" : ""}>${new Date(x.start.toMillis()).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} · ${fmt(x.seconds)}</option>`).join("")}</select>
-  <select id="cfr" aria-label="which friend">${friends.map(u => `<option value="${esc(u.id)}" ${u.id === cardOpt.fid ? "selected" : ""}>${esc(u.emoji)} ${esc(u.name)}</option>`).join("")}</select>
-  <div class="cprev"><div class="cload">drawing your card…</div><img id="cimg" alt="photocard preview"></div>
-  ${friends.length ? `<button class="btn" id="csend">💌 send</button>` : ""}
-  <div class="row"><button class="btn ghost" id="cclose">close</button>${canShare ? `<button class="btn ghost" id="cshare">share</button>` : ""}<button class="btn ghost" id="csave">save ⬇️</button></div></div></div>`;
-  const vis = () => { $("#csel").hidden = cardOpt.mode !== "me"; $("#cfr").hidden = friends.length < 2; $("#cper").hidden = cardOpt.mode !== "recap"; $("#cscene").hidden = cardOpt.mode === "board" || cardOpt.mode === "garden"; const sb = $("#csend"); if (sb) sb.hidden = cardOpt.mode === "garden"; }; // the garden card is a big picture to save / share (friend inbox cards are small 640px ones)
+  <div class="cbar">${friends.length ? `<button class="btn" id="csend">💌 send</button>` : ""}
+  <div class="row"><button class="btn ghost" id="cclose">close</button>${canShare ? `<button class="btn ghost" id="cshare">share</button>` : ""}<button class="btn${friends.length ? " ghost" : ""}" id="csave">save ⬇️</button></div></div></div></div>`;
+  const vis = () => { $("#csel").hidden = cardOpt.mode !== "me"; $("#cfr").hidden = friends.length < 2; $("#cper").hidden = cardOpt.mode !== "recap"; $("#cscenebox").hidden = cardOpt.mode === "board" || cardOpt.mode === "garden"; const sb = $("#csend"); if (sb) sb.hidden = cardOpt.mode === "garden"; }; // the garden card is a big picture to save / share (friend inbox cards are small 640px ones)
   const shapeUi = () => { // the shape buttons: the garden card also has a wide one, and remembers its own shape
     const g = cardOpt.mode === "garden", opts = g ? { ...SH, wide: "🏞️ wide" } : SH, cur = g ? cardOpt.gshape : cardOpt.shape, box = $("#cshape");
     box.innerHTML = Object.keys(opts).map(k => `<button data-shape="${k}" class="${k === cur ? "sel" : ""}">${opts[k]}</button>`).join("");
