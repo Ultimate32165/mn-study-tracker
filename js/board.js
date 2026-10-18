@@ -34,13 +34,12 @@ export function boardSnap(notes) {
 
 export function boardMain(notes) {
   const st = getStyle(), S = STYLES[st.s];
-  return `<div class="bhead"><h2>our board</h2><span class="bbtns"><button class="chip" data-act="card" data-id="board">📸 photocard</button><button class="chip" data-act="bstyle">🎨 style</button></span></div>
-  <div class="bnew"><input id="bnew" maxlength="140" placeholder="what do we need to do? ✏️" autocomplete="off" enterkeyhint="send"><button class="chip" data-act="badd">add</button></div>
+  return `<div class="bnew"><input id="bnew" maxlength="140" placeholder="what do we need to do? ✏️" autocomplete="off" enterkeyhint="send"><button class="chip pri" data-act="badd">add</button></div>
   <aside class="bside${palOpen ? " open" : ""}" id="bside"><button class="bside-t" data-bt>🎨 colours &amp; stickers <span class="now" id="bnow">${preview()}</span><i>▾</i></button>
     <div class="bside-b"><h5>colour</h5><div class="bgrid" id="bcol"><button class="rnd${draft.color < 0 ? " sel" : ""}" data-bc="-1" aria-label="surprise colour" title="surprise me">🎲</button>${COLORS.map((c, i) => `<button data-bc="${i}" class="${draft.color === i ? "sel" : ""}" style="--c:${col(c)}" aria-label="colour ${i + 1}"></button>`).join("")}</div>
     <h5>sticker</h5><div class="bgrid bsg" id="bstk">${STICKERS.map(e => `<button data-bi="${e}" class="${draft.icon === e ? "sel" : ""}" aria-label="sticker ${e || "none"}">${e || "∅"}</button>`).join("")}</div>
     <p class="bhint">for your next note</p></div></aside>
-  <p class="hint">drag a box to move it · tap to edit · on a phone, press and hold first ✋</p>
+  <div class="bhead"><p class="hint">drag to move · tap to edit · on a phone, press and hold first ✋</p><span class="bbtns"><button class="chip" data-act="card" data-id="board">📸 photocard</button><button class="chip" data-act="bstyle">🎨 style</button></span></div>
   <div class="bd s-${st.s} p-${st.pat}${st.faces ? "" : " nofaces"}" style="--bgc:${col(COLORS[st.bg])}">
   ${S.lanes.map(([name, e], l) => { const list = inLane(notes, l);
     return `<section class="lane" data-lane="${l}"><h4>${e} ${name} <em>${list.length}</em>${l === 2 && list.length ? `<button class="chip" data-act="bclear">clear</button>` : ""}</h4><div class="lbox">${list.map(note).join("")}</div></section>`; }).join("")}</div>`;

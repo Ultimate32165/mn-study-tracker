@@ -18,7 +18,7 @@ function evoMoment(m, a, b) {
   burst(); setTimeout(() => burst(["✨", "⭐", "🌟", "💖"], 30), 500);
 }
 function addCardBtn(el, ms) { // "make a card" button inside a milestone pop-up
-  const b = document.createElement("button"); b.className = "chip"; b.textContent = "📸 make a card";
+  const b = document.createElement("button"); b.className = "chip pri"; b.textContent = "📸 make a card";
   b.onclick = e => { e.stopPropagation(); el.remove(); cardOpt.ms = ms; cardSheet("milestone"); };
   el.querySelector(".popc").appendChild(b);
 }

@@ -1,4 +1,4 @@
-// Pop-up sheets: the time wheel (sheet), 'still studying?' (askStill) and the profile / settings sheet.
+// Pop-up sheets: the time wheel with quick presets (sheet), 'still studying?' (askStill) and the settings sheet (profileSheet: grouped setting rows).
 import * as DB from "./db.js";
 import { PETS, petOf } from "./pets.js";
 import { elapsed, goalOf, limitOf, me } from "./state.js";
@@ -15,12 +15,14 @@ function askStill(m) {
 }
 
 // ---------- sheets ----------
-function sheet({ title, note = "", secs = 0, max, date, onSave }) { // max = cap in seconds (edit mode: can only reduce)
-  const mins = Math.floor(secs / 60), hMax = max === undefined ? 23 : Math.floor(max / 3600);
+const dur = m => m < 60 ? m + "m" : m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : m / 60 + "h";
+function sheet({ title, note = "", secs = 0, max, date, presets, onSave }) { // max = cap in seconds (edit mode: can only reduce); presets = quick minutes chips (none when max is set)
+  const mins = Math.floor(secs / 60), hMax = max === undefined ? 23 : Math.floor(max / 3600), pre = max === undefined ? (presets || [15, 30, 60, 90, 120]) : [];
   const col = (id, n) => `<div class="col" id="${id}">${[...Array(n + 1)].map((_, i) => `<div>${String(i).padStart(2, "0")}</div>`).join("")}</div>`;
   modal.innerHTML = `<div class="back"><div class="sheet"><h3>${title}</h3><p class="hint">${note}</p>
   ${date !== undefined ? `<input type="date" id="sd" value="${date}" max="${key(Date.now())}">` : ""}
   <div class="wheel"><div class="band"></div>${col("wh", hMax)}<b>:</b>${col("wm", 59)}</div><div class="wl"><span>hours</span><span>mins</span></div>
+  ${pre.length ? `<div class="presets">${pre.map(m => `<button class="chip" data-pm="${m}">${dur(m)}</button>`).join("")}</div>` : ""}
   <div class="row"><button class="btn ghost" id="sx">cancel</button><button class="btn" id="ss">save 💖</button></div></div></div>`;
   const wh = $("#wh"), wm = $("#wm"), idx = c => Math.round(c.scrollTop / 44);
   wh.scrollTop = Math.floor(mins / 60) * 44; wm.scrollTop = (mins % 60) * 44;
@@ -31,6 +33,7 @@ function sheet({ title, note = "", secs = 0, max, date, onSave }) { // max = cap
   };
   const watch = c => { c.onscroll = () => { const i = idx(c); [...c.children].forEach((d, k) => d.classList.toggle("s", k === i)); clearTimeout(t); t = setTimeout(clamp, 150); }; c.onscroll(); };
   watch(wh); watch(wm);
+  modal.querySelectorAll("[data-pm]").forEach(b => b.onclick = () => { const m = +b.dataset.pm; wh.scrollTo({ top: Math.min(Math.floor(m / 60), hMax) * 44, behavior: "smooth" }); wm.scrollTo({ top: (m % 60) * 44, behavior: "smooth" }); });
   $("#sx").onclick = () => modal.innerHTML = "";
   $("#ss").onclick = async () => {
     let sec = (idx(wh) * 60 + idx(wm)) * 60; if (max !== undefined) sec = Math.min(sec, max);
@@ -38,16 +41,21 @@ function sheet({ title, note = "", secs = 0, max, date, onSave }) { // max = cap
   };
 }
 function profileSheet(mine) {
-  modal.innerHTML = `<div class="back"><div class="sheet prof"><h3>your profile</h3><input id="pn" value="${esc(mine.name)}" maxlength="20">
+  const pet = petOf(mine), grp = (t, l) => `<p class="sg">${t}</p><div class="emojis">${themeBtns(l)}</div>`;
+  modal.innerHTML = `<div class="back"><div class="sheet prof"><h3>settings</h3>
+  <div class="me"><input id="pn" value="${esc(mine.name)}" maxlength="20" aria-label="your name" placeholder="your name"></div>
   <div class="emojis">${EMOJI.map(e => `<button class="av ${e === mine.emoji ? "sel" : ""}" data-e="${e}">${e}</button>`).join("")}</div>
-  <div class="opts"><button class="btn ghost" id="gl">🎯 daily goal: ${goalOf(mine) ? fmt(goalOf(mine)) : "off"}</button>
-  <button class="btn ghost" id="lm">⏰ still-studying: ${limitOf(mine) ? "after " + fmt(limitOf(mine)) : "off"}</button>
-  <button class="btn ghost" id="pt">${PETS[petOf(mine)].e[2]} pet: ${petOf(mine)}</button>
-  <button class="btn ghost" id="pm">🍅 pomodoro: ${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5} min</button>
-  <button class="btn ghost" id="nt">🔔 notifications</button>
-  <button class="btn ghost" id="rm">🍃 reduce motion: ${calm ? "on" : "off"}</button></div>
-  <p class="hint">cute themes</p><div class="emojis">${themeBtns(["auto", ...CUTE])}</div><p class="hint">dark themes 🌙</p><div class="emojis">${themeBtns(DARK)}</div><p class="hint">seasons 🍃 · light, then dark</p><div class="emojis">${themeBtns(SEASON)}</div><p class="hint">glass themes ✨</p><div class="emojis">${themeBtns(GLASS)}</div>
-  <details class="cmore"><summary>🎨 customize theme</summary>
+  <p class="sg">study</p><div class="setl">
+  <button class="srow" id="gl"><i>🎯</i><span>daily goal</span><em>${goalOf(mine) ? fmt(goalOf(mine)) : "off"}</em></button>
+  <button class="srow" id="pm"><i>🍅</i><span>pomodoro</span><em>${mine.pomoFocus ?? 25} / ${mine.pomoRest ?? 5} min</em></button>
+  <button class="srow" id="lm"><i>⏰</i><span>still-studying check</span><em>${limitOf(mine) ? "after " + fmt(limitOf(mine)) : "off"}</em></button>
+  <button class="srow" id="pt"><i>${PETS[pet].e[2]}</i><span>my pet</span><em>${pet}</em></button></div>
+  <p class="sg">app</p><div class="setl">
+  <button class="srow" id="nt"><i>🔔</i><span>notifications</span><em></em></button>
+  <button class="srow" id="rm"><i>🍃</i><span>reduce motion</span><em>${calm ? "on" : "off"}</em></button></div>
+  <details class="cmore"><summary>🎨 themes &amp; look</summary>
+  ${grp("cute", ["auto", ...CUTE])}${grp("dark 🌙", DARK)}${grp("seasons 🍃 · light, then dark", SEASON)}${grp("glass ✨", GLASS)}
+  <p class="sg">customize</p>
   <div class="crow"><b>background tint</b><div class="cacc">${dotBtns("hue")}</div></div>
   <div class="crow"><b>accent colour</b><div class="cacc">${dotBtns("acc")}</div></div>
   <div class="crow"><b>corners</b><div class="seg wrap">${lookBtns("round")}</div></div>
@@ -55,21 +63,21 @@ function profileSheet(mine) {
   <div class="crow"><button class="btn ghost" data-look="random">🎲 surprise me</button><button class="btn ghost" data-look="reset">↺ back to the theme's own look</button></div></details>
   <div class="row"><button class="btn ghost" id="lo">log out</button><button class="btn" id="ps">save 💖</button></div><button class="link" id="sx">close</button></div></div>`;
   let em = mine.emoji;
-  $("#gl").onclick = () => sheet({ title: "daily goal 🎯", note: "How long do you want to study each day? 00:00 turns it off.", secs: goalOf(mine), onSave: sec => DB.updateProfile(me.uid, { goal: sec }) });
-  $("#lm").onclick = () => sheet({ title: "still-studying check ⏰", note: "Ask me “still studying?” when the timer runs this long. 00:00 turns it off.", secs: limitOf(mine), onSave: sec => DB.updateProfile(me.uid, { limit: sec }) });
+  $("#gl").onclick = () => sheet({ title: "daily goal 🎯", note: "How long do you want to study each day? 00:00 turns it off.", secs: goalOf(mine), presets: [120, 180, 240, 360], onSave: sec => DB.updateProfile(me.uid, { goal: sec }) });
+  $("#lm").onclick = () => sheet({ title: "still-studying check ⏰", note: "Ask me “still studying?” when the timer runs this long. 00:00 turns it off.", secs: limitOf(mine), presets: [60, 120, 180, 240], onSave: sec => DB.updateProfile(me.uid, { limit: sec }) });
   $("#pt").onclick = () => {
     modal.innerHTML = `<div class="back"><div class="sheet"><h3>pick your pet 🐾</h3><p class="hint">It grows as you study, and gets sleepy if you skip a day.</p><div class="emojis">${Object.keys(PETS).map(t => `<button class="av ${t === petOf(mine) ? "sel" : ""}" data-p="${t}" title="${t}">${PETS[t].e[2]}</button>`).join("")}</div><button class="link" id="sx">close</button></div></div>`;
     $("#sx").onclick = () => modal.innerHTML = "";
     modal.querySelectorAll("[data-p]").forEach(b => b.onclick = async () => { await DB.updateProfile(me.uid, { pet: b.dataset.p }); modal.innerHTML = ""; toast("New friend! " + PETS[b.dataset.p].e[2]); });
   };
-  $("#pm").onclick = () => sheet({ title: "focus length 🍅", note: "How long is each study block? (hours : minutes)", secs: (mine.pomoFocus ?? 25) * 60,
+  $("#pm").onclick = () => sheet({ title: "focus length 🍅", note: "How long is each study block? (hours : minutes)", secs: (mine.pomoFocus ?? 25) * 60, presets: [15, 25, 45, 60],
     onSave: async sec => {
       if (sec < 60) throw Error("Minimum is 1 minute.");
       await DB.updateProfile(me.uid, { pomoFocus: sec / 60 });
-      setTimeout(() => sheet({ title: "break length ☕", note: "How long is each break?", secs: (mine.pomoRest ?? 5) * 60,
+      setTimeout(() => sheet({ title: "break length ☕", note: "How long is each break?", secs: (mine.pomoRest ?? 5) * 60, presets: [5, 10, 15, 20],
         onSave: async s2 => { if (s2 < 60) throw Error("Minimum is 1 minute."); await DB.updateProfile(me.uid, { pomoRest: s2 / 60 }); toast("Pomodoro saved! 🍅"); } }), 0);
     } });
-  $("#rm").onclick = () => { toggleCalm(); $("#rm").textContent = `🍃 reduce motion: ${calm ? "on" : "off"}`; toast(calm ? "Motion reduced 🍃" : "Motion back on ✨"); };
+  $("#rm").onclick = () => { toggleCalm(); $("#rm em").textContent = calm ? "on" : "off"; toast(calm ? "Motion reduced 🍃" : "Motion back on ✨"); };
   $("#nt").onclick = async () => { try { toast((await Notification.requestPermission()) === "granted" ? "Notifications on! 🔔" : "Notifications blocked."); } catch { toast("Install the app to your home screen first."); } };
   modal.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { setTheme(b.dataset.t); modal.querySelectorAll("[data-t]").forEach(x => x.classList.toggle("sel", x === b)); });
   modal.querySelectorAll("[data-look]").forEach(b => b.onclick = () => { setLook(b.dataset.look); modal.querySelectorAll("[data-look]").forEach(x => x.classList.toggle("sel", isLook(x.dataset.look))); });

@@ -130,7 +130,7 @@ function scene(u, total, night) {
 
 export function forestMain(u, left, total, night) {
   const n = forestOf(u).length;
-  return `<h2>my forest</h2><div class="forest${night ? " night" : ""}"><svg viewBox="0 0 384 292" role="img" aria-label="isometric forest">${scene(u, total, night)}</svg></div>
+  return `<div class="forest${night ? " night" : ""}"><svg viewBox="0 0 384 292" role="img" aria-label="isometric forest">${scene(u, total, night)}</svg></div>
   <div class="fpanel"><div class="seedbar">🌱 <b>${left}</b> seeds</div>
   <p class="hint">${n ? `${n} / ${N * N} tiles planted · ` : ""}tap a free tile to plant 🌱 · tap a tree to see how it grows</p></div>`;
 }
@@ -144,7 +144,7 @@ export function forestAct(i, x) {
     catch (e) { pop = { c: -1, at: 0 }; x.toast(x.err(e)); }
   };
   if (!t) {
-    x.modal.innerHTML = `<div class="back"><div class="sheet"><h3>plant a tree 🌱</h3><p class="hint">Each tree grows only while <b>you</b> study, on its own clock, starting now.<br><b>🌱 ${x.left} seeds</b> to spend</p>
+    x.modal.innerHTML = `<div class="back"><div class="sheet"><h3>plant a tree 🌱</h3><div class="seedbar">🌱 <b>${x.left}</b> seeds to spend</div><p class="hint">Each tree grows only while <b>you</b> study, on its own clock, starting now.</p>
     <div class="shopg">${Object.entries(SPECIES).map(([id, s]) => `<button class="${x.left >= s.price ? "" : "lock"}" data-sp="${id}"><div class="fsp">${thumb(id)}</div><b>${s.n}</b><small>🌱 ${s.price} · full in ${+s.hrs[4].toFixed(1)}h</small></button>`).join("")}</div>
     <button class="link" id="fx">close</button></div></div>`;
     q("#fx").onclick = close;

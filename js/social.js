@@ -14,7 +14,7 @@ function cheerCard(list) {
   el.onclick = () => el.remove(); document.body.appendChild(el); setTimeout(() => el.remove(), 5500);
 }
 function stickerSheet(to, mine) {
-  modal.innerHTML = `<div class="back"><div class="sheet"><h3>send a sticker 💌</h3><div class="stk">${STICKERS.map(t => `<button class="btn ghost" data-s="${esc(t)}">${esc(t)}</button>`).join("")}</div><button class="link" id="sx">close</button></div></div>`;
+  modal.innerHTML = `<div class="back"><div class="sheet"><h3>send a sticker 💌</h3><p class="hint">tap one to send it right away</p><div class="stk">${STICKERS.map(t => `<button class="btn ghost" data-s="${esc(t)}">${esc(t)}</button>`).join("")}</div><button class="link" id="sx">close</button></div></div>`;
   $("#sx").onclick = () => modal.innerHTML = "";
   modal.querySelectorAll("[data-s]").forEach(b => b.onclick = async () => { modal.innerHTML = ""; try { await DB.cheer(to, me.uid, mine.name, b.dataset.s); toast("Sticker sent 💌"); } catch (e) { toast(errMsg(e)); } });
 }
@@ -38,7 +38,7 @@ function giftSheet(id) {
   if (!g.seen) DB.markGift(me.uid, g.id).catch(() => {});
   const when = g.at && g.at.toMillis ? dayLong(g.at.toMillis()) : "";
   modal.innerHTML = `<div class="back"><div class="sheet cardsheet"><h3>${esc(g.emoji)} from ${esc(g.name)}</h3><p class="hint">${esc(when)}</p><div class="cprev"><img src="${safeImg(g.img)}" alt="card from ${esc(g.name)}"></div>
-  <div class="row"><button class="btn ghost" id="gx">close</button><button class="btn ghost" id="gd">remove 🗑️</button><button class="btn" id="gs">save ⬇️</button></div></div></div>`;
+  <div class="row"><button class="btn ghost" id="gx">close</button><button class="btn" id="gs">save ⬇️</button></div><button class="link" id="gd">remove this card 🗑️</button></div></div>`;
   $("#gx").onclick = () => modal.innerHTML = "";
   $("#gs").onclick = () => { const a = document.createElement("a"); a.href = safeImg(g.img); a.download = `card-from-${String(g.name || "friend").replace(/[^a-z0-9]+/gi, "-")}-${key(Date.now())}.jpg`; document.body.appendChild(a); a.click(); a.remove(); toast("Saved 📸"); };
   $("#gd").onclick = async () => { if (!confirm("Remove this card?")) return; try { await DB.deleteGift(me.uid, g.id); modal.innerHTML = ""; } catch (e) { toast(errMsg(e)); } };

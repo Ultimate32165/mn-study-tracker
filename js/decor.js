@@ -69,8 +69,9 @@ function gardenPanel() {
     <div class="gbtns"><button class="btn ghost" data-act="gcancel">cancel</button><button class="btn" data-act="gdone">done 💖</button></div>`;
   }
   return `<div class="gtop"><div class="seedbar">🌱 <b>${seedsLeft(m)}</b> seeds</div><button class="chip" data-act="gwx">🌦️ ${wl}</button></div>
-  <div class="gbtns"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button><button class="btn ghost" data-act="gland">🎨 style garden</button><button class="btn ghost" data-act="gchoose">🐾 garden pets</button><button class="btn ghost wide" data-act="card" data-id="garden">📸 garden photocard</button></div>
-  <p class="hint">drag the garden to look around ✋ · pinch or use ＋ － to zoom 🔍 · tap a pet for tricks, treats & a nickname 💗 · tap visitors for seeds 🦋</p>${coupleCard()}`;
+  <div class="gbtns"><button class="btn" data-act="gshop">🛍️ shop</button><button class="btn ghost" data-act="gedit">🪴 decorate</button></div>
+  <div class="gtools"><button data-act="gland"><i>🎨</i>style</button><button data-act="gchoose"><i>🐾</i>pets</button><button data-act="card" data-id="garden"><i>📸</i>photocard</button></div>
+  <p class="hint">drag to look around · pinch or ＋ － to zoom · tap pets and visitors 💗🦋</p>${coupleCard()}`;
 }
 function enterEdit(m) {
   G.edit = true; G.work = decorOf(m).map(d => ({ ...d })); G.sel = null;
@@ -91,7 +92,7 @@ function delSel() {
 }
 function shopSheet(mine) {
   const left = seedsLeft(mine);
-  modal.innerHTML = `<div class="back"><div class="sheet"><h3>decoration shop 🛍️</h3><p class="hint">You earn 🌱 1 seed for every 5 minutes you study (and from garden visitors).<br><b>🌱 ${left} seeds</b> to spend</p>
+  modal.innerHTML = `<div class="back"><div class="sheet"><h3>decoration shop 🛍️</h3><div class="seedbar">🌱 <b>${left}</b> seeds to spend</div><p class="hint">1 seed for every 5 minutes you study, plus garden visitors.</p>
   ${CATS.map(([c, cn]) => `<h4 class="shopcat">${cn}</h4><div class="shopg">${Object.keys(ITEMS).filter(id => ITEMS[id].c === c).map(id => { const x = ITEMS[id]; return `<button class="${left >= x.price ? "" : "lock"}" data-buy="${id}"><div class="shopthumb">${ART[id]}</div><b>${x.n}</b><small>🌱 ${x.price}</small></button>`; }).join("")}</div>`).join("")}
   <button class="link" id="sx">close</button></div></div>`;
   $("#sx").onclick = () => modal.innerHTML = "";

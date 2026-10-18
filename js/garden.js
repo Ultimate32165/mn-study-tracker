@@ -258,7 +258,7 @@ async function treat(key, m) {
   G.card.hidden = true;
 }
 
-const gardenMain = () => `<h2>our garden</h2><div id="gslot"></div><div id="gpanel">${gardenPanel()}</div>`;
+const gardenMain = () => `<div id="gslot"></div><div id="gpanel">${gardenPanel()}</div>`;
 function gardenTap(key) {
   const p = G.pets.get(key), u = p && users.find(x => x.id === p.uid); if (!u) return;
   if (performance.now() - G.noClick < 300) return; // that was the end of a drag, not a tap
