@@ -7,7 +7,9 @@ import { $, burst, ls, toast } from "./util.js";
 
 const COIN = { bonus: 2, level: 10 }, COST = 15, START = 30; // coins per bonus word / per finished level, price of a hint, coins at the start
 const SIZE = 9; // the grid never gets wider or taller than this
-const load = () => { try { const s = JSON.parse(ls("games") || "null"); return s && s.v === 2 ? s : null; } catch { return null; } }; // an older (quordle) save has no v: 2, so it is ignored
+const okLv = l => l && Array.isArray(l.order) && Array.isArray(l.found) && Array.isArray(l.bonus) && Array.isArray(l.hint) && Array.isArray(l.grid) && l.grid.every(g => g && typeof g.w === "string" && Number.isInteger(g.r) && Number.isInteger(g.c));
+const okSave = s => s && s.v === 2 && Number.isInteger(s.lvl) && typeof s.coins === "number" && s.st && (!s.lv || okLv(s.lv));
+const load = () => { try { const s = JSON.parse(ls("games") || "null"); return okSave(s) ? s : null; } catch { return null; } };
 const store = load() || { v: 2, lvl: 1, lv: null, coins: START, st: { done: 0, bonus: 0 } }; // lv = the level being played: { root, order, grid, found, bonus, hint, done }
 const save = () => ls("games", JSON.stringify(store));
 const cur = () => store.lv || (store.lv = buildLevel(store.lvl));
