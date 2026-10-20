@@ -1,8 +1,7 @@
-// GAMES TAB: Wordscapes (replaces quordle / octordle).
-// Local-only persistence using localStorage "games" with schema { v: 2, lvl, lv, coins, st }.
+// GAMES TAB: Wordscapes with Level Selector & Progress tracking
 import { LEVELS } from "./words.js";
 import { tab, ui } from "./state.js";
-import { burst, ls, toast } from "./util.js";
+import { burst, ls, modal, toast } from "./util.js";
 
 const START_COINS = 30;
 const HINT_COST = 15;
@@ -12,9 +11,12 @@ const LEVEL_COMPLETE_COIN = 10;
 function loadStore() {
   try {
     const raw = JSON.parse(ls("games") || "{}");
-    if (raw.v === 2 && typeof raw.lvl === "number") return raw;
+    if (raw.v === 2 && typeof raw.lvl === "number") {
+      if (!raw.maxLvl) raw.maxLvl = raw.lvl; // track highest unlocked level
+      return raw;
+    }
   } catch {}
-  return { v: 2, lvl: 1, lv: null, coins: START_COINS, st: { played: 0, won: 0 } };
+  return { v: 2, lvl: 1, maxLvl: 1, lv: null, coins: START_COINS, st: { played: 0, won: 0 } };
 }
 
 const store = loadStore();
@@ -28,14 +30,13 @@ function getLevelDef(lvlNum) {
 function initLevelState(lvlNum) {
   const def = getLevelDef(lvlNum);
   const letters = [...def.wheel_letters];
-  // Deterministic shuffle
   letters.sort(() => 0.5 - Math.random());
   return {
     lvlNum,
     order: letters,
     found: [],
     bonus: [],
-    hints: {}, // "r,c" -> true
+    hints: {},
     done: false
   };
 }
@@ -54,7 +55,7 @@ function curLevel() {
 }
 
 // In-progress letter selection
-let sel = []; // indices of selected letters on the dial
+let sel = [];
 let isSwiping = false;
 
 function getLetterUnderPointer(e) {
@@ -115,11 +116,17 @@ function submitWord(word) {
       lv.found.push(word);
       if (lv.found.length === def.target_words.length) {
         lv.done = true;
-        store.coins += LEVEL_COMPLETE_COIN;
+        // Only grant completion coins if finishing for the first time
+        if (store.lvl >= store.maxLvl) {
+          store.coins += LEVEL_COMPLETE_COIN;
+          store.maxLvl = Math.max(store.maxLvl, store.lvl + 1);
+          toast(`Level Complete! +${LEVEL_COMPLETE_COIN} 🪙`);
+        } else {
+          toast("Level Replayed! ⭐");
+        }
         store.st.won++;
         save();
         burst(null, 50);
-        toast(`Level Complete! +${LEVEL_COMPLETE_COIN} 🪙`);
       } else {
         save();
       }
@@ -142,7 +149,7 @@ function submitWord(word) {
   toast("Not in the word list");
 }
 
-// Global pointer event delegation for wheel gestures
+// Pointer drag listeners
 document.addEventListener("pointerdown", e => {
   if (tab !== "games") return;
   const wheel = e.target.closest(".wwheel");
@@ -187,7 +194,7 @@ document.addEventListener("pointercancel", () => {
   updateDirectDom();
 });
 
-// Keyboard support
+// Keyboard
 addEventListener("keydown", e => {
   if (tab !== "games" || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
   const lv = curLevel();
@@ -228,6 +235,30 @@ addEventListener("keydown", e => {
   }
 });
 
+// Pop-up Sheet for Level Selection
+function levelsSheet() {
+  const max = store.maxLvl || 1;
+  const list = LEVELS.map(l => {
+    const num = l.level_id;
+    const isUnlocked = num <= max;
+    const isCurrent = num === store.lvl;
+    const isCompleted = num < max;
+
+    return `<button class="wlvl-btn${isCurrent ? " curr" : ""}${isCompleted ? " done" : ""}${!isUnlocked ? " lock" : ""}" 
+      data-act="${isUnlocked ? "gpick" : "glock"}" data-lvl="${num}">
+      <b>${num}</b>
+      <small>${!isUnlocked ? "🔒" : isCompleted ? "✓" : "▶"}</small>
+    </button>`;
+  }).join("");
+
+  modal(`<div class="sheet">
+    <h3>Select Level</h3>
+    <p class="hint">Replay finished levels anytime or resume progress</p>
+    <div class="wlvl-grid">${list}</div>
+    <button class="btn ghost" data-act="mclose">Close</button>
+  </div>`);
+}
+
 function gamesAct(act, data) {
   const lv = curLevel();
   const def = getLevelDef(store.lvl);
@@ -244,7 +275,6 @@ function gamesAct(act, data) {
     if (lv.done) return;
     if (store.coins < HINT_COST) return toast(`Need ${HINT_COST} 🪙 for a hint!`);
     
-    // Locate unrevealed letters in target words
     const unrevealed = [];
     def.target_words.forEach(t => {
       if (!lv.found.includes(t.word)) {
@@ -263,14 +293,26 @@ function gamesAct(act, data) {
     store.coins -= HINT_COST;
     save();
     toast(`Hint revealed! -${HINT_COST} 🪙`);
+  } else if (act === "glvls") {
+    levelsSheet();
+  } else if (act === "gpick") {
+    const targetLvl = +data.lvl;
+    if (targetLvl && targetLvl <= store.maxLvl) {
+      store.lvl = targetLvl;
+      store.lv = initLevelState(store.lvl);
+      save();
+      modal(""); // close sheet
+    }
+  } else if (act === "glock") {
+    toast(`Level ${data.lvl} is locked! Complete previous levels first 🔒`);
   } else if (act === "gnext") {
     store.lvl++;
+    if (store.lvl > store.maxLvl) store.maxLvl = store.lvl;
     store.lv = initLevelState(store.lvl);
     save();
   }
 }
 
-// ---------- DOM Generation ----------
 function gridHtml(def, lv) {
   let maxR = 0, maxC = 0;
   const gridCells = {};
@@ -312,7 +354,7 @@ function gridHtml(def, lv) {
 function wheelHtml(lv) {
   const letters = lv.order;
   const n = letters.length;
-  const radius = 68; // wheel radius in px
+  const radius = 68;
   const center = 96;
 
   let lets = "";
@@ -337,7 +379,7 @@ function gamesMain() {
   return `<h2>Wordscapes<span class="wbar">🪙 ${store.coins}</span></h2>
   <div class="gm">
     <div class="wtop">
-      <span class="chip">Level ${store.lvl}</span>
+      <button class="chip wlvl-trigger" data-act="glvls">Level ${store.lvl} ▾</button>
       <span class="chip ghost">${def.tier}</span>
     </div>
     
@@ -356,7 +398,7 @@ function gamesMain() {
     ${lv.done ? `
       <div class="wdone card">
         <h3>Level Complete! 🎉</h3>
-        <p class="hint">Awesome job solving all target words!</p>
+        <p class="hint">You found all words in this level!</p>
         <button class="btn" data-act="gnext">Next Level ➔</button>
       </div>
     ` : ""}

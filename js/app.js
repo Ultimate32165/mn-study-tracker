@@ -102,7 +102,8 @@ app.onclick = async e => {
     else if (a === "badd") addBoardNote(mine);
     else if (a === "bclear") { const ids = board.filter(n => n.lane === 2).map(n => n.id); if (ids.length && confirm(`Clear ${ids.length} finished note${ids.length > 1 ? "s" : ""}?`)) await DB.clearNotes(ids); }
     else if (a === "fcell") forestAct(+id, { u: mine, total: totalOf(mine), left: seedsLeft(mine), modal, toast, err: errMsg, fmt, burst, save: t => DB.saveForest(me.uid, t) });
-    else if (a === "gshuf" || a === "ghint" || a === "gnext") { gamesAct(a, b.dataset); render(); }
+    else if (a === "gshuf" || a === "ghint" || a === "gnext" || a === "glvls" || a === "gpick" || a === "glock") { gamesAct(a, b.dataset); render(); }
+	else if (a === "mclose") { modal(""); }
     else if (a === "gedit") enterEdit(mine);
     else if (a === "gdone") await exitEdit(true);
     else if (a === "gcancel") await exitEdit(false);
