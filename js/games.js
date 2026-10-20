@@ -7,13 +7,15 @@ import { $, burst, ls, toast } from "./util.js";
 
 const COIN = { bonus: 2, level: 10 }, COST = 15, START = 30; // coins per bonus word / per finished level, price of a hint, coins at the start
 const SIZE = 9; // the grid never gets wider or taller than this
-const okLv = l => l && Array.isArray(l.order) && Array.isArray(l.found) && Array.isArray(l.bonus) && Array.isArray(l.hint) && Array.isArray(l.grid) && l.grid.every(g => g && typeof g.w === "string" && Number.isInteger(g.r) && Number.isInteger(g.c));
-const okSave = s => s && s.v === 2 && Number.isInteger(s.lvl) && typeof s.coins === "number" && s.st && (!s.lv || okLv(s.lv));
-const load = () => { try { const s = JSON.parse(ls("games") || "null"); return okSave(s) ? s : null; } catch { return null; } };
+const okLv = l => l && Array.isArray(l.order) && Array.isArray(l.found) && Array.isArray(l.bonus) && Array.isArray(l.hint) && Array.isArray(l.grid) && l.grid.every(g => g && typeof g.w === "string" && Number.isInteger(g.r) && Number.isInteger(g.c)); // is a saved level complete and usable?
+const okSave = s => s && s.v === 2 && Number.isInteger(s.lvl) && typeof s.coins === "number" && s.st && (!s.lv || okLv(s.lv)) && (s.prog == null || typeof s.prog === "object");
+const load = () => { try { const s = JSON.parse(ls("games") || "null"); return okSave(s) ? s : null; } catch { return null; } }; // a broken or foreign save is ignored and a fresh game starts
 const store = load() || { v: 2, lvl: 1, lv: null, coins: START, st: { done: 0, bonus: 0 } }; // lv = the level being played: { root, order, grid, found, bonus, hint, done }
+store.prog = store.prog || {}; // levels left halfway, by level number
+if (!Number.isInteger(store.best)) store.best = Math.max(0, store.lvl - 1 + (store.lv && store.lv.done ? 1 : 0)); // best = highest finished level (older saves don't have it)
 const save = () => ls("games", JSON.stringify(store));
 const cur = () => store.lv || (store.lv = buildLevel(store.lvl));
-let sel = [], drag = false; // sel = wheel positions picked so far (kept here, so a redraw in the middle of a word doesn't lose it)
+let sel = [], drag = false, picking = false; // picking = level picker is open; sel = wheel positions picked so far (kept here, so a redraw in the middle of a word doesn't lose it)
 
 // ---------- building a level ----------
 // letters on the wheel and grid words per level: 1-5 / 6-15 / 16-35 / 36+
@@ -81,7 +83,7 @@ const foundCells = lv => new Set(lv.grid.filter(g => lv.found.includes(g.w)).fla
 const spelled = () => sel.map(i => cur().order[i]).join("");
 function check(lv) { // a word whose cells are all showing (hints, crossings) counts as found; every word found = level done
   for (let again = true; again;) { again = false; const s = new Set([...foundCells(lv), ...lv.hint]); for (const g of lv.grid) if (!lv.found.includes(g.w) && cellsOf(g).every(k => s.has(k))) { lv.found.push(g.w); again = true; } }
-  if (!lv.done && lv.grid.every(g => lv.found.includes(g.w))) { lv.done = 1; store.coins += COIN.level; store.st.done++; burst(null, 60); toast("Level complete! 🎉"); }
+  if (!lv.done && lv.grid.every(g => lv.found.includes(g.w))) { lv.done = 1; if (store.lvl > store.best) { store.best = store.lvl; lv.rew = 1; store.coins += COIN.level; store.st.done++; } burst(null, 60); toast("Level complete! 🎉"); }
 }
 function submit(w) {
   const lv = cur(), g = lv.grid.find(x => x.w === w);
@@ -89,10 +91,17 @@ function submit(w) {
   if (g) { if (lv.found.includes(w)) return toast("Already found"); lv.found.push(w); }
   else if (!VALID.has(w)) return toast("Not in the word list");
   else if (lv.bonus.includes(w)) return toast("Already found");
-  else { lv.bonus.push(w); store.coins += COIN.bonus; store.st.bonus++; toast(`Bonus word! +${COIN.bonus} 🪙`); }
+  else { lv.bonus.push(w); if (store.lvl > store.best) { store.coins += COIN.bonus; store.st.bonus++; toast(`Bonus word! +${COIN.bonus} 🪙`); } else toast("Bonus word!"); }
   check(lv); save();
 }
 function shuffle() { const lv = cur(); lv.order = shuf(lv.order); sel = []; save(); }
+
+function goto(n) { // switch level; a level left halfway is kept and comes back when you return to it
+  const lv = store.lv;
+  if (lv && !lv.done && (lv.found.length || lv.bonus.length || lv.hint.length)) store.prog[store.lvl] = lv;
+  const back = store.prog[n]; delete store.prog[n];
+  store.lvl = n; store.lv = okLv(back) ? back : null; sel = []; picking = false; save();
+}
 
 // called by app.js for every data-act of this tab: gshuf (shuffle the wheel), ghint (reveal a letter), gnext (next level)
 function gamesAct(a) {
@@ -103,7 +112,7 @@ function gamesAct(a) {
     if (store.coins < COST) return toast(`A hint costs ${COST} coins 🪙`);
     const s = new Set([...foundCells(lv), ...lv.hint]), hid = [...new Set(lv.grid.flatMap(cellsOf))].filter(k => !s.has(k)); if (!hid.length) return;
     lv.hint.push(hid[Math.floor(Math.random() * hid.length)]); store.coins -= COST; check(lv); save();
-  } else if (a === "gnext") { if (!lv.done) return; store.lvl++; store.lv = null; sel = []; save(); }
+  } else if (a === "gnext") { if (!lv.done) return; goto(store.lvl + 1); }
 }
 
 // ---------- swiping the wheel ----------
@@ -128,8 +137,17 @@ addEventListener("pointerdown", e => {
 addEventListener("pointermove", e => { if (drag) move(e); });
 addEventListener("pointerup", () => { if (!drag) return; drag = false; const w = spelled(); sel = []; paint(); if (w.length > 1) { submit(w); ui.render(); } });
 addEventListener("pointercancel", () => { if (!drag) return; drag = false; sel = []; paint(); });
+addEventListener("click", e => { // level picker: data-gl = open / close / a level number
+  if (tab !== "games" || !e.target.closest) return;
+  const b = e.target.closest("[data-gl]"); if (!b) return;
+  const v = b.dataset.gl;
+  if (v === "open") picking = true;
+  else if (v === "close") picking = false;
+  else { const n = +v; if (n >= 1 && n <= store.best + 1) { if (n !== store.lvl) goto(n); else picking = false; } }
+  ui.render();
+});
 addEventListener("keydown", e => { // a real keyboard works too: letters, Backspace, Enter, Space = shuffle
-  if (tab !== "games" || drag || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (tab !== "games" || drag || picking || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
   const lv = cur(), k = e.key; if (!(k === "Enter" || k === "Backspace" || k === " " || /^[a-z]$/i.test(k))) return; e.preventDefault();
   if (lv.done) { if (k === "Enter") gamesAct("gnext"); }
   else if (k === " ") shuffle();
@@ -150,10 +168,17 @@ function wheelHtml(lv) {
   const n = lv.order.length;
   return `<div class="wwheel"><svg class="wline" viewBox="0 0 100 100"><polyline points="${sel.map(i => pos(i, n)).join(" ")}"/></svg>${lv.order.map((ch, i) => { const p = pos(i, n); return `<i class="wlet${sel.includes(i) ? " on" : ""}" style="left:${p[0]}%;top:${p[1]}%">${ch}</i>`; }).join("")}</div>`;
 }
+function pickerHtml() { // every finished level + the next one
+  const top = store.best + 1; let h = "";
+  for (let n = 1; n <= top; n++) h += `<button class="wlv${n === store.lvl ? " cur" : ""}${n <= store.best ? " ok" : ""}${store.prog[n] ? " prog" : ""}" data-gl="${n}">${n}</button>`;
+  return `<div class="gm"><div class="wbar"><b>Pick a level</b><button class="chip" data-gl="close">✕ close</button></div><div class="wpick">${h}</div>
+  <p class="hint">Finish level ${top} to unlock the next one. Replaying a finished level gives no coins.</p></div>`;
+}
 function gamesMain() {
+  if (picking) return pickerHtml();
   const lv = cur(), nb = lv.bonus.length;
-  return `<div class="gm"><div class="wbar"><b>Level ${store.lvl}</b><span>🪙 ${store.coins}</span></div>${gridHtml(lv)}
-  ${lv.done ? `<div class="wdone"><b>Level ${store.lvl} complete! 🎉</b><span>+${COIN.level} 🪙 · ${nb} bonus word${nb === 1 ? "" : "s"}</span><button class="btn" data-act="gnext">next level</button></div>`
+  return `<div class="gm"><div class="wbar"><button class="chip" data-gl="open">☰ Level ${store.lvl}</button><span>🪙 ${store.coins}</span></div>${gridHtml(lv)}
+  ${lv.done ? `<div class="wdone"><b>Level ${store.lvl} complete! 🎉</b><span>${lv.rew ? `+${COIN.level} 🪙 · ` : ""}${nb} bonus word${nb === 1 ? "" : "s"}</span><button class="btn" data-act="gnext">next level</button></div>`
     : `<div class="wpre${sel.length ? " has" : ""}">${spelled()}</div>${wheelHtml(lv)}<div class="wtools"><button class="chip" data-act="gshuf">🔀 shuffle</button><button class="chip pri${store.coins < COST ? " dim" : ""}" data-act="ghint">💡 hint · ${COST} 🪙</button></div>`}
   <p class="hint">${lv.found.length} of ${lv.grid.length} words · ${nb} bonus</p></div>`;
 }

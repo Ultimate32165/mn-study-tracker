@@ -853,10 +853,7 @@ background:radial-gradient(60% 40% at 15% 0%,color-mix(in srgb,var(--glow1) 85%,
 .wbar{align-self:stretch;display:flex;justify-content:space-between;align-items:center;font-family:var(--hf);font-weight:600}
 .wbar span{background:var(--card);border:1px solid var(--edge);border-radius:999px;padding:4px 12px;font-size:.88rem}
 .wgrid{container-type:inline-size;width:min(100%,calc(var(--c)*40px));display:grid;grid-template-columns:repeat(var(--c),1fr);gap:3px}
-.wcell{display:grid;place-items:center;aspect-ratio:1;border-radius:6px;font-style:normal;font-family:var(--hf);font-weight:600;text-transform:uppercase;line-height:1;font-size:.8rem;font-size:calc(55cqw/var(--c));color:var(--ink);
-background:color-mix(in srgb,var(--main) 24%,var(--card));
-border:1px solid color-mix(in srgb,var(--main-d) 35%,transparent);
-box-shadow:0 2px 0 color-mix(in srgb,var(--main-d) 50%,transparent),inset 0 1px 0 rgba(255,255,255,.35)}
+.wcell{display:grid;place-items:center;aspect-ratio:1;border-radius:6px;font-style:normal;font-family:var(--hf);font-weight:600;text-transform:uppercase;line-height:1;font-size:.8rem;font-size:calc(55cqw/var(--c));color:var(--ink);background:color-mix(in srgb,var(--main) 24%,var(--card));border:1px solid color-mix(in srgb,var(--main-d) 35%,transparent);box-shadow:0 2px 0 color-mix(in srgb,var(--main-d) 50%,transparent),inset 0 1px 0 rgba(255,255,255,.35)}
 .wcell.x{visibility:hidden}
 .wcell.on{background:var(--main-d);border-color:transparent;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 .wcell.hnt{background:color-mix(in srgb,var(--alt) 70%,var(--card));border-color:transparent;color:var(--ink);text-shadow:none}
@@ -875,6 +872,14 @@ box-shadow:0 2px 0 color-mix(in srgb,var(--main-d) 50%,transparent),inset 0 1px 
 .wdone b{font-family:var(--hf);font-size:1.1rem}
 .wdone span{color:var(--soft);font-size:.88rem}
 .wdone .btn{margin-top:10px}
+/* level picker: .wpick grid of .wlv tiles (ok = finished, prog = left halfway, cur = the level being played) */
+.wpick{align-self:stretch;display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;max-height:60vh;overflow:auto;padding:2px}
+.wlv{position:relative;aspect-ratio:1;border-radius:12px;border:1px solid var(--edge);background:var(--card);color:var(--ink);font-family:var(--hf);font-weight:600;font-size:1rem;cursor:pointer}
+.wlv.ok{background:color-mix(in srgb,var(--main) 24%,var(--card))}
+.wlv.ok::after{content:"✓";position:absolute;top:3px;right:6px;font-size:.6rem;color:var(--main-d)}
+.wlv.prog::before{content:"•";position:absolute;bottom:1px;left:50%;transform:translateX(-50%);font-size:1rem;line-height:1;color:var(--alt)}
+.wlv.cur{background:var(--main-d);color:#fff;border-color:transparent}
+.wlv.cur::after{color:#fff}
 .gm .hint{margin:0}
 @media (max-width:400px){nav button span{font-size:.62rem;white-space:nowrap}}
 
