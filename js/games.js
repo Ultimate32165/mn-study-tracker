@@ -1,84 +1,361 @@
-// GAMES TAB. Quordle (4 boards) and Octordle (8 boards): guess 5-letter words, every guess is scored on every unsolved board at once.
-// The game is saved on this device only (localStorage "games"); nothing goes to Firebase.
-import { ANSWERS, VALID } from "./words.js";
+// GAMES TAB: Wordscapes (replaces quordle / octordle).
+// Local-only persistence using localStorage "games" with schema { v: 2, lvl, lv, coins, st }.
+import { LEVELS } from "./words.js";
 import { tab, ui } from "./state.js";
 import { burst, ls, toast } from "./util.js";
 
-const MAX = { 4: 9, 8: 13 }; // guesses allowed per mode
-const NAME = { 4: "quordle", 8: "octordle" };
-const load = () => { try { return JSON.parse(ls("games") || "{}"); } catch { return {}; } };
-const store = load(); // { mode: 4|8, 4: game, 8: game, s: { 4: [played, won], 8: [played, won] } }
+const START_COINS = 30;
+const HINT_COST = 15;
+const BONUS_COIN = 2;
+const LEVEL_COMPLETE_COIN = 10;
+
+function loadStore() {
+  try {
+    const raw = JSON.parse(ls("games") || "{}");
+    if (raw.v === 2 && typeof raw.lvl === "number") return raw;
+  } catch {}
+  return { v: 2, lvl: 1, lv: null, coins: START_COINS, st: { played: 0, won: 0 } };
+}
+
+const store = loadStore();
 const save = () => ls("games", JSON.stringify(store));
-const pick = n => { const t = []; while (t.length < n) { const w = ANSWERS[Math.floor(Math.random() * ANSWERS.length)]; if (!t.includes(w)) t.push(w); } return t; };
-const fresh = n => ({ t: pick(n), g: [], c: "", done: 0 }); // t = secret words, g = guesses so far, c = word being typed, done: 0 playing / 1 won / 2 lost
-const mode = () => store.mode === 8 ? 8 : 4;
-function cur() { const n = mode(); if (!store[n] || store[n].t.length !== n) store[n] = fresh(n); return store[n]; }
 
-// 0 = letter not in the word, 1 = in the word but elsewhere, 2 = right spot (handles repeated letters correctly)
-function score(g, t) {
-  const r = [0, 0, 0, 0, 0], left = {};
-  for (let i = 0; i < 5; i++) if (g[i] === t[i]) r[i] = 2; else left[t[i]] = (left[t[i]] || 0) + 1;
-  for (let i = 0; i < 5; i++) if (r[i] !== 2 && left[g[i]] > 0) { r[i] = 1; left[g[i]]--; }
-  return r;
-}
-const rowsOf = (g, b) => { const rows = []; for (const w of g.g) { rows.push(w); if (w === g.t[b]) break; } return rows; }; // a solved board stops taking guesses
-const solved = (g, b) => g.g.includes(g.t[b]);
-
-function press(k) {
-  const g = cur(); if (g.done) return;
-  if (k === "enter") {
-    if (g.c.length < 5) return toast("5 letters needed");
-    if (!VALID.has(g.c)) return toast("Not in the word list");
-    g.g.push(g.c); g.c = "";
-    const n = g.t.length;
-    if (g.t.every(w => g.g.includes(w))) g.done = 1; else if (g.g.length >= MAX[n]) g.done = 2;
-    if (g.done) { const s = store.s || (store.s = {}), p = s[n] || (s[n] = [0, 0]); p[0]++; if (g.done === 1) { p[1]++; burst(null, 60); toast("All solved! 🎉"); } }
-  } else if (k === "del") g.c = g.c.slice(0, -1);
-  else if (g.c.length < 5) g.c += k;
-  save();
+function getLevelDef(lvlNum) {
+  const idx = (lvlNum - 1) % LEVELS.length;
+  return LEVELS[idx];
 }
 
-// called by app.js for every data-act that starts with "g" in this tab: gk (key), gnew (new game), gmode (4 / 8 boards)
-function gamesAct(a, d) {
-  if (a === "gk") press(d.k);
-  else if (a === "gnew") { const n = mode(); if (cur().done || !cur().g.length || confirm("Give up and start a new game?")) { store[n] = fresh(n); save(); } }
-  else if (a === "gmode") { store.mode = +d.id === 8 ? 8 : 4; save(); }
+function initLevelState(lvlNum) {
+  const def = getLevelDef(lvlNum);
+  const letters = [...def.wheel_letters];
+  // Deterministic shuffle
+  letters.sort(() => 0.5 - Math.random());
+  return {
+    lvlNum,
+    order: letters,
+    found: [],
+    bonus: [],
+    hints: {}, // "r,c" -> true
+    done: false
+  };
 }
-addEventListener("keydown", e => { // a real keyboard works too
-  if (tab !== "games" || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-  const k = e.key === "Enter" ? "enter" : e.key === "Backspace" ? "del" : /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() : "";
-  if (!k) return; e.preventDefault(); press(k); ui.render();
+
+function curLevel() {
+  if (!store.lv || store.lv.lvlNum !== store.lvl) {
+    store.lv = initLevelState(store.lvl);
+    save();
+  }
+  return store.lv;
+}
+
+// In-progress letter selection
+let sel = []; // indices of selected letters on the dial
+let isSwiping = false;
+
+function getLetterUnderPointer(e) {
+  const wheel = document.querySelector(".wwheel");
+  if (!wheel) return -1;
+  const rect = wheel.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const nodes = wheel.querySelectorAll(".wlet");
+  for (let i = 0; i < nodes.length; i++) {
+    const nr = nodes[i].getBoundingClientRect();
+    const nx = nr.left - rect.left + nr.width / 2;
+    const ny = nr.top - rect.top + nr.height / 2;
+    const dist = Math.hypot(x - nx, y - ny);
+    if (dist <= nr.width * 0.6) return i;
+  }
+  return -1;
+}
+
+function updateDirectDom() {
+  const lv = curLevel();
+  const word = sel.map(i => lv.order[i]).join("");
+  const preview = document.querySelector(".wpre");
+  if (preview) preview.textContent = word;
+
+  const letterEls = document.querySelectorAll(".wlet");
+  letterEls.forEach((el, i) => {
+    el.classList.toggle("sel", sel.includes(i));
+  });
+
+  const svg = document.querySelector(".wline");
+  const wheel = document.querySelector(".wwheel");
+  if (svg && wheel && letterEls.length) {
+    const rect = wheel.getBoundingClientRect();
+    let pts = [];
+    sel.forEach(idx => {
+      const nr = letterEls[idx].getBoundingClientRect();
+      const cx = (nr.left - rect.left) + nr.width / 2;
+      const cy = (nr.top - rect.top) + nr.height / 2;
+      pts.push(`${cx},${cy}`);
+    });
+    const poly = svg.querySelector("polyline");
+    if (poly) poly.setAttribute("points", pts.join(" "));
+  }
+}
+
+function submitWord(word) {
+  const lv = curLevel();
+  const def = getLevelDef(store.lvl);
+  word = word.toUpperCase();
+  if (word.length < 2) return;
+
+  const target = def.target_words.find(t => t.word === word);
+  if (target) {
+    if (lv.found.includes(word)) {
+      toast("Already found!");
+    } else {
+      lv.found.push(word);
+      if (lv.found.length === def.target_words.length) {
+        lv.done = true;
+        store.coins += LEVEL_COMPLETE_COIN;
+        store.st.won++;
+        save();
+        burst(null, 50);
+        toast(`Level Complete! +${LEVEL_COMPLETE_COIN} 🪙`);
+      } else {
+        save();
+      }
+    }
+    return;
+  }
+
+  if (def.bonus_words && def.bonus_words.includes(word)) {
+    if (lv.bonus.includes(word)) {
+      toast("Bonus word already found!");
+    } else {
+      lv.bonus.push(word);
+      store.coins += BONUS_COIN;
+      save();
+      toast(`Bonus word found! +${BONUS_COIN} 🪙`);
+    }
+    return;
+  }
+
+  toast("Not in the word list");
+}
+
+// Global pointer event delegation for wheel gestures
+document.addEventListener("pointerdown", e => {
+  if (tab !== "games") return;
+  const wheel = e.target.closest(".wwheel");
+  if (!wheel) return;
+  isSwiping = true;
+  sel = [];
+  const idx = getLetterUnderPointer(e);
+  if (idx !== -1) sel.push(idx);
+  updateDirectDom();
 });
 
-// ---------- drawing ----------
-const CLS = ["m", "n", "h"]; // tile / key classes for score 0 / 1 / 2
-const ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
-function boardHtml(g, b, max) {
-  const rows = rowsOf(g, b), won = solved(g, b), live = !won && !g.done;
-  let h = "";
-  for (let r = 0; r < max; r++) {
-    let cells = "";
-    if (r < rows.length) { const sc = score(rows[r], g.t[b]); cells = [...rows[r]].map((ch, i) => `<i class="gt ${CLS[sc[i]]}">${ch}</i>`).join(""); }
-    else if (r === rows.length && live) for (let i = 0; i < 5; i++) cells += g.c[i] ? `<i class="gt t">${g.c[i]}</i>` : `<i class="gt e"></i>`;
-    else for (let i = 0; i < 5; i++) cells += `<i class="gt e"></i>`;
-    h += `<div class="gr">${cells}</div>`;
+document.addEventListener("pointermove", e => {
+  if (!isSwiping || tab !== "games") return;
+  const idx = getLetterUnderPointer(e);
+  if (idx !== -1) {
+    if (sel.length >= 2 && sel[sel.length - 2] === idx) {
+      sel.pop();
+    } else if (!sel.includes(idx)) {
+      sel.push(idx);
+    }
+    updateDirectDom();
   }
-  return `<div class="gbd${won ? " won" : ""}">${h}${g.done === 2 && !won ? `<div class="gans">${g.t[b]}</div>` : ""}</div>`;
+});
+
+document.addEventListener("pointerup", () => {
+  if (!isSwiping || tab !== "games") return;
+  isSwiping = false;
+  const lv = curLevel();
+  const word = sel.map(i => lv.order[i]).join("");
+  sel = [];
+  updateDirectDom();
+  if (word) {
+    submitWord(word);
+    ui.render();
+  }
+});
+
+document.addEventListener("pointercancel", () => {
+  if (!isSwiping) return;
+  isSwiping = false;
+  sel = [];
+  updateDirectDom();
+});
+
+// Keyboard support
+addEventListener("keydown", e => {
+  if (tab !== "games" || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  const lv = curLevel();
+  if (e.key === " ") {
+    e.preventDefault();
+    gamesAct("gshuf", {});
+    ui.render();
+    return;
+  }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const word = sel.map(i => lv.order[i]).join("");
+    sel = [];
+    updateDirectDom();
+    if (word) {
+      submitWord(word);
+      ui.render();
+    }
+    return;
+  }
+  if (e.key === "Backspace") {
+    e.preventDefault();
+    if (sel.length) sel.pop();
+    updateDirectDom();
+    return;
+  }
+  if (/^[a-z]$/i.test(e.key)) {
+    const ch = e.key.toUpperCase();
+    const available = [];
+    lv.order.forEach((letter, idx) => {
+      if (letter === ch && !sel.includes(idx)) available.push(idx);
+    });
+    if (available.length) {
+      e.preventDefault();
+      sel.push(available[0]);
+      updateDirectDom();
+    }
+  }
+});
+
+function gamesAct(act, data) {
+  const lv = curLevel();
+  const def = getLevelDef(store.lvl);
+
+  if (act === "gshuf") {
+    const letters = [...lv.order];
+    for (let i = letters.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [letters[i], letters[j]] = [letters[j], letters[i]];
+    }
+    lv.order = letters;
+    save();
+  } else if (act === "ghint") {
+    if (lv.done) return;
+    if (store.coins < HINT_COST) return toast(`Need ${HINT_COST} 🪙 for a hint!`);
+    
+    // Locate unrevealed letters in target words
+    const unrevealed = [];
+    def.target_words.forEach(t => {
+      if (!lv.found.includes(t.word)) {
+        for (let i = 0; i < t.word.length; i++) {
+          const r = t.direction === "horizontal" ? t.start[0] : t.start[0] + i;
+          const c = t.direction === "horizontal" ? t.start[1] + i : t.start[1];
+          const k = `${r},${c}`;
+          if (!lv.hints[k]) unrevealed.push({ k, char: t.word[i] });
+        }
+      }
+    });
+
+    if (!unrevealed.length) return toast("All remaining letters are visible!");
+    const pick = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+    lv.hints[pick.k] = pick.char;
+    store.coins -= HINT_COST;
+    save();
+    toast(`Hint revealed! -${HINT_COST} 🪙`);
+  } else if (act === "gnext") {
+    store.lvl++;
+    store.lv = initLevelState(store.lvl);
+    save();
+  }
 }
-function keyHtml(g, st, k, wide) { // one key; each board gets its own coloured corner (4 boards: quarters, 8 boards: eighths)
-  const q = g.t.map((_, b) => `<s class="${st[k] ? CLS[st[k][b] - 1] || "" : ""}"></s>`).join("");
-  return `<button class="gk${wide ? " w" : ""}" data-act="gk" data-k="${k}" aria-label="${k}"><span class="q q${g.t.length}">${wide ? "" : q}</span><b>${k === "enter" ? "enter" : k === "del" ? "⌫" : k}</b></button>`;
+
+// ---------- DOM Generation ----------
+function gridHtml(def, lv) {
+  let maxR = 0, maxC = 0;
+  const gridCells = {};
+
+  def.target_words.forEach(t => {
+    const isFound = lv.found.includes(t.word);
+    for (let i = 0; i < t.word.length; i++) {
+      const r = t.direction === "horizontal" ? t.start[0] : t.start[0] + i;
+      const c = t.direction === "horizontal" ? t.start[1] + i : t.start[1];
+      if (r > maxR) maxR = r;
+      if (c > maxC) maxC = c;
+      const k = `${r},${c}`;
+      if (!gridCells[k]) {
+        gridCells[k] = { char: t.word[i], revealed: isFound || !!lv.hints[k] };
+      } else if (isFound || lv.hints[k]) {
+        gridCells[k].revealed = true;
+      }
+    }
+  });
+
+  const rows = maxR + 1;
+  const cols = maxC + 1;
+
+  let h = "";
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const item = gridCells[`${r},${c}`];
+      if (item) {
+        h += `<div class="wcell act${item.revealed ? " rev" : ""}"><span>${item.revealed ? item.char : ""}</span></div>`;
+      } else {
+        h += `<div class="wcell emp"></div>`;
+      }
+    }
+  }
+
+  return `<div class="wgrid" style="--rows:${rows}; --cols:${cols};">${h}</div>`;
 }
+
+function wheelHtml(lv) {
+  const letters = lv.order;
+  const n = letters.length;
+  const radius = 68; // wheel radius in px
+  const center = 96;
+
+  let lets = "";
+  letters.forEach((ch, i) => {
+    const theta = (2 * Math.PI / n) * i - Math.PI / 2;
+    const x = Math.round(center + radius * Math.cos(theta));
+    const y = Math.round(center + radius * Math.sin(theta));
+    const isSelected = sel.includes(i);
+    lets += `<div class="wlet${isSelected ? " sel" : ""}" style="left:${x}px; top:${y}px;">${ch}</div>`;
+  });
+
+  return `<div class="wwheel">
+    <svg class="wline"><polyline points="" /></svg>
+    ${lets}
+  </div>`;
+}
+
 function gamesMain() {
-  const g = cur(), n = g.t.length, max = MAX[n], st = {};
-  g.t.forEach((_, b) => rowsOf(g, b).forEach(w => { const sc = score(w, g.t[b]); [...w].forEach((ch, i) => { const a = st[ch] || (st[ch] = Array(n).fill(0)); a[b] = Math.max(a[b], sc[i] + 1); }); }));
-  const s = (store.s || {})[n] || [0, 0], left = max - g.g.length, open = g.t.filter((_, b) => !solved(g, b)).length;
-  const msg = g.done === 1 ? `Solved in ${g.g.length} of ${max}! 🎉` : g.done === 2 ? `Out of guesses. ${open} word${open > 1 ? "s" : ""} missed, shown under the boards.` : `${left} guess${left > 1 ? "es" : ""} left · ${open} word${open > 1 ? "s" : ""} to find`;
-  return `<h2>${NAME[n]}<button class="chip${n === 4 ? " pri" : ""}" data-act="gmode" data-id="4">4 boards</button><button class="chip${n === 8 ? " pri" : ""}" data-act="gmode" data-id="8">8 boards</button></h2>
-  <div class="gm"><div class="gboards${n === 8 ? " o" : ""}">${g.t.map((_, b) => boardHtml(g, b, max)).join("")}</div>
-  <p class="hint">${msg} · won ${s[1]} of ${s[0]}</p>
-  <div class="gkb">${ROWS.map((r, i) => `<div class="gkr">${i === 2 ? keyHtml(g, st, "enter", 1) : ""}${[...r].map(k => keyHtml(g, st, k)).join("")}${i === 2 ? keyHtml(g, st, "del", 1) : ""}</div>`).join("")}</div>
-  <button class="btn${g.done ? "" : " ghost"}" data-act="gnew">${g.done ? "play again" : "new game"}</button></div>`;
+  const lv = curLevel();
+  const def = getLevelDef(store.lvl);
+
+  return `<h2>Wordscapes<span class="wbar">🪙 ${store.coins}</span></h2>
+  <div class="gm">
+    <div class="wtop">
+      <span class="chip">Level ${store.lvl}</span>
+      <span class="chip ghost">${def.tier}</span>
+    </div>
+    
+    <div class="wgrid-wrap">
+      ${gridHtml(def, lv)}
+    </div>
+
+    <div class="wpre"></div>
+
+    <div class="wplay">
+      <button class="wbtn" data-act="gshuf" aria-label="Shuffle Letters">🔀</button>
+      ${wheelHtml(lv)}
+      <button class="wbtn" data-act="ghint" aria-label="Hint">💡<small>${HINT_COST}</small></button>
+    </div>
+
+    ${lv.done ? `
+      <div class="wdone card">
+        <h3>Level Complete! 🎉</h3>
+        <p class="hint">Awesome job solving all target words!</p>
+        <button class="btn" data-act="gnext">Next Level ➔</button>
+      </div>
+    ` : ""}
+  </div>`;
 }
 
 export { gamesAct, gamesMain };

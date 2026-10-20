@@ -846,40 +846,30 @@ html[data-dark="1"] .bside{box-shadow:var(--sh-s)}
 /* ===== phone performance: the endless background drift and the halo stay still on touch devices ===== */
 @media (hover:none){body::before,body::after,.dial.idle::after{animation:none}}
 
-/* games tab (games.js): quordle 4 boards / octordle 8 boards. Tile + key states: m = miss, n = near, h = hit, t = typed, e = empty */
-.gm{display:flex;flex-direction:column;gap:10px}
-.gboards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.gboards.o{grid-template-columns:repeat(4,1fr);gap:6px}
-.gbd{container-type:inline-size;position:relative;background:var(--card);border:1px solid var(--edge);border-radius:var(--r2);padding:6px;box-shadow:var(--sh-s);display:flex;flex-direction:column;gap:3px}
-.gbd.won{box-shadow:0 0 0 1px var(--live),var(--sh-s)}
-.gbd.won .gr{opacity:.9}
-.gr{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
-.gt{display:grid;place-items:center;aspect-ratio:1;border-radius:6px;font-style:normal;font-family:var(--hf);font-weight:600;text-transform:uppercase;line-height:1;font-size:.7rem;font-size:9cqw;color:var(--ink);background:color-mix(in srgb,var(--ink) 7%,var(--card));border:1px solid var(--hair)}
-.gt.e{background:color-mix(in srgb,var(--tint) 60%,var(--card))}
-.gt.t{border-color:var(--main);box-shadow:inset 0 0 0 1px var(--main)}
-.gt.m{background:color-mix(in srgb,var(--ink) 18%,var(--card));border-color:transparent;color:color-mix(in srgb,var(--ink) 70%,var(--card))}
-.gt.n{background:color-mix(in srgb,#ffc94d 88%,var(--card));border-color:transparent;color:#4a3300}
-.gt.h{background:var(--live);border-color:transparent;color:#fff}
-.gboards.o .gbd{padding:3px;border-radius:10px;gap:1px}
-.gboards.o .gr{gap:1px}
-.gboards.o .gt{border-radius:3px}
-.gans{text-align:center;font-family:var(--hf);font-weight:600;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--main-d);padding:2px 0 0}
-.gboards.o .gans{font-size:.6rem;letter-spacing:.02em}
-.gkb{display:flex;flex-direction:column;gap:6px;margin-top:4px}
-.gkr{display:flex;gap:4px;justify-content:center}
-.gk{position:relative;flex:1;min-width:0;height:46px;border-radius:10px;overflow:hidden;background:var(--card);border:1px solid var(--edge);box-shadow:var(--sh-s);color:var(--ink);padding:0;touch-action:manipulation;user-select:none;-webkit-user-select:none}
-.gk.w{flex:1.6}
-.gk b{position:relative;font-family:var(--hf);font-weight:600;font-size:.92rem;text-transform:uppercase}
-.gk.w b{font-size:.7rem}
-.gk:active{transform:scale(.93)}
-.gk .q{position:absolute;inset:0;display:grid}
-.gk .q4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
-.gk .q8{grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr}
-.gk .q s{display:block;text-decoration:none}
-.gk .q s.m{background:color-mix(in srgb,var(--ink) 22%,var(--card))}
-.gk .q s.n{background:color-mix(in srgb,#ffc94d 90%,var(--card))}
-.gk .q s.h{background:var(--live)}
-@media (max-width:400px){nav button span{font-size:.62rem;white-space:nowrap}.gkr{gap:3px}}
+/* ===== Wordscapes UI ===== */
+.wbar{margin-left:auto;font-family:var(--hf);font-size:1.05rem;color:var(--main-d);background:var(--tint);padding:4px 12px;border-radius:999px;border:1px solid var(--edge)}
+.wtop{display:flex;gap:8px;justify-content:center;margin-bottom:6px}
+.wtop .chip.ghost{background:none;border-color:var(--edge)}
+.wgrid-wrap{display:flex;justify-content:center;align-items:center;min-height:180px;max-height:36vh;overflow:hidden;padding:12px;border-radius:var(--r);background:radial-gradient(ellipse at 50% 50%,var(--tint) 0%,var(--card) 90%);border:1px solid var(--edge);box-shadow:var(--sh-s)}
+.wgrid{display:grid;grid-template-rows:repeat(var(--rows),1fr);grid-template-columns:repeat(var(--cols),1fr);gap:4px;width:100%;max-width:320px;aspect-ratio:var(--cols)/var(--rows)}
+.wcell{position:relative;border-radius:8px;aspect-ratio:1;display:grid;place-items:center}
+.wcell.emp{visibility:hidden}
+.wcell.act{background:var(--card);border:1.5px solid var(--edge);box-shadow:var(--sh-s)}
+.wcell.rev{background:var(--main);border-color:var(--main-d);color:#fff}
+.wcell span{font-family:var(--hf);font-size:clamp(0.8rem,4cqw,1.25rem);font-weight:700;line-height:1;text-transform:uppercase}
+.wpre{height:28px;line-height:28px;text-align:center;font-family:var(--hf);font-size:1.35rem;font-weight:700;letter-spacing:2px;color:var(--main-d);margin:4px 0}
+.wplay{position:relative;display:flex;justify-content:center;align-items:center;gap:18px;margin:2px 0 10px}
+.wwheel{touch-action:none;user-select:none;-webkit-user-select:none;position:relative;width:192px;height:192px;border-radius:50%;background:color-mix(in srgb,var(--card) 85%,transparent);border:2px solid var(--edge);box-shadow:var(--sh)}
+.wline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.wline polyline{fill:none;stroke:var(--main-d);stroke-width:6;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
+.wlet{position:absolute;width:44px;height:44px;margin-left:-22px;margin-top:-22px;border-radius:50%;background:var(--card);border:1.5px solid var(--edge);box-shadow:var(--sh-s);font-family:var(--hf);font-size:1.3rem;font-weight:700;color:var(--ink);display:grid;place-items:center;z-index:3;transition:transform .12s,background .12s}
+.wlet.sel{background:var(--main);color:#fff;border-color:var(--main-d);transform:scale(1.15)}
+.wbtn{width:46px;height:46px;border-radius:50%;background:var(--card);border:1px solid var(--edge);box-shadow:var(--sh-s);font-size:1.25rem;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink)}
+.wbtn small{font-size:.65rem;font-family:var(--hf);font-weight:700;color:var(--main-d);line-height:1}
+.wbtn:active{transform:scale(.92)}
+.wdone{text-align:center;margin-top:10px;animation:pip .35s cubic-bezier(.3,1.6,.5,1)}
+.wdone h3{margin:0 0 4px;font-size:1.25rem}
+@media (max-width:400px){nav button span{font-size:.62rem;white-space:nowrap}}
 
 /* ===== cute dot cursors: colours follow the theme (strawberry is also the default) ===== */
 :root,[data-theme=strawberry]{--cur:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='%23ff8fb8' stroke='white' stroke-width='2'/%3E%3C/svg%3E") 8 8;--cur-p:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='7' fill='%23e8639a' stroke='white' stroke-width='2'/%3E%3Ccircle cx='8.8' cy='8.8' r='1.8' fill='white' fill-opacity='.75'/%3E%3C/svg%3E") 11 11;--cur-g:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='9' fill='none' stroke='white' stroke-width='5'/%3E%3Ccircle cx='13' cy='13' r='9' fill='none' stroke='%23e8639a' stroke-width='2.5'/%3E%3Ccircle cx='13' cy='13' r='3' fill='%23e8639a' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E") 13 13;--cur-gg:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='8' fill='%23e8639a' stroke='white' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='2.5' fill='white'/%3E%3C/svg%3E") 13 13}
