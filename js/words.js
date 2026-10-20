@@ -34,10 +34,10 @@ export const LEVELS = [
   {
     "level_id": 4,
     "tier": "3-Letter Starter",
-    "wheel_letters": ["E", "P", "N"],
+    "wheel_letters": ["N", "E", "T"],
     "target_words": [
-      { "word": "PEN", "start": [0, 0], "direction": "horizontal" },
-      { "word": "PIN", "start": [0, 0], "direction": "vertical" }
+      { "word": "NET", "start": [0, 0], "direction": "horizontal" },
+      { "word": "TEN", "start": [0, 2], "direction": "vertical" }
     ],
     "bonus_words": []
   },
