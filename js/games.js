@@ -369,8 +369,8 @@ function gridHtml(def, lv) {
 function wheelHtml(lv) {
   const letters = lv.order;
   const n = letters.length;
-  const radius = 68;
-  const center = 96;
+  const center = 86; // Exactly half of 172px
+  const radius = 54; // Gives 13px padding between tile outer edge and wheel border
 
   let lets = "";
   letters.forEach((ch, i) => {
