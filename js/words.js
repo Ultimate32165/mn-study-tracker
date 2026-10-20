@@ -48,8 +48,8 @@ export const LEVELS = [
     "target_words": [
       { "word": "BARE", "start": [0, 0], "direction": "horizontal" },
       { "word": "BEAR", "start": [0, 0], "direction": "vertical" },
-      { "word": "EAR", "start": [1, 0], "direction": "horizontal" },
-      { "word": "BAR", "start": [0, 0], "direction": "horizontal" }
+      { "word": "EAR",  "start": [1, 1], "direction": "vertical" },
+      { "word": "BAR",  "start": [3, 0], "direction": "horizontal" }
     ],
     "bonus_words": ["ERA", "ARE"]
   },
