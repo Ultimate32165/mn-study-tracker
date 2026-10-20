@@ -846,6 +846,41 @@ html[data-dark="1"] .bside{box-shadow:var(--sh-s)}
 /* ===== phone performance: the endless background drift and the halo stay still on touch devices ===== */
 @media (hover:none){body::before,body::after,.dial.idle::after{animation:none}}
 
+/* games tab (games.js): quordle 4 boards / octordle 8 boards. Tile + key states: m = miss, n = near, h = hit, t = typed, e = empty */
+.gm{display:flex;flex-direction:column;gap:10px}
+.gboards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.gboards.o{grid-template-columns:repeat(4,1fr);gap:6px}
+.gbd{container-type:inline-size;position:relative;background:var(--card);border:1px solid var(--edge);border-radius:var(--r2);padding:6px;box-shadow:var(--sh-s);display:flex;flex-direction:column;gap:3px}
+.gbd.won{box-shadow:0 0 0 1px var(--live),var(--sh-s)}
+.gbd.won .gr{opacity:.9}
+.gr{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
+.gt{display:grid;place-items:center;aspect-ratio:1;border-radius:6px;font-style:normal;font-family:var(--hf);font-weight:600;text-transform:uppercase;line-height:1;font-size:.7rem;font-size:9cqw;color:var(--ink);background:color-mix(in srgb,var(--ink) 7%,var(--card));border:1px solid var(--hair)}
+.gt.e{background:color-mix(in srgb,var(--tint) 60%,var(--card))}
+.gt.t{border-color:var(--main);box-shadow:inset 0 0 0 1px var(--main)}
+.gt.m{background:color-mix(in srgb,var(--ink) 18%,var(--card));border-color:transparent;color:color-mix(in srgb,var(--ink) 70%,var(--card))}
+.gt.n{background:color-mix(in srgb,#ffc94d 88%,var(--card));border-color:transparent;color:#4a3300}
+.gt.h{background:var(--live);border-color:transparent;color:#fff}
+.gboards.o .gbd{padding:3px;border-radius:10px;gap:1px}
+.gboards.o .gr{gap:1px}
+.gboards.o .gt{border-radius:3px}
+.gans{text-align:center;font-family:var(--hf);font-weight:600;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--main-d);padding:2px 0 0}
+.gboards.o .gans{font-size:.6rem;letter-spacing:.02em}
+.gkb{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.gkr{display:flex;gap:4px;justify-content:center}
+.gk{position:relative;flex:1;min-width:0;height:46px;border-radius:10px;overflow:hidden;background:var(--card);border:1px solid var(--edge);box-shadow:var(--sh-s);color:var(--ink);padding:0;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.gk.w{flex:1.6}
+.gk b{position:relative;font-family:var(--hf);font-weight:600;font-size:.92rem;text-transform:uppercase}
+.gk.w b{font-size:.7rem}
+.gk:active{transform:scale(.93)}
+.gk .q{position:absolute;inset:0;display:grid}
+.gk .q4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.gk .q8{grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr}
+.gk .q s{display:block;text-decoration:none}
+.gk .q s.m{background:color-mix(in srgb,var(--ink) 22%,var(--card))}
+.gk .q s.n{background:color-mix(in srgb,#ffc94d 90%,var(--card))}
+.gk .q s.h{background:var(--live)}
+@media (max-width:400px){nav button span{font-size:.62rem;white-space:nowrap}.gkr{gap:3px}}
+
 /* ===== cute dot cursors: colours follow the theme (strawberry is also the default) ===== */
 :root,[data-theme=strawberry]{--cur:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='%23ff8fb8' stroke='white' stroke-width='2'/%3E%3C/svg%3E") 8 8;--cur-p:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='7' fill='%23e8639a' stroke='white' stroke-width='2'/%3E%3Ccircle cx='8.8' cy='8.8' r='1.8' fill='white' fill-opacity='.75'/%3E%3C/svg%3E") 11 11;--cur-g:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='9' fill='none' stroke='white' stroke-width='5'/%3E%3Ccircle cx='13' cy='13' r='9' fill='none' stroke='%23e8639a' stroke-width='2.5'/%3E%3Ccircle cx='13' cy='13' r='3' fill='%23e8639a' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E") 13 13;--cur-gg:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='8' fill='%23e8639a' stroke='white' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='2.5' fill='white'/%3E%3C/svg%3E") 13 13}
 [data-theme=matcha]{--cur:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='%237fcf8f' stroke='white' stroke-width='2'/%3E%3C/svg%3E") 8 8;--cur-p:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='7' fill='%2355a866' stroke='white' stroke-width='2'/%3E%3Ccircle cx='8.8' cy='8.8' r='1.8' fill='white' fill-opacity='.75'/%3E%3C/svg%3E") 11 11;--cur-g:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='9' fill='none' stroke='white' stroke-width='5'/%3E%3Ccircle cx='13' cy='13' r='9' fill='none' stroke='%2355a866' stroke-width='2.5'/%3E%3Ccircle cx='13' cy='13' r='3' fill='%2355a866' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E") 13 13;--cur-gg:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='8' fill='%2355a866' stroke='white' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='2.5' fill='white'/%3E%3C/svg%3E") 13 13}

@@ -3,6 +3,7 @@ import { boardBusy, boardDraft, boardKeep, boardMain, boardRestore, boardSheet, 
 import * as DB from "./db.js";
 import { SIGNUP_CODE } from "./firebase-config.js";
 import { forestAct, forestMain } from "./forest.js";
+import { gamesAct, gamesMain } from "./games.js";
 import { delSel, enterEdit, exitEdit, gardenPanel, resetSeedBase, seedsLeft, shopSheet } from "./decor.js";
 import { clearGarden, findPet, gardenMain, gardenSheet, gardenTap, mountGarden, nameSheet, syncGarden, treat, trick } from "./garden.js";
 import { collectVisitor, cycleWx, queueVisit, resetVisits } from "./garden-fx.js";
@@ -22,7 +23,7 @@ let unsubs = [], lastCheer = 0, lastHtml = "";
 
 
 // ---------- the page ----------
-const NAV = [["home", "🏠", "together"], ["stats", "📊", "my stats"], ["garden", "🌳", "garden"], ["forest", "🌲", "forest"], ["board", "📝", "board"]]; // bottom tab bar: [tab id, icon, label]
+const NAV = [["home", "🏠", "together"], ["stats", "📊", "my stats"], ["garden", "🌳", "garden"], ["forest", "🌲", "forest"], ["board", "📝", "board"], ["games", "🎮", "games"]]; // bottom tab bar: [tab id, icon, label]
 const TITLES = Object.fromEntries(NAV.map(([id, , name]) => [id, name])); // big page title = tab name
 const hello = () => { const h = new Date().getHours(); return h < 5 ? "still up" : h < 12 ? "good morning" : h < 18 ? "good afternoon" : "good evening"; };
 function render() {
@@ -37,7 +38,7 @@ function render() {
   }
   const kept = tab === "board" ? boardKeep() : null;
   const html = `<header><div class="ht"><small>${hello()}, ${esc(mine.name)}</small><h1>${TITLES[tab] || "together"}</h1></div><div class="hr"><button class="av" data-act="profile" aria-label="profile and settings">${esc(mine.emoji)}</button></div></header>
-  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "board" ? boardMain(board) : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine), isEvening() || /night|cocoa|berry|forest|deepsea|ink|galaxy/.test(document.documentElement.dataset.theme || "")) : statsView(mine)}</main>
+  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "board" ? boardMain(board) : tab === "games" ? gamesMain() : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine), isEvening() || /night|cocoa|berry|forest|deepsea|ink|galaxy/.test(document.documentElement.dataset.theme || "")) : statsView(mine)}</main>
   <nav>${NAV.map(([id, ic, name]) => `<button class="${tab === id ? "act" : ""}" data-act="tab" data-id="${id}" aria-label="${name}"><i>${ic}</i><span>${name}</span></button>`).join("")}</nav>`;
   if (html !== lastHtml) { // only touch the page when something you can see changed (keeps scrolling smooth, doesn't restart animations or re-decode images)
     lastHtml = html; app.innerHTML = html;
@@ -101,6 +102,7 @@ app.onclick = async e => {
     else if (a === "badd") addBoardNote(mine);
     else if (a === "bclear") { const ids = board.filter(n => n.lane === 2).map(n => n.id); if (ids.length && confirm(`Clear ${ids.length} finished note${ids.length > 1 ? "s" : ""}?`)) await DB.clearNotes(ids); }
     else if (a === "fcell") forestAct(+id, { u: mine, total: totalOf(mine), left: seedsLeft(mine), modal, toast, err: errMsg, fmt, burst, save: t => DB.saveForest(me.uid, t) });
+    else if (a === "gk" || a === "gnew" || a === "gmode") { gamesAct(a, b.dataset); render(); }
     else if (a === "gedit") enterEdit(mine);
     else if (a === "gdone") await exitEdit(true);
     else if (a === "gcancel") await exitEdit(false);
