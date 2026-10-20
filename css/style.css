@@ -858,8 +858,8 @@ background:color-mix(in srgb,var(--main) 24%,var(--card));
 border:1px solid color-mix(in srgb,var(--main-d) 35%,transparent);
 box-shadow:0 2px 0 color-mix(in srgb,var(--main-d) 50%,transparent),inset 0 1px 0 rgba(255,255,255,.35)}
 .wcell.x{visibility:hidden}
-.wcell.on{background:var(--main);border-color:transparent;color:#fff}
-.wcell.hnt{background:color-mix(in srgb,var(--alt) 50%,var(--card));border-color:transparent}
+.wcell.on{background:var(--main-d);border-color:transparent;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.wcell.hnt{background:color-mix(in srgb,var(--alt) 70%,var(--card));border-color:transparent;color:var(--ink);text-shadow:none}
 .wpre{min-height:2.3rem;min-width:2.3rem;padding:0 18px;display:flex;align-items:center;justify-content:center;border-radius:999px;font-family:var(--hf);font-weight:600;font-size:1.15rem;letter-spacing:.12em;text-transform:uppercase;color:#fff}
 .wpre.has{background:var(--main-d)}
 .wwheel{position:relative;width:min(100%,270px);aspect-ratio:1;container-type:inline-size;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
