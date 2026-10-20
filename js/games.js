@@ -1,4 +1,4 @@
-// GAMES TAB: Wordscapes with Level Selector & Progress tracking
+// GAMES TAB: Wordscapes with Level Selector & Local Progress
 import { LEVELS } from "./words.js";
 import { tab, ui } from "./state.js";
 import { burst, ls, modal, toast } from "./util.js";
@@ -12,7 +12,7 @@ function loadStore() {
   try {
     const raw = JSON.parse(ls("games") || "{}");
     if (raw.v === 2 && typeof raw.lvl === "number") {
-      if (!raw.maxLvl) raw.maxLvl = raw.lvl; // track highest unlocked level
+      if (!raw.maxLvl) raw.maxLvl = raw.lvl;
       return raw;
     }
   } catch {}
@@ -116,7 +116,6 @@ function submitWord(word) {
       lv.found.push(word);
       if (lv.found.length === def.target_words.length) {
         lv.done = true;
-        // Only grant completion coins if finishing for the first time
         if (store.lvl >= store.maxLvl) {
           store.coins += LEVEL_COMPLETE_COIN;
           store.maxLvl = Math.max(store.maxLvl, store.lvl + 1);
@@ -194,7 +193,7 @@ document.addEventListener("pointercancel", () => {
   updateDirectDom();
 });
 
-// Keyboard
+// Real keyboard support
 addEventListener("keydown", e => {
   if (tab !== "games" || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
   const lv = curLevel();
@@ -235,7 +234,7 @@ addEventListener("keydown", e => {
   }
 });
 
-// Pop-up Sheet for Level Selection
+// Self-contained modal for browsing & selecting levels
 function levelsSheet() {
   const max = store.maxLvl || 1;
   const list = LEVELS.map(l => {
@@ -244,21 +243,45 @@ function levelsSheet() {
     const isCurrent = num === store.lvl;
     const isCompleted = num < max;
 
-    return `<button class="wlvl-btn${isCurrent ? " curr" : ""}${isCompleted ? " done" : ""}${!isUnlocked ? " lock" : ""}" 
-      data-act="${isUnlocked ? "gpick" : "glock"}" data-lvl="${num}">
+    return `<button class="wlvl-btn${isCurrent ? " curr" : ""}${isCompleted ? " done" : ""}${!isUnlocked ? " lock" : ""}" data-lvl="${num}">
       <b>${num}</b>
       <small>${!isUnlocked ? "🔒" : isCompleted ? "✓" : "▶"}</small>
     </button>`;
   }).join("");
 
-  modal.innerHTML = `<div class="back" data-act="mclose">
-  <div class="sheet" onclick="event.stopPropagation()">
-    <h3>Select Level</h3>
-    <p class="hint">Replay finished levels anytime or resume progress</p>
-    <div class="wlvl-grid">${list}</div>
-    <button class="btn ghost" data-act="mclose">Close</button>
-  </div>
-</div>`;
+  modal.innerHTML = `<div class="back" id="wlvl-back">
+    <div class="sheet">
+      <h3>Select Level</h3>
+      <p class="hint">Replay finished levels anytime or resume progress</p>
+      <div class="wlvl-grid">${list}</div>
+      <button class="btn ghost" id="wlvl-close">Close</button>
+    </div>
+  </div>`;
+
+  const back = document.getElementById("wlvl-back");
+  const closeBtn = document.getElementById("wlvl-close");
+  const close = () => { modal.innerHTML = ""; };
+
+  if (back) back.onclick = e => { if (e.target === back) close(); };
+  if (closeBtn) closeBtn.onclick = close;
+
+  const grid = modal.querySelector(".wlvl-grid");
+  if (grid) {
+    grid.onclick = e => {
+      const btn = e.target.closest(".wlvl-btn");
+      if (!btn) return;
+      const num = +btn.dataset.lvl;
+      if (num <= max) {
+        store.lvl = num;
+        store.lv = initLevelState(store.lvl);
+        save();
+        close();
+        ui.render();
+      } else {
+        toast(`Level ${num} is locked! 🔒`);
+      }
+    };
+  }
 }
 
 function gamesAct(act, data) {
@@ -297,16 +320,6 @@ function gamesAct(act, data) {
     toast(`Hint revealed! -${HINT_COST} 🪙`);
   } else if (act === "glvls") {
     levelsSheet();
-  } else if (act === "gpick") {
-    const targetLvl = +data.lvl;
-    if (targetLvl && targetLvl <= store.maxLvl) {
-      store.lvl = targetLvl;
-      store.lv = initLevelState(store.lvl);
-      save();
-      modal.innerHTML = "";
-    }
-  } else if (act === "glock") {
-    toast(`Level ${data.lvl} is locked! Complete previous levels first 🔒`);
   } else if (act === "gnext") {
     store.lvl++;
     if (store.lvl > store.maxLvl) store.maxLvl = store.lvl;
