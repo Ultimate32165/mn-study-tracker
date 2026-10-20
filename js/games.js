@@ -251,12 +251,14 @@ function levelsSheet() {
     </button>`;
   }).join("");
 
-  modal(`<div class="sheet">
+  modal.innerHTML = `<div class="back" data-act="mclose">
+  <div class="sheet" onclick="event.stopPropagation()">
     <h3>Select Level</h3>
     <p class="hint">Replay finished levels anytime or resume progress</p>
     <div class="wlvl-grid">${list}</div>
     <button class="btn ghost" data-act="mclose">Close</button>
-  </div>`);
+  </div>
+</div>`;
 }
 
 function gamesAct(act, data) {
@@ -301,7 +303,7 @@ function gamesAct(act, data) {
       store.lvl = targetLvl;
       store.lv = initLevelState(store.lvl);
       save();
-      modal(""); // close sheet
+      modal.innerHTML = "";
     }
   } else if (act === "glock") {
     toast(`Level ${data.lvl} is locked! Complete previous levels first 🔒`);
