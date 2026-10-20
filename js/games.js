@@ -41,7 +41,12 @@ function initLevelState(lvlNum) {
 }
 
 function curLevel() {
-  if (!store.lv || store.lv.lvlNum !== store.lvl) {
+  const def = getLevelDef(store.lvl);
+  const isMismatch = !store.lv || 
+    store.lv.lvlNum !== store.lvl || 
+    store.lv.order.slice().sort().join("") !== def.wheel_letters.slice().sort().join("");
+
+  if (isMismatch) {
     store.lv = initLevelState(store.lvl);
     save();
   }
