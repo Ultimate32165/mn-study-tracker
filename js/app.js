@@ -3,7 +3,8 @@ import { boardBusy, boardDraft, boardKeep, boardMain, boardRestore, boardSheet, 
 import * as DB from "./db.js";
 import { SIGNUP_CODE } from "./firebase-config.js";
 import { forestAct, forestMain } from "./forest.js";
-import { gamesAct, gamesMain } from "./games.js";
+import { gamesAct } from "./games.js";
+import { duelAct, duelInit, gamesHub, onMatches, resetDuel } from "./duel.js";
 import { delSel, enterEdit, exitEdit, gardenPanel, resetSeedBase, seedsLeft, shopSheet } from "./decor.js";
 import { clearGarden, findPet, gardenMain, gardenSheet, gardenTap, mountGarden, nameSheet, syncGarden, treat, trick } from "./garden.js";
 import { collectVisitor, cycleWx, queueVisit, resetVisits } from "./garden-fx.js";
@@ -38,7 +39,7 @@ function render() {
   }
   const kept = tab === "board" ? boardKeep() : null;
   const html = `<header><div class="ht"><small>${hello()}, ${esc(mine.name)}</small><h1>${TITLES[tab] || "together"}</h1></div><div class="hr"><button class="av" data-act="profile" aria-label="profile and settings">${esc(mine.emoji)}</button></div></header>
-  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "board" ? boardMain(board) : tab === "games" ? gamesMain() : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine), isEvening() || /night|cocoa|berry|forest|deepsea|ink|galaxy/.test(document.documentElement.dataset.theme || "")) : statsView(mine)}</main>
+  <main>${tab === "home" ? homeView(mine) : tab === "garden" ? gardenMain() : tab === "board" ? boardMain(board) : tab === "games" ? gamesHub() : tab === "forest" ? forestMain(mine, seedsLeft(mine), totalOf(mine), isEvening() || /night|cocoa|berry|forest|deepsea|ink|galaxy/.test(document.documentElement.dataset.theme || "")) : statsView(mine)}</main>
   <nav>${NAV.map(([id, ic, name]) => `<button class="${tab === id ? "act" : ""}" data-act="tab" data-id="${id}" aria-label="${name}"><i>${ic}</i><span>${name}</span></button>`).join("")}</nav>`;
   if (html !== lastHtml) { // only touch the page when something you can see changed (keeps scrolling smooth, doesn't restart animations or re-decode images)
     lastHtml = html; app.innerHTML = html;
@@ -58,6 +59,7 @@ function softRender() {
   if (!softRaf) softRaf = requestAnimationFrame(() => { softRaf = 0; render(); });
 }
 ui.render = softRender; // let the other files ask for a redraw (button handlers below call render() directly, so they stay instant)
+duelInit(() => { if (tab === "games") render(); }); // Pebble Pass draws each move instantly
 
 // ---- shared to-do board (js/board.js) ----
 async function addBoardNote(mine) {
@@ -103,6 +105,7 @@ app.onclick = async e => {
     else if (a === "bclear") { const ids = board.filter(n => n.lane === 2).map(n => n.id); if (ids.length && confirm(`Clear ${ids.length} finished note${ids.length > 1 ? "s" : ""}?`)) await DB.clearNotes(ids); }
     else if (a === "fcell") forestAct(+id, { u: mine, total: totalOf(mine), left: seedsLeft(mine), modal, toast, err: errMsg, fmt, burst, save: t => DB.saveForest(me.uid, t) });
     else if (a === "gshuf" || a === "ghint" || a === "gnext") { gamesAct(a); render(); }
+    else if (a === "dl") { await duelAct(id, b); render(); } // games menu + Pebble Pass buttons (js/duel.js)
     else if (a === "gedit") enterEdit(mine);
     else if (a === "gdone") await exitEdit(true);
     else if (a === "gcancel") await exitEdit(false);
@@ -140,12 +143,12 @@ app.onclick = async e => {
 
 // ---------- boot ----------
 DB.watchAuth(u => {
-  unsubs.forEach(f => f()); unsubs = []; resetData(u); giftKnown.clear(); clearGarden(); resetSeedBase(); resetVisits();
+  unsubs.forEach(f => f()); unsubs = []; resetData(u); giftKnown.clear(); clearGarden(); resetSeedBase(); resetVisits(); resetDuel();
   if (u) unsubs = [DB.watchUsers(x => { setUsers(x); softRender(); }), DB.watchBoard(x => { setBoard(x); softRender(); }), DB.watchSessions(u.uid, x => { setSessions(x); softRender(); }),
     DB.watchCheers(u.uid, list => {
       cheerCard(list); list.forEach(c => queueVisit(c.from)); burst(list.map(c => short(c.emoji) ? c.emoji : "💌"), 24);
       notify(`${list[0].name || "Your friend"} sent you a cheer!`, list.map(c => c.emoji).join("  "));
-    }), DB.watchGifts(u.uid, onGifts)];
+    }), DB.watchGifts(u.uid, onGifts), DB.watchMatches(onMatches)];
   render();
 });
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); setInstallEvt(e); render(); });

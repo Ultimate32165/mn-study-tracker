@@ -7,6 +7,67 @@ service cloud.firestore {
       match /sessions/{sid} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
+      // anyone signed in can send a cheer/sticker; only the owner can read/delete them
+      match /cheers/{cid} {
+        allow create: if request.auth != null && request.resource.data.from == request.auth.uid
+                      && request.resource.data.emoji is string && request.resource.data.emoji.size() <= 40;
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+      }
+      // a photocard sent from a friend (small jpeg as text). Anyone signed in can send; only the owner can read, mark as seen, or delete.
+      match /gifts/{gid} {
+        allow create: if request.auth != null && request.resource.data.from == request.auth.uid
+                      && request.resource.data.keys().hasOnly(['from', 'name', 'emoji', 'kind', 'img', 'seen', 'at'])
+                      && request.resource.data.at == request.time
+                      && request.resource.data.seen == false
+                      && request.resource.data.name is string && request.resource.data.name.size() <= 40
+                      && request.resource.data.emoji is string && request.resource.data.emoji.size() <= 40
+                      && request.resource.data.kind is string && request.resource.data.kind.size() <= 12
+                      && request.resource.data.img is string && request.resource.data.img.size() < 700000;
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+        allow update: if request.auth != null && request.auth.uid == uid
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen']);
+      }
+    }
+
+    // shared to-do board: anyone signed in can read, add (as themselves), move, edit and delete notes
+    match /board/{nid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.by == request.auth.uid
+                    && request.resource.data.text is string && request.resource.data.text.size() <= 200
+                    && request.resource.data.lane in [0, 1, 2];
+      allow update: if request.auth != null
+                    && request.resource.data.text is string && request.resource.data.text.size() <= 200
+                    && request.resource.data.lane in [0, 1, 2];
+      allow delete: if request.auth != null;
+    }
+
+    // Pebble Pass (two-player game). One doc per match, see js/db.js for the fields.
+    match /matches/{mid} {
+      function aff() { return request.resource.data.diff(resource.data).affectedKeys(); }
+      function inMatch() { return request.auth.uid == resource.data.p0 || request.auth.uid == resource.data.p1; }
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.p0 == request.auth.uid && request.resource.data.p1 == ''
+                    && request.resource.data.keys().hasOnly(['p0', 'p1', 'n0', 'n1', 'e0', 'e1', 'c0', 'c1', 's0', 's1', 't', 'mv', 'roll', 'win', 'at'])
+                    && request.resource.data.s0 == 9 && request.resource.data.s1 == 9 && request.resource.data.mv == 0 && request.resource.data.win == -1
+                    && request.resource.data.n0 is string && request.resource.data.n0.size() <= 40
+                    && request.resource.data.e0 is string && request.resource.data.e0.size() <= 40;
+      allow update: if request.auth != null && (
+        // the partner joins an open match
+        (resource.data.p1 == '' && request.resource.data.p1 == request.auth.uid && request.resource.data.p1 != resource.data.p0
+          && aff().hasOnly(['p1', 'n1', 'e1', 'c1']) && request.resource.data.n1.size() <= 40 && request.resource.data.e1.size() <= 40
+          && request.resource.data.c1 != resource.data.c0)
+        // a move: only on your own turn, one move at a time, the 18 pebbles stay 18
+        || (inMatch() && resource.data.win == -1 && resource.data.p1 != '' && request.resource.data.mv == resource.data.mv + 1
+          && request.resource.data.s0 + request.resource.data.s1 == 18 && aff().hasOnly(['s0', 's1', 't', 'roll', 'mv', 'win'])
+          && ((resource.data.t == 0 && request.auth.uid == resource.data.p0) || (resource.data.t == 1 && request.auth.uid == resource.data.p1)))
+        // play again after a game ended
+        || (inMatch() && resource.data.win != -1 && request.resource.data.win == -1 && request.resource.data.mv == 0
+          && request.resource.data.s0 == 9 && request.resource.data.s1 == 9 && aff().hasOnly(['s0', 's1', 't', 'roll', 'mv', 'win']))
+        // change your own pebble colour (the two colours must differ)
+        || (((request.auth.uid == resource.data.p0 && aff().hasOnly(['c0'])) || (request.auth.uid == resource.data.p1 && aff().hasOnly(['c1'])))
+          && request.resource.data.c0 != request.resource.data.c1)
+      );
+      allow delete: if request.auth != null && inMatch();
     }
   }
 }

@@ -29,7 +29,8 @@ js/
   carddata.js  photocard.js  card.js                     photocards
   board.js            shared to-do board tab
   forest.js           study forest tab
-  games.js  words.js  games tab (Wordscapes) + its word lists
+  games.js  words.js  Wordscapes + its word lists
+  duel.js             games menu + Pebble Pass (two-player live game)
 ```
 
 ---
@@ -326,6 +327,8 @@ Goal: a calmer, simpler, still lively look: soft shadows, hairline borders, one 
 ---
 
 ## 7. Games tab log
+
+**Pebble Pass + games menu (added later; sections below describe Wordscapes).** The games tab now opens a **menu** (Wordscapes / Pebble Pass), built by `gamesHub()` in the new `js/duel.js` (`app.js` calls it instead of `gamesMain()`; `gamesMain()` is still the Wordscapes screen, shown under a "‹ games" back button). **Pebble Pass** is a live two-player game: each player has 9 pebbles (their own colour, 8 choices) on their side, on your turn you roll the dice and pass that many (all you have left if fewer) to the partner, first to empty their own side wins; "play again" resets. Data: Firestore `matches/{id}` = `{ p0, p1 (uids, p1 "" until joined), n0, n1, e0, e1, c0, c1 (colour 0-7), s0, s1 (pebbles per side, always 18 total), t (turn), mv (moves), roll, win (-1 | 0 | 1), at }`. The player who is on turn writes the whole move in one `updateMatch`; the other phone sees it through `watchMatches` -> `onMatches` and plays dice tumble -> pebbles fly -> pebbles land (Web Animations, started after the redraw; skipped when reduce-motion is on). `app.js`: one `dl` branch in `onclick` (all menu / game buttons, handled by `duelAct`), `watchMatches(onMatches)` in the boot list, `resetDuel()` on login change, `duelInit(render)` so moves redraw instantly. `db.js`: `watchMatches`, `createMatch`, `updateMatch`, `deleteMatch`. `firestore.rules`: new `matches` block (a move is only accepted on your own turn, one move at a time, pebbles stay 18) **-> re-publish the rules in the Firebase console**. `sw.js`: `duel.js` added to list `A`, `C` is now `mn-study-v15`. CSS: "Pebble Pass" block just before the cursors. **Not tested in a browser or against real Firestore yet.**
 
 **Status: Wordscapes is built** (replaced quordle / octordle). Files changed: `js/games.js` (rewritten), `js/words.js` (new lists), `js/app.js` (one line: the games branch of `onclick` now handles `gshuf` / `ghint` / `gnext`), `css/style.css` (games block replaced), `sw.js` (`C` is now `mn-study-v14`; `games.js` / `words.js` were already in list `A`). `state.js` needed no change: `setTab` accepts any name, so `"games"` works.
 

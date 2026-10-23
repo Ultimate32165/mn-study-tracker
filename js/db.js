@@ -77,6 +77,12 @@ export const editNote = (id, text, color, icon) => updateDoc(noteRef(id), { text
 export const deleteNote = id => deleteDoc(noteRef(id));
 export async function clearNotes(ids) { const b = writeBatch(db); ids.forEach(id => b.delete(noteRef(id))); await b.commit(); }
 
+// ---- Pebble Pass (two-player game): matches/{id} = { p0, p1 (uids; p1 "" until joined), n0, n1 (names), e0, e1 (emoji), c0, c1 (colour 0-7, c1 -1 until joined), s0, s1 (pebbles on each side, always 18 together), t (whose turn 0|1), mv (moves played), roll (last dice), win (-1 none | 0 | 1), at (ms) } ----
+export const watchMatches = cb => onSnapshot(query(collection(db, "matches"), limit(30)), s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+export const createMatch = m => addDoc(collection(db, "matches"), m);
+export const updateMatch = (id, d) => updateDoc(doc(db, "matches", id), d);
+export const deleteMatch = id => deleteDoc(doc(db, "matches", id));
+
 // ---- badges ----
 export const unlockBadge = (uid, id) => updateDoc(userRef(uid), { [`badges.${id}`]: Date.now() });
 
